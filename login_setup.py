@@ -7,6 +7,7 @@ Run this script to authenticate and save a session file that the MCP server can 
 import asyncio
 import os
 import getpass
+import shutil
 from monarchmoney import MonarchMoney, RequireMFAException
 from dotenv import load_dotenv
 
@@ -44,13 +45,49 @@ async def main():
         
         # Test the connection first
         print("\nTesting connection...")
-        accounts = await mm.get_accounts()
-        if accounts:
-            account_count = len(accounts.get("accounts", []))
-            print(f"✅ Found {account_count} accounts")
-        else:
-            print("❌ No accounts data returned")
-            return
+        try:
+            accounts = await mm.get_accounts()
+            if accounts:
+                account_count = len(accounts.get("accounts", []))
+                print(f"✅ Found {account_count} accounts")
+            else:
+                print("❌ No accounts data returned")
+                return
+        except Exception as test_error:
+            print(f"❌ Connection test failed: {test_error}")
+            print("Session may be expired. Clearing old session and trying fresh login...")
+            
+            # Clear old session and try fresh login
+            if os.path.exists(".mm"):
+                import shutil
+                shutil.rmtree(".mm")
+                print("🗑️ Cleared expired session files")
+            
+            # Try fresh login
+            mm_fresh = MonarchMoney()
+            try:
+                await mm_fresh.login(email, password)
+                print("✅ Fresh login successful (no MFA required)")
+                mm = mm_fresh
+                
+                # Test connection again
+                accounts = await mm.get_accounts()
+                account_count = len(accounts.get("accounts", []))
+                print(f"✅ Found {account_count} accounts")
+                
+            except RequireMFAException:
+                print("🔐 MFA required for fresh login")
+                mfa_code = input("Two Factor Code: ")
+                
+                mm_mfa_fresh = MonarchMoney()
+                await mm_mfa_fresh.multi_factor_authenticate(email, password, mfa_code)
+                print("✅ Fresh MFA authentication successful")
+                mm = mm_mfa_fresh
+                
+                # Test connection again
+                accounts = await mm.get_accounts()
+                account_count = len(accounts.get("accounts", []))
+                print(f"✅ Found {account_count} accounts")
         
         # Try to save session for MCP server to use
         try:

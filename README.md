@@ -6,7 +6,53 @@ A Model Context Protocol (MCP) server for integrating with the Monarch Money per
 
 ### 1. Installation
 
+#### Option A: If you're Rob (already configured)
 The server is already installed in your Claude Desktop configuration. No additional installation needed!
+
+#### Option B: First-time setup for others
+
+1. **Clone this repository**:
+   ```bash
+   git clone https://github.com/robcerda/monarch-mcp-server.git
+   cd monarch-mcp-server
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   pip install -e .
+   ```
+
+3. **Configure Claude Desktop**:
+   Add this to your Claude Desktop configuration file:
+   
+   **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   
+   **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+   
+   ```json
+   {
+     "mcpServers": {
+       "Monarch Money": {
+         "command": "/opt/homebrew/bin/uv",
+         "args": [
+           "run",
+           "--with",
+           "mcp[cli]",
+           "--with-editable",
+           "/path/to/your/monarch-mcp-server",
+           "mcp",
+           "run",
+           "/path/to/your/monarch-mcp-server/src/monarch_mcp_server/server.py"
+         ]
+       }
+     }
+   }
+   ```
+   
+   **Important**: Replace `/path/to/your/monarch-mcp-server` with your actual path!
+
+4. **Restart Claude Desktop**
 
 ### 2. One-Time Authentication Setup
 
@@ -14,7 +60,7 @@ The server is already installed in your Claude Desktop configuration. No additio
 
 Open Terminal and run:
 ```bash
-cd /Users/rob/Scripts/monarch-mcp-server
+cd /path/to/your/monarch-mcp-server
 python login_setup.py
 ```
 
@@ -99,7 +145,7 @@ Get my cashflow for the last 3 months using get_cashflow
 
 ### Authentication Issues
 If you see "Authentication needed" errors:
-1. Run the setup command: `cd /Users/rob/Scripts/monarch-mcp-server && python login_setup.py`
+1. Run the setup command: `cd /path/to/your/monarch-mcp-server && python login_setup.py`
 2. Restart Claude Desktop
 3. Try using a tool like `get_accounts`
 
@@ -148,7 +194,7 @@ MIT License
 
 For issues:
 1. Check authentication with `check_auth_status`
-2. Verify session with `setup_authentication` instructions
+2. Run the setup command again: `cd /path/to/your/monarch-mcp-server && python login_setup.py`
 3. Check error logs for detailed messages
 4. Ensure Monarch Money service is accessible
 

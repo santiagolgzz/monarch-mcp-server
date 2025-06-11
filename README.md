@@ -10,11 +10,6 @@ My MonarchMoney referral: https://www.monarchmoney.com/referral/ufmn0r83yf?r_sou
 
 ### 1. Installation
 
-#### Option A: If you're Rob (already configured)
-The server is already installed in your Claude Desktop configuration. No additional installation needed!
-
-#### Option B: First-time setup for others
-
 1. **Clone this repository**:
    ```bash
    git clone https://github.com/robcerda/monarch-mcp-server.git

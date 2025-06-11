@@ -2,6 +2,8 @@
 
 A Model Context Protocol (MCP) server for integrating with the Monarch Money personal finance platform. This server provides seamless access to your financial accounts, transactions, budgets, and analytics through Claude Desktop.
 
+My MonarchMoney referral: https://www.monarchmoney.com/referral/ufmn0r83yf?r_source=share
+
 **Built with the [MonarchMoney Python library](https://github.com/hammem/monarchmoney) by [@hammem](https://github.com/hammem)** - A fantastic unofficial API for Monarch Money with full MFA support.
 
 ## 🚀 Quick Start

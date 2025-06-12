@@ -6,6 +6,10 @@ My MonarchMoney referral: https://www.monarchmoney.com/referral/ufmn0r83yf?r_sou
 
 **Built with the [MonarchMoney Python library](https://github.com/hammem/monarchmoney) by [@hammem](https://github.com/hammem)** - A fantastic unofficial API for Monarch Money with full MFA support.
 
+<a href="https://glama.ai/mcp/servers/@robcerda/monarch-mcp-server">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@robcerda/monarch-mcp-server/badge" alt="monarch-mcp-server MCP server" />
+</a>
+
 ## 🚀 Quick Start
 
 ### 1. Installation

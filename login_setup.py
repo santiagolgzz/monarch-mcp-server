@@ -96,7 +96,7 @@ async def main():
             
             # Try using the library's built-in session saving
             print(f"\nSaving session to: {session_path}")
-            result = await mm.save_session(session_path)
+            result = mm.save_session(session_path)
             print(f"Save result: {result}")
             
             if os.path.exists(session_path):

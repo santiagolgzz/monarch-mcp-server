@@ -201,11 +201,11 @@ def get_transactions(
             # Build filters
             filters = {}
             if start_date:
-                filters["startDate"] = start_date
+                filters["start_date"] = start_date
             if end_date:
-                filters["endDate"] = end_date
+                filters["end_date"] = end_date
             if account_id:
-                filters["accountId"] = account_id
+                filters["account_id"] = account_id
             
             return await client.get_transactions(
                 limit=limit,
@@ -284,9 +284,9 @@ def get_cashflow(
             
             filters = {}
             if start_date:
-                filters["startDate"] = start_date
+                filters["start_date"] = start_date
             if end_date:
-                filters["endDate"] = end_date
+                filters["end_date"] = end_date
             
             return await client.get_cashflow(**filters)
         
@@ -344,16 +344,16 @@ def create_transaction(
             client = await get_monarch_client()
             
             transaction_data = {
-                "accountId": account_id,
+                "account_id": account_id,
                 "amount": amount,
                 "description": description,
                 "date": date
             }
             
             if category_id:
-                transaction_data["categoryId"] = category_id
+                transaction_data["category_id"] = category_id
             if merchant_name:
-                transaction_data["merchantName"] = merchant_name
+                transaction_data["merchant_name"] = merchant_name
             
             return await client.create_transaction(**transaction_data)
         
@@ -387,14 +387,14 @@ def update_transaction(
         async def _update_transaction():
             client = await get_monarch_client()
             
-            update_data = {"transactionId": transaction_id}
+            update_data = {"transaction_id": transaction_id}
             
             if amount is not None:
                 update_data["amount"] = amount
             if description is not None:
                 update_data["description"] = description
             if category_id is not None:
-                update_data["categoryId"] = category_id
+                update_data["category_id"] = category_id
             if date is not None:
                 update_data["date"] = date
             

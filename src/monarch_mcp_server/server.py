@@ -14,6 +14,7 @@ from mcp.server.fastmcp import FastMCP
 import mcp.types as types
 from monarchmoney import MonarchMoney, RequireMFAException
 from pydantic import BaseModel, Field
+from .secure_session import secure_session
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -51,50 +52,35 @@ class MonarchConfig(BaseModel):
 
 
 async def get_monarch_client() -> MonarchMoney:
-    """Get or create MonarchMoney client instance."""
+    """Get or create MonarchMoney client instance using secure session storage."""
     global _monarch_client
     
     if _monarch_client is None:
-        _monarch_client = MonarchMoney()
+        # Try to get authenticated client from secure session
+        _monarch_client = secure_session.get_authenticated_client()
         
-        # Try to load existing session first - check multiple locations
-        session_locations = [
-            os.getenv("MONARCH_SESSION_FILE", "monarch_session.json"),
-            "/Users/rob/Scripts/monarch-mcp-server/monarch_session.json",
-            "/Users/rob/Scripts/monarch-mcp-server/.mm/mm_session.pickle",
-            os.path.expanduser("~/.mm/mm_session.pickle")  # Default library location
-        ]
+        if _monarch_client is not None:
+            logger.info("✅ Using authenticated client from secure keyring storage")
+            return _monarch_client
         
-        for session_file in session_locations:
-            if os.path.exists(session_file):
-                logger.info(f"Found session file: {session_file}")
-                try:
-                    # Try creating a fresh client and loading the session
-                    test_client = MonarchMoney()
-                    test_client.load_session(session_file)  # This is NOT async!
-                    logger.info(f"Successfully loaded Monarch Money session from: {session_file}")
-                    _monarch_client = test_client
-                    return _monarch_client
-                except Exception as e:
-                    logger.error(f"Failed to load session from {session_file}: {e}")
-                    logger.error(f"Exception type: {type(e)}")
-                    # Continue to next session file
-            else:
-                logger.info(f"Session file not found: {session_file}")
-        
-        # If no session found, try environment credentials
+        # If no secure session, try environment credentials
         email = os.getenv("MONARCH_EMAIL")
         password = os.getenv("MONARCH_PASSWORD")
         
         if email and password:
             try:
+                _monarch_client = MonarchMoney()
                 await _monarch_client.login(email, password)
                 logger.info("Successfully logged into Monarch Money with environment credentials")
+                
+                # Save the session securely
+                secure_session.save_authenticated_session(_monarch_client)
+                
             except Exception as e:
                 logger.error(f"Failed to login to Monarch Money: {e}")
                 raise
         else:
-            raise RuntimeError("🔐 Authentication needed! Run: cd /Users/rob/Scripts/monarch-mcp-server && python login_setup.py")
+            raise RuntimeError("🔐 Authentication needed! Run: python login_setup.py")
     
     return _monarch_client
 
@@ -105,7 +91,7 @@ def setup_authentication() -> str:
     return """🔐 Monarch Money - One-Time Setup
 
 1️⃣ Open Terminal and run:
-   cd /Users/rob/Scripts/monarch-mcp-server && python login_setup.py
+   python login_setup.py
 
 2️⃣ Enter your Monarch Money credentials when prompted
    • Email and password
@@ -127,25 +113,18 @@ def setup_authentication() -> str:
 def check_auth_status() -> str:
     """Check if already authenticated with Monarch Money."""
     try:
-        session_locations = [
-            os.getenv("MONARCH_SESSION_FILE", "monarch_session.json"),
-            "/Users/rob/Scripts/monarch-mcp-server/monarch_session.json",
-            "/Users/rob/Scripts/monarch-mcp-server/.mm/mm_session.pickle",
-            os.path.expanduser("~/.mm/mm_session.pickle")
-        ]
-        
-        status = "🔍 Session file check:\n"
-        for session_file in session_locations:
-            if os.path.exists(session_file):
-                status += f"✅ Found: {session_file}\n"
-            else:
-                status += f"❌ Missing: {session_file}\n"
+        # Check if we have a token in the keyring
+        token = secure_session.load_token()
+        if token:
+            status = "✅ Authentication token found in secure keyring storage\n"
+        else:
+            status = "❌ No authentication token found in keyring\n"
         
         email = os.getenv("MONARCH_EMAIL")
         if email:
-            status += f"\n📧 Environment email: {email}"
+            status += f"📧 Environment email: {email}\n"
         
-        status += "\n\n💡 Try get_accounts to test connection or run login_setup.py if needed."
+        status += "\n💡 Try get_accounts to test connection or run login_setup.py if needed."
         
         return status
     except Exception as e:
@@ -154,24 +133,18 @@ def check_auth_status() -> str:
 
 @mcp.tool()
 def debug_session_loading() -> str:
-    """Debug session loading issues."""
+    """Debug keyring session loading issues."""
     try:
-        async def _debug():
-            import traceback
-            
-            session_file = "/Users/rob/Scripts/monarch-mcp-server/.mm/mm_session.pickle"
-            
-            try:
-                client = MonarchMoney()
-                client.load_session(session_file)  # NOT async!
-                return "✅ Session loaded successfully"
-            except Exception as e:
-                error_details = traceback.format_exc()
-                return f"❌ Session loading failed:\nError: {str(e)}\nType: {type(e)}\nTraceback:\n{error_details}"
-        
-        return run_async(_debug())
+        # Check keyring access
+        token = secure_session.load_token()
+        if token:
+            return f"✅ Token found in keyring (length: {len(token)})"
+        else:
+            return "❌ No token found in keyring. Run login_setup.py to authenticate."
     except Exception as e:
-        return f"Debug failed: {str(e)}"
+        import traceback
+        error_details = traceback.format_exc()
+        return f"❌ Keyring access failed:\nError: {str(e)}\nType: {type(e)}\nTraceback:\n{error_details}"
 
 
 @mcp.tool()
@@ -228,11 +201,11 @@ def get_transactions(
             # Build filters
             filters = {}
             if start_date:
-                filters["startDate"] = start_date
+                filters["start_date"] = start_date
             if end_date:
-                filters["endDate"] = end_date
+                filters["end_date"] = end_date
             if account_id:
-                filters["accountId"] = account_id
+                filters["account_id"] = account_id
             
             return await client.get_transactions(
                 limit=limit,
@@ -311,9 +284,9 @@ def get_cashflow(
             
             filters = {}
             if start_date:
-                filters["startDate"] = start_date
+                filters["start_date"] = start_date
             if end_date:
-                filters["endDate"] = end_date
+                filters["end_date"] = end_date
             
             return await client.get_cashflow(**filters)
         
@@ -371,16 +344,16 @@ def create_transaction(
             client = await get_monarch_client()
             
             transaction_data = {
-                "accountId": account_id,
+                "account_id": account_id,
                 "amount": amount,
                 "description": description,
                 "date": date
             }
             
             if category_id:
-                transaction_data["categoryId"] = category_id
+                transaction_data["category_id"] = category_id
             if merchant_name:
-                transaction_data["merchantName"] = merchant_name
+                transaction_data["merchant_name"] = merchant_name
             
             return await client.create_transaction(**transaction_data)
         
@@ -414,14 +387,14 @@ def update_transaction(
         async def _update_transaction():
             client = await get_monarch_client()
             
-            update_data = {"transactionId": transaction_id}
+            update_data = {"transaction_id": transaction_id}
             
             if amount is not None:
                 update_data["amount"] = amount
             if description is not None:
                 update_data["description"] = description
             if category_id is not None:
-                update_data["categoryId"] = category_id
+                update_data["category_id"] = category_id
             if date is not None:
                 update_data["date"] = date
             

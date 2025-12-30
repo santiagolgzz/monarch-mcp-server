@@ -4,7 +4,7 @@
 
 ### Tool Count
 - **Original**: 10 tools (+ 3 debug/auth tools)
-- **Extended**: 40+ tools (+ 3 debug/auth tools)
+- **Extended**: 37 tools (+ 3 debug/auth tools)
 - **Increase**: 300%+ more functionality
 
 ### Feature Coverage

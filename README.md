@@ -2,11 +2,11 @@
 
 # Monarch Money MCP Server - Extended Edition
 
-A comprehensive Model Context Protocol (MCP) server for integrating with the Monarch Money personal finance platform. This **extended version** provides access to **40+ tools** covering the complete Monarch Money API, including advanced features like transaction splits, category management, tags, manual accounts, and more.
+A comprehensive Model Context Protocol (MCP) server for integrating with the Monarch Money personal finance platform. This **extended version** provides access to **37 tools** (40 including debug/auth) covering the complete Monarch Money API, including advanced features like transaction splits, category management, tags, manual accounts, and more.
 
 ## 🎯 Extended Features
 
-This fork extends the original [monarch-mcp-server](https://github.com/robcerda/monarch-mcp-server) from 10 tools to **40+ tools**, adding:
+This fork extends the original [monarch-mcp-server](https://github.com/robcerda/monarch-mcp-server) from 10 tools to **37 tools** (40 including debug/auth), adding:
 
 - ✅ **Account History & Manual Accounts**: Track balance history and create/manage manual accounts
 - ✅ **Transaction Splits & Details**: Full support for split transactions and detailed transaction views

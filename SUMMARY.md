@@ -41,7 +41,7 @@ An extended fork of the [monarch-mcp-server](https://github.com/robcerda/monarch
 - Blocking account refresh
 
 ### 3. Documentation Enhancements
-- Comprehensive README with all 40+ tools organized by category
+- Comprehensive README with all 37 tools organized by category
 - Extended usage examples for all new features
 - CHANGELOG documenting all additions
 - FEATURES_COMPARISON showing original vs extended
@@ -115,7 +115,7 @@ An extended fork of the [monarch-mcp-server](https://github.com/robcerda/monarch
    python login_setup.py
    ```
 
-5. **Restart Claude Desktop** and enjoy 40+ financial tools!
+5. **Restart Claude Desktop** and enjoy 37 financial tools (40 including debug/auth)!
 
 ## Next Steps
 

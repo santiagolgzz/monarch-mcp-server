@@ -109,6 +109,16 @@ get_safety_stats
 ### Emergency Controls
 
 ```
+
+### Operation Log Sensitivity
+
+Write operations are logged to `~/.mm/detailed_operation_log.jsonl` to enable rollback guidance.
+These entries may include sensitive data (transaction descriptions, amounts, IDs, and category
+names). If you operate on a shared machine, consider:
+
+- Restricting access to your home directory
+- Rotating or deleting the log periodically
+- Disabling safety logging by setting `"enabled": false` in `~/.mm/safety_config.json` (not recommended)
 # Stop everything NOW
 enable_emergency_stop
 

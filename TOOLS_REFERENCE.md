@@ -1,6 +1,6 @@
 # Quick Tools Reference
 
-## All 40 Available Tools
+## All 37 Available Tools
 
 ### Authentication & Setup (3 tools)
 1. `setup_authentication` - Get authentication setup instructions
@@ -59,7 +59,7 @@
 
 **Legend**: ⭐ NEW = Added in Extended Edition
 
-**Total**: 37 tools (40 including debug tools)
+**Total**: 37 tools (40 including debug/auth tools)
 **Original**: 10 tools (13 including debug tools)
 **New**: 27 tools added (+270% increase)
 

@@ -3,6 +3,8 @@
 import os
 import logging
 import asyncio
+import csv
+import io
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime, date
 import json
@@ -13,7 +15,7 @@ from dotenv import load_dotenv
 from mcp.server.auth.provider import AccessTokenT
 from mcp.server.fastmcp import FastMCP
 import mcp.types as types
-from monarchmoney import MonarchMoney, RequireMFAException
+from monarchmoney import MonarchMoney
 from pydantic import BaseModel, Field
 from monarch_mcp_server.secure_session import secure_session
 from monarch_mcp_server.safety import get_safety_guard, require_safety_check
@@ -43,6 +45,48 @@ def run_async(coro):
     with ThreadPoolExecutor() as executor:
         future = executor.submit(_run)
         return future.result()
+
+
+def _validate_date(date_str: Optional[str], field_name: str) -> None:
+    """Validate a YYYY-MM-DD date string."""
+    if date_str is None:
+        return
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError as exc:
+        raise ValueError(
+            f"{field_name} must be in YYYY-MM-DD format (got '{date_str}')"
+        ) from exc
+
+
+def _validate_balance_history_csv(csv_data: str) -> None:
+    """Validate CSV data for account balance history uploads."""
+    if not csv_data.strip():
+        raise ValueError("csv_data must not be empty")
+
+    reader = csv.DictReader(io.StringIO(csv_data))
+    required_fields = {"date", "balance"}
+    if not reader.fieldnames or not required_fields.issubset(
+        {name.strip().lower() for name in reader.fieldnames}
+    ):
+        raise ValueError("csv_data must include 'date' and 'balance' headers")
+
+    for index, row in enumerate(reader, start=1):
+        if not row:
+            continue
+        date_value = row.get("date")
+        balance_value = row.get("balance")
+        if date_value is None or balance_value is None:
+            raise ValueError(
+                f"csv_data row {index} must include date and balance values"
+            )
+        _validate_date(date_value.strip(), f"csv_data row {index} date")
+        try:
+            float(balance_value)
+        except ValueError as exc:
+            raise ValueError(
+                f"csv_data row {index} balance must be a number (got '{balance_value}')"
+            ) from exc
 
 
 class MonarchConfig(BaseModel):
@@ -203,6 +247,8 @@ def get_transactions(
         account_id: Specific account ID to filter by
     """
     try:
+        _validate_date(start_date, "start_date")
+        _validate_date(end_date, "end_date")
 
         async def _get_transactions():
             client = await get_monarch_client()
@@ -288,6 +334,8 @@ def get_cashflow(
         end_date: End date in YYYY-MM-DD format
     """
     try:
+        _validate_date(start_date, "start_date")
+        _validate_date(end_date, "end_date")
 
         async def _get_cashflow():
             client = await get_monarch_client()
@@ -354,6 +402,7 @@ def create_transaction(
     Safety: Rate limited to 10/min, 100/day
     """
     try:
+        _validate_date(date, "date")
 
         async def _create_transaction():
             client = await get_monarch_client()
@@ -402,6 +451,7 @@ def update_transaction(
         date: New transaction date in YYYY-MM-DD format
     """
     try:
+        _validate_date(date, "date")
 
         async def _update_transaction():
             client = await get_monarch_client()
@@ -464,6 +514,8 @@ def get_account_history(
         end_date: End date in YYYY-MM-DD format (optional)
     """
     try:
+        _validate_date(start_date, "start_date")
+        _validate_date(end_date, "end_date")
 
         async def _get_history():
             client = await get_monarch_client()
@@ -631,6 +683,8 @@ def get_transactions_summary(
         end_date: End date in YYYY-MM-DD format (optional)
     """
     try:
+        _validate_date(start_date, "start_date")
+        _validate_date(end_date, "end_date")
 
         async def _get_summary():
             client = await get_monarch_client()
@@ -660,6 +714,8 @@ def get_cashflow_summary(
         end_date: End date in YYYY-MM-DD format (optional)
     """
     try:
+        _validate_date(start_date, "start_date")
+        _validate_date(end_date, "end_date")
 
         async def _get_summary():
             client = await get_monarch_client()
@@ -1024,6 +1080,7 @@ def upload_account_balance_history(account_id: str, csv_data: str) -> str:
                   2024-01-02,1050.00
     """
     try:
+        _validate_balance_history_csv(csv_data)
 
         async def _upload_history():
             client = await get_monarch_client()

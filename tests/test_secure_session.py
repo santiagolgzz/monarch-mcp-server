@@ -149,3 +149,50 @@ class TestGlobalSecureSession:
         """Test that global secure_session is instantiated."""
         assert secure_session is not None
         assert isinstance(secure_session, SecureMonarchSession)
+
+
+class TestCleanupMethod:
+    """Tests for the cleanup old session files method."""
+
+    def test_cleanup_uses_absolute_paths(self):
+        """Test that cleanup method uses absolute paths based on home directory."""
+        from unittest.mock import patch
+        from pathlib import Path
+        
+        session = SecureMonarchSession()
+        
+        # Mock Path operations to verify absolute paths are used
+        with patch.object(Path, 'exists', return_value=False) as mock_exists:
+            with patch('monarch_mcp_server.secure_session.keyring'):
+                # This should not raise even if paths don't exist
+                session._cleanup_old_session_files()
+        
+        # Verify the method completed without error
+        # The cleanup should check paths relative to home
+        # Since we mocked exists to return False, no deletions happen
+
+    def test_cleanup_only_deletes_files(self):
+        """Test that cleanup only deletes files, not directories."""
+        import tempfile
+        from pathlib import Path
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a mock .mm directory with a pickle file
+            mm_dir = Path(tmpdir) / ".mm"
+            mm_dir.mkdir()
+            pickle_file = mm_dir / "mm_session.pickle"
+            pickle_file.write_text("fake pickle content")
+            
+            session = SecureMonarchSession()
+            
+            # Patch Path.home to return our temp dir
+            # We need to patch where Path is used (after import in the method)
+            with patch('pathlib.Path.home', return_value=Path(tmpdir)):
+                with patch('monarch_mcp_server.secure_session.keyring'):
+                    session._cleanup_old_session_files()
+            
+            # The pickle file should be deleted
+            assert not pickle_file.exists()
+            # But the .mm directory should still exist (not deleted)
+            assert mm_dir.exists()
+

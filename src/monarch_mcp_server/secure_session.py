@@ -84,22 +84,25 @@ class SecureMonarchSession:
             logger.warning("⚠️  MonarchMoney instance has no token to save")
 
     def _cleanup_old_session_files(self) -> None:
-        """Clean up old insecure session files."""
+        """Clean up old insecure session files.
+        
+        Uses absolute paths based on user's home directory to avoid
+        accidentally cleaning up files in wrong working directories.
+        """
+        from pathlib import Path
+        
+        home = Path.home()
         cleanup_paths = [
-            ".mm/mm_session.pickle",
-            "monarch_session.json",
-            ".mm",  # Remove the entire directory if empty
+            home / ".mm" / "mm_session.pickle",
+            home / "monarch_session.json",
+            # Note: Don't auto-delete .mm directory as it contains other config
         ]
 
         for path in cleanup_paths:
             try:
-                if os.path.exists(path):
-                    if os.path.isfile(path):
-                        os.remove(path)
-                        logger.info(f"🗑️ Cleaned up old insecure session file: {path}")
-                    elif os.path.isdir(path) and not os.listdir(path):
-                        os.rmdir(path)
-                        logger.info(f"🗑️ Cleaned up empty session directory: {path}")
+                if path.exists() and path.is_file():
+                    path.unlink()
+                    logger.info(f"🗑️ Cleaned up old insecure session file: {path}")
             except Exception as e:
                 logger.warning(f"⚠️  Could not clean up {path}: {e}")
 

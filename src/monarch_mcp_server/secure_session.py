@@ -32,54 +32,96 @@ class SecureMonarchSession:
             raise
 
     def load_token(self) -> Optional[str]:
-        """Load the authentication token from the system keyring."""
+        """Load the authentication token from querying keyring or session file."""
         try:
+            # 1. Try keyring first
             token = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
             if token:
                 logger.info("✅ Token loaded from keyring")
                 return token
-            else:
-                logger.info("🔍 No token found in keyring")
-                return None
         except Exception as e:
             logger.error(f"❌ Failed to load token from keyring: {e}")
-            return None
+
+        # 2. Fallback to pickle file (standard library behavior)
+        try:
+            from pathlib import Path
+            import pickle
+            
+            session_file = Path.home() / ".mm" / "mm_session.pickle"
+            if session_file.exists():
+                with open(session_file, "rb") as f:
+                    data = pickle.load(f)
+                    token = data.get("token")
+                    if token:
+                        logger.info("✅ Token loaded from mm_session.pickle fallback")
+                        return token
+        except Exception as e:
+            logger.error(f"❌ Failed to load token from session file: {e}")
+
+        logger.info("🔍 No token found in keyring or session file")
+        return None
 
     def delete_token(self) -> None:
-        """Delete the authentication token from the system keyring."""
+        """Delete the authentication token from system keyring and session file."""
         try:
             keyring.delete_password(KEYRING_SERVICE, KEYRING_USERNAME)
             logger.info("🗑️ Token deleted from keyring")
-
-            # Also clean up any old insecure files
-            self._cleanup_old_session_files()
-
         except Exception as e:
-            # PasswordDeleteError means token doesn't exist - that's OK
             error_type = type(e).__name__
             if "PasswordDeleteError" in error_type or "not found" in str(e).lower():
                 logger.info("🔍 No token found in keyring to delete")
             else:
                 logger.error(f"❌ Failed to delete token from keyring: {e}")
 
+        # Also clean up session files
+        self._cleanup_old_session_files()
+
+        # Clean up the library's native session file too
+        try:
+            from pathlib import Path
+            session_file = Path.home() / ".mm" / "mm_session.pickle"
+            if session_file.exists():
+                session_file.unlink()
+                logger.info("🗑️ Deleted mm_session.pickle")
+        except Exception as e:
+            logger.error(f"❌ Failed to delete mm_session.pickle: {e}")
+
     def get_authenticated_client(self) -> Optional[MonarchMoney]:
         """Get an authenticated MonarchMoney client."""
-        token = self.load_token()
-        if not token:
-            return None
-
+        # First try to load session using library's native persistence (loads cookies!)
+        mm = MonarchMoney()
         try:
-            client = MonarchMoney(token=token)
-            logger.info("✅ MonarchMoney client created with stored token")
-            return client
+            mm.load_session()
+            if mm.token:
+                logger.info("✅ MonarchMoney client loaded with native session (cookies+token)")
+                return mm
         except Exception as e:
-            logger.error(f"❌ Failed to create MonarchMoney client: {e}")
-            return None
+            logger.warning(f"⚠️ Failed to load native session: {e}")
+
+        # Fallback to token-only auth (from keyring) if native load failed
+        token = self.load_token()
+        if token:
+            try:
+                client = MonarchMoney(token=token)
+                logger.info("✅ MonarchMoney client created with stored token (token-only)")
+                return client
+            except Exception as e:
+                logger.error(f"❌ Failed to create MonarchMoney client: {e}")
+        
+        return None
 
     def save_authenticated_session(self, mm: MonarchMoney) -> None:
         """Save the session from an authenticated MonarchMoney instance."""
         if mm.token:
+            # 1. Save to keyring (most secure)
             self.save_token(mm.token)
+            
+            # 2. Save native session pickle (persists cookies for long sessions)
+            try:
+                mm.save_session()
+                logger.info("✅ Full session (cookies) saved to mm_session.pickle")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not save native session pickle: {e}")
         else:
             logger.warning("⚠️  MonarchMoney instance has no token to save")
 
@@ -93,9 +135,8 @@ class SecureMonarchSession:
         
         home = Path.home()
         cleanup_paths = [
-            home / ".mm" / "mm_session.pickle",
+            # home / ".mm" / "mm_session.pickle",  <-- KEEP THIS ONE!
             home / "monarch_session.json",
-            # Note: Don't auto-delete .mm directory as it contains other config
         ]
 
         for path in cleanup_paths:

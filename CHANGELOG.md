@@ -1,9 +1,51 @@
 # Changelog
 
-## [1.0.0] - Extended Edition - 2025-01-29
+## [1.1.0] - Architecture Improvements - 2025-12-30
 
-### Major Enhancement
-Extended the Monarch Money MCP Server from 10 tools to **40+ tools**, providing comprehensive coverage of the Monarch Money API.
+### Added - Code Quality
+- **Test Suite**: Comprehensive pytest test suite with 60+ test cases covering:
+  - Exceptions module tests
+  - Utils module tests  
+  - Safety module tests
+  - Secure session tests with mocked keyring
+- **CI/CD Pipeline**: GitHub Actions workflow for automated:
+  - Testing across Python 3.10, 3.11, 3.12
+  - Code formatting checks (black, isort)
+  - Type checking (mypy)
+- **Custom Exception Hierarchy**: New `exceptions.py` module with specific error types:
+  - `MonarchMCPError` (base class)
+  - `AuthenticationError`, `SessionExpiredError`
+  - `NetworkError`, `APIError`
+  - `ValidationError`, `SafetyError`, `EmergencyStopError`
+
+### Added - Utility Module
+- New `utils.py` module with:
+  - Improved `run_async` using persistent thread pool (more efficient)
+  - `format_result` and `format_error` helpers
+  - `validate_date_format`, `validate_positive_amount`, `validate_non_empty_string`
+  - `classify_exception` for intelligent error classification
+  - `get_config_dir` and `get_config_path` for cross-platform paths
+
+### Changed - Performance
+- Refactored `run_async` to use a persistent `ThreadPoolExecutor` instead of creating new pools per call
+- Added `atexit` handler to cleanly shutdown executor on exit
+- Removed unnecessary `asyncio` dependency from requirements (it's part of stdlib)
+
+### Changed - Compatibility
+- **Lowered Python requirement**: Now supports Python 3.10+ (previously 3.12+)
+- Added Python 3.10 and 3.11 to supported versions in classifiers
+
+### Changed - Documentation
+- Fixed README clone URL to use placeholder for user's fork
+- Added maintainer attribution in pyproject.toml
+- Added keywords for better discoverability
+- Updated development status to Beta
+
+### Fixed
+- Removed unused imports in server.py
+- Fixed hardcoded paths to use cross-platform Path.home()
+
+## [1.0.0] - Extended Edition - 2025-01-29
 
 ### Added - Account Management (7 new tools)
 - `get_account_history` - Get daily account balance history with date filtering

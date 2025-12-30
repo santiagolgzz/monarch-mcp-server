@@ -85,19 +85,31 @@ class TestSecureMonarchSession:
     def test_get_authenticated_client_success(self, mock_mm_class, mock_keyring):
         """Test getting authenticated client when token exists."""
         mock_keyring.get_password.return_value = "valid_token"
+        
+        # Configure mock client to fail native load but succeed with token
         mock_client = MagicMock()
+        mock_client.token = None # Initially no token from load_session
         mock_mm_class.return_value = mock_client
 
         session = SecureMonarchSession()
         client = session.get_authenticated_client()
 
         assert client is mock_client
-        mock_mm_class.assert_called_once_with(token="valid_token")
+        # Should initiate client, try load_session, then init again with token
+        # Note: In implementation we create NEW instance for native load
+        # simpler to just verify the token flow worked
+        mock_mm_class.assert_any_call(token="valid_token")
 
     @patch("monarch_mcp_server.secure_session.keyring")
-    def test_get_authenticated_client_no_token(self, mock_keyring):
+    @patch("monarch_mcp_server.secure_session.MonarchMoney")
+    def test_get_authenticated_client_no_token(self, mock_mm_class, mock_keyring):
         """Test getting authenticated client when no token exists."""
         mock_keyring.get_password.return_value = None
+        
+        # Mock client that fails native load
+        mock_client = MagicMock()
+        mock_client.token = None
+        mock_mm_class.return_value = mock_client
 
         session = SecureMonarchSession()
         client = session.get_authenticated_client()
@@ -109,7 +121,10 @@ class TestSecureMonarchSession:
     def test_get_authenticated_client_error(self, mock_mm_class, mock_keyring):
         """Test getting authenticated client when MonarchMoney raises error."""
         mock_keyring.get_password.return_value = "invalid_token"
-        mock_mm_class.side_effect = Exception("Invalid token")
+        
+        # Setup side effect to fail on init with token
+        # We need to handle the first init (empty) separately from second (with token)
+        mock_mm_class.side_effect = [MagicMock(token=None), Exception("Invalid token")]
 
         session = SecureMonarchSession()
         client = session.get_authenticated_client()
@@ -128,6 +143,8 @@ class TestSecureMonarchSession:
         mock_keyring.set_password.assert_called_once_with(
             KEYRING_SERVICE, KEYRING_USERNAME, "session_token_abc"
         )
+        # Verify native session is also saved
+        mock_mm.save_session.assert_called_once()
 
     @patch("monarch_mcp_server.secure_session.keyring")
     def test_save_authenticated_session_no_token(self, mock_keyring):
@@ -191,8 +208,18 @@ class TestCleanupMethod:
                 with patch('monarch_mcp_server.secure_session.keyring'):
                     session._cleanup_old_session_files()
             
-            # The pickle file should be deleted
-            assert not pickle_file.exists()
+            # The pickle file should still exist (we stopped cleaning it up)
+            assert pickle_file.exists()
             # But the .mm directory should still exist (not deleted)
             assert mm_dir.exists()
+            
+            # Verify that OTHER old files are still cleaned up
+            json_file = Path(tmpdir) / "monarch_session.json"
+            json_file.write_text("{}")
+            
+            with patch('pathlib.Path.home', return_value=Path(tmpdir)):
+                with patch('monarch_mcp_server.secure_session.keyring'):
+                    session._cleanup_old_session_files()
+            
+            assert not json_file.exists()
 

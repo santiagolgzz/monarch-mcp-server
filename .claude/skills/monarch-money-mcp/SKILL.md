@@ -1,11 +1,14 @@
 ---
 name: monarch-money-mcp
-description: "Use for viewing financial accounts, transactions, budgets, and cashflow from Monarch Money. Use for creating or updating transactions. Triggers: finances, spending, accounts, budgets"
+description: "Use for managing Monarch Money finances: accounts, transactions, budgets, and cashflow. Triggers: finances, spending, accounts, budgets"
 ---
 
 # Monarch Money MCP
 
-Access ~40 tools for Monarch Money personal finance. See [tools.md](references/tools.md) for full list.
+Access ~40 tools for Monarch Money personal finance.
+- **[tools.md](references/tools.md)**: Full tool list
+- **[safety.md](references/safety.md)**: Safety tiers
+- **[financial-analysis.md](references/financial-analysis.md)**: Analysis guides
 
 ## Quick Start
 
@@ -22,8 +25,6 @@ get_cashflow              # Income vs expenses
 - **Destructive ops require approval** - `delete_*` tools prompt user first
 - **Emergency stop** - `enable_emergency_stop` blocks all writes
 - **Dates** - Always YYYY-MM-DD format
-
-See [safety.md](references/safety.md) for tiers.
 
 ## Common Tools
 

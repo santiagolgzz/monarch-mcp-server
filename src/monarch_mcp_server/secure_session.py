@@ -54,10 +54,13 @@ class SecureMonarchSession:
             # Also clean up any old insecure files
             self._cleanup_old_session_files()
 
-        except keyring.errors.PasswordDeleteError:
-            logger.info("🔍 No token found in keyring to delete")
         except Exception as e:
-            logger.error(f"❌ Failed to delete token from keyring: {e}")
+            # PasswordDeleteError means token doesn't exist - that's OK
+            error_type = type(e).__name__
+            if "PasswordDeleteError" in error_type or "not found" in str(e).lower():
+                logger.info("🔍 No token found in keyring to delete")
+            else:
+                logger.error(f"❌ Failed to delete token from keyring: {e}")
 
     def get_authenticated_client(self) -> Optional[MonarchMoney]:
         """Get an authenticated MonarchMoney client."""

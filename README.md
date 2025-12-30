@@ -31,8 +31,9 @@ This fork extends the original [monarch-mcp-server](https://github.com/robcerda/
 
 1. **Clone this repository**:
    ```bash
-   git clone https://github.com/robcerda/monarch-mcp-server.git
-   cd monarch-mcp-server
+   # Replace with your fork URL if applicable
+   git clone https://github.com/YOUR_USERNAME/monarch-mcp-server-extended.git
+   cd monarch-mcp-server-extended
    ```
 
 2. **Install dependencies**:

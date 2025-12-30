@@ -2,21 +2,26 @@
 
 import os
 import logging
-import asyncio
+import atexit
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime, date
 import json
-import threading
-from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
-from mcp.server.auth.provider import AccessTokenT
 from mcp.server.fastmcp import FastMCP
-import mcp.types as types
 from monarchmoney import MonarchMoney, RequireMFAException
 from pydantic import BaseModel, Field
+
 from monarch_mcp_server.secure_session import secure_session
 from monarch_mcp_server.safety import get_safety_guard, require_safety_check
+from monarch_mcp_server.utils import run_async, shutdown_executor, format_result, format_error
+from monarch_mcp_server.exceptions import (
+    MonarchMCPError,
+    AuthenticationError,
+    SessionExpiredError,
+    NetworkError,
+    APIError,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -28,21 +33,8 @@ load_dotenv()
 # Initialize FastMCP server
 mcp = FastMCP("Monarch Money MCP Server")
 
-
-def run_async(coro):
-    """Run async function in a new thread with its own event loop."""
-
-    def _run():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(coro)
-        finally:
-            loop.close()
-
-    with ThreadPoolExecutor() as executor:
-        future = executor.submit(_run)
-        return future.result()
+# Register cleanup on exit
+atexit.register(shutdown_executor)
 
 
 class MonarchConfig(BaseModel):

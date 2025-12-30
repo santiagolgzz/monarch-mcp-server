@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "monarch-mcp-server"
-version = "0.1.0"
-description = "Model Context Protocol (MCP) server for Monarch Money personal finance platform"
+name = "monarch-mcp-server-extended"
+version = "1.0.0"
+description = "Extended Model Context Protocol (MCP) server for Monarch Money with 40+ tools covering the complete API"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [

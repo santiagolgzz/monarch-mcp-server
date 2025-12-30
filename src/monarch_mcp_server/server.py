@@ -14,13 +14,21 @@ from pydantic import BaseModel, Field
 
 from monarch_mcp_server.secure_session import secure_session
 from monarch_mcp_server.safety import get_safety_guard, require_safety_check
-from monarch_mcp_server.utils import run_async, shutdown_executor, format_result, format_error
+from monarch_mcp_server.utils import (
+    run_async,
+    shutdown_executor,
+    format_result,
+    format_error,
+    validate_date_format,
+    validate_non_empty_string,
+)
 from monarch_mcp_server.exceptions import (
     MonarchMCPError,
     AuthenticationError,
     SessionExpiredError,
     NetworkError,
     APIError,
+    ValidationError,
 )
 
 # Configure logging
@@ -195,16 +203,19 @@ def get_transactions(
         account_id: Specific account ID to filter by
     """
     try:
+        # Validate date formats if provided
+        validated_start = validate_date_format(start_date, "start_date")
+        validated_end = validate_date_format(end_date, "end_date")
 
         async def _get_transactions():
             client = await get_monarch_client()
 
             # Build filters
             filters = {}
-            if start_date:
-                filters["start_date"] = start_date
-            if end_date:
-                filters["end_date"] = end_date
+            if validated_start:
+                filters["start_date"] = validated_start
+            if validated_end:
+                filters["end_date"] = validated_end
             if account_id:
                 filters["account_id"] = account_id
 
@@ -346,6 +357,10 @@ def create_transaction(
     Safety: Rate limited to 10/min, 100/day
     """
     try:
+        # Validate required inputs
+        validate_non_empty_string(account_id, "account_id")
+        validate_non_empty_string(description, "description")
+        validated_date = validate_date_format(date, "date")
 
         async def _create_transaction():
             client = await get_monarch_client()
@@ -354,7 +369,7 @@ def create_transaction(
                 "account_id": account_id,
                 "amount": amount,
                 "description": description,
-                "date": date,
+                "date": validated_date,
             }
 
             if category_id:
@@ -367,6 +382,8 @@ def create_transaction(
         result = run_async(_create_transaction())
 
         return json.dumps(result, indent=2, default=str)
+    except ValidationError as e:
+        return f"Validation error: {str(e)}"
     except Exception as e:
         logger.error(f"Failed to create transaction: {e}")
         return f"Error creating transaction: {str(e)}"
@@ -394,6 +411,9 @@ def update_transaction(
         date: New transaction date in YYYY-MM-DD format
     """
     try:
+        # Validate required inputs
+        validate_non_empty_string(transaction_id, "transaction_id")
+        validated_date = validate_date_format(date, "date") if date else None
 
         async def _update_transaction():
             client = await get_monarch_client()
@@ -406,14 +426,16 @@ def update_transaction(
                 update_data["description"] = description
             if category_id is not None:
                 update_data["category_id"] = category_id
-            if date is not None:
-                update_data["date"] = date
+            if validated_date is not None:
+                update_data["date"] = validated_date
 
             return await client.update_transaction(**update_data)
 
         result = run_async(_update_transaction())
 
         return json.dumps(result, indent=2, default=str)
+    except ValidationError as e:
+        return f"Validation error: {str(e)}"
     except Exception as e:
         logger.error(f"Failed to update transaction: {e}")
         return f"Error updating transaction: {str(e)}"
@@ -822,6 +844,9 @@ def create_manual_account(
         account_subtype: Optional account subtype
     """
     try:
+        # Validate required inputs
+        validate_non_empty_string(account_name, "account_name")
+        validate_non_empty_string(account_type, "account_type")
 
         async def _create_account():
             client = await get_monarch_client()
@@ -836,6 +861,8 @@ def create_manual_account(
 
         result = run_async(_create_account())
         return json.dumps(result, indent=2, default=str)
+    except ValidationError as e:
+        return f"Validation error: {str(e)}"
     except Exception as e:
         logger.error(f"Failed to create manual account: {e}")
         return f"Error creating manual account: {str(e)}"
@@ -940,6 +967,8 @@ def create_tag(name: str, color: Optional[str] = None) -> str:
         color: Optional color for the tag (hex format, e.g., '#FF5733')
     """
     try:
+        # Validate required inputs
+        validate_non_empty_string(name, "name")
 
         async def _create_tag():
             client = await get_monarch_client()
@@ -949,6 +978,8 @@ def create_tag(name: str, color: Optional[str] = None) -> str:
 
         result = run_async(_create_tag())
         return json.dumps(result, indent=2, default=str)
+    except ValidationError as e:
+        return f"Validation error: {str(e)}"
     except Exception as e:
         logger.error(f"Failed to create tag: {e}")
         return f"Error creating tag: {str(e)}"

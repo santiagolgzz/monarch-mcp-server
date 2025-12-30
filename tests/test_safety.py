@@ -105,6 +105,10 @@ class TestSafetyGuard:
 
     def test_record_operation(self, temp_guard):
         """Test recording an operation."""
+        # Reset counts to ensure clean state for this test
+        from collections import defaultdict
+        temp_guard.daily_counts = defaultdict(lambda: defaultdict(int))
+        
         temp_guard.record_operation(
             "create_transaction",
             success=True,

@@ -46,9 +46,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/robcerda/monarch-mcp-server"
-Repository = "https://github.com/robcerda/monarch-mcp-server"
-Issues = "https://github.com/robcerda/monarch-mcp-server/issues"
+Homepage = "https://github.com/santiagolgzz/monarch-mcp-server"
+Repository = "https://github.com/santiagolgzz/monarch-mcp-server"
+Issues = "https://github.com/santiagolgzz/monarch-mcp-server/issues"
+Upstream = "https://github.com/robcerda/monarch-mcp-server"
 
 [project.scripts]
 monarch-mcp-server = "monarch_mcp_server.server:main"

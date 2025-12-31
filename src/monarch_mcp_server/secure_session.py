@@ -11,8 +11,13 @@ from monarchmoney import MonarchMoney
 logger = logging.getLogger(__name__)
 
 # Keyring service identifiers
+# Keyring service identifiers
 KEYRING_SERVICE = "com.mcp.monarch-mcp-server"
 KEYRING_USERNAME = "monarch-token"
+
+# Standardize session file location to user's home directory
+from pathlib import Path
+DEFAULT_SESSION_FILE = Path.home() / ".mm" / "mm_session.pickle"
 
 
 class SecureMonarchSession:
@@ -32,71 +37,115 @@ class SecureMonarchSession:
             raise
 
     def load_token(self) -> Optional[str]:
-        """Load the authentication token from the system keyring."""
+        """Load the authentication token from querying keyring or session file."""
         try:
+            # 1. Try keyring first
             token = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
             if token:
                 logger.info("✅ Token loaded from keyring")
                 return token
-            else:
-                logger.info("🔍 No token found in keyring")
-                return None
         except Exception as e:
             logger.error(f"❌ Failed to load token from keyring: {e}")
-            return None
+
+        # 2. Fallback to pickle file (standard library behavior)
+        try:
+            import pickle
+            
+            if DEFAULT_SESSION_FILE.exists():
+                with open(DEFAULT_SESSION_FILE, "rb") as f:
+                    data = pickle.load(f)
+                    token = data.get("token")
+                    if token:
+                        logger.info("✅ Token loaded from mm_session.pickle fallback")
+                        return token
+        except Exception as e:
+            logger.error(f"❌ Failed to load token from session file: {e}")
+
+        logger.info("🔍 No token found in keyring or session file")
+        return None
 
     def delete_token(self) -> None:
-        """Delete the authentication token from the system keyring."""
+        """Delete the authentication token from system keyring and session file."""
         try:
             keyring.delete_password(KEYRING_SERVICE, KEYRING_USERNAME)
             logger.info("🗑️ Token deleted from keyring")
-
-            # Also clean up any old insecure files
-            self._cleanup_old_session_files()
-
-        except keyring.errors.PasswordDeleteError:
-            logger.info("🔍 No token found in keyring to delete")
         except Exception as e:
-            logger.error(f"❌ Failed to delete token from keyring: {e}")
+            error_type = type(e).__name__
+            if "PasswordDeleteError" in error_type or "not found" in str(e).lower():
+                logger.info("🔍 No token found in keyring to delete")
+            else:
+                logger.error(f"❌ Failed to delete token from keyring: {e}")
+
+        # Also clean up session files
+        self._cleanup_old_session_files()
+
+        # Clean up the library's native session file too
+        try:
+            if DEFAULT_SESSION_FILE.exists():
+                DEFAULT_SESSION_FILE.unlink()
+                logger.info(f"🗑️ Deleted {DEFAULT_SESSION_FILE}")
+        except Exception as e:
+            logger.error(f"❌ Failed to delete mm_session.pickle: {e}")
 
     def get_authenticated_client(self) -> Optional[MonarchMoney]:
         """Get an authenticated MonarchMoney client."""
-        token = self.load_token()
-        if not token:
-            return None
-
+        # First try to load session using library's native persistence (loads cookies!)
+        mm = MonarchMoney()
         try:
-            client = MonarchMoney(token=token)
-            logger.info("✅ MonarchMoney client created with stored token")
-            return client
+            # Explicitly use the default session file path
+            mm.load_session(filename=str(DEFAULT_SESSION_FILE))
+            if mm.token:
+                logger.info("✅ MonarchMoney client loaded with native session (cookies+token)")
+                return mm
         except Exception as e:
-            logger.error(f"❌ Failed to create MonarchMoney client: {e}")
-            return None
+            logger.warning(f"⚠️ Failed to load native session: {e}")
+
+        # Fallback to token-only auth (from keyring) if native load failed
+        token = self.load_token()
+        if token:
+            try:
+                client = MonarchMoney(token=token)
+                logger.info("✅ MonarchMoney client created with stored token (token-only)")
+                return client
+            except Exception as e:
+                logger.error(f"❌ Failed to create MonarchMoney client: {e}")
+        
+        return None
 
     def save_authenticated_session(self, mm: MonarchMoney) -> None:
         """Save the session from an authenticated MonarchMoney instance."""
         if mm.token:
+            # 1. Save to keyring (most secure)
             self.save_token(mm.token)
+            
+            # 2. Save native session pickle (persists cookies for long sessions)
+            try:
+                # Be sure to create the directory if it doesn't exist
+                DEFAULT_SESSION_FILE.parent.mkdir(parents=True, exist_ok=True)
+                mm.save_session(filename=str(DEFAULT_SESSION_FILE))
+                logger.info(f"✅ Full session (cookies) saved to {DEFAULT_SESSION_FILE}")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not save native session pickle: {e}")
         else:
             logger.warning("⚠️  MonarchMoney instance has no token to save")
 
     def _cleanup_old_session_files(self) -> None:
-        """Clean up old insecure session files."""
+        """Clean up old insecure session files.
+        
+        Uses absolute paths based on user's home directory to avoid
+        accidentally cleaning up files in wrong working directories.
+        """
+        
         cleanup_paths = [
-            ".mm/mm_session.pickle",
-            "monarch_session.json",
-            ".mm",  # Remove the entire directory if empty
+            # home / ".mm" / "mm_session.pickle",  <-- KEEP THIS ONE! (Handled by delete_token now)
+            Path.home() / "monarch_session.json",
         ]
 
         for path in cleanup_paths:
             try:
-                if os.path.exists(path):
-                    if os.path.isfile(path):
-                        os.remove(path)
-                        logger.info(f"🗑️ Cleaned up old insecure session file: {path}")
-                    elif os.path.isdir(path) and not os.listdir(path):
-                        os.rmdir(path)
-                        logger.info(f"🗑️ Cleaned up empty session directory: {path}")
+                if path.exists() and path.is_file():
+                    path.unlink()
+                    logger.info(f"🗑️ Cleaned up old insecure session file: {path}")
             except Exception as e:
                 logger.warning(f"⚠️  Could not clean up {path}: {e}")
 

@@ -128,7 +128,9 @@ class SafetyGuard:
         except Exception as e:
             logger.error(f"Failed to save operation log: {e}")
 
-    def check_operation(self, operation_name: str) -> tuple[bool, str]:
+    def check_operation(
+        self, operation_name: str, operation_details: Optional[Dict] = None
+    ) -> tuple[bool, str]:
         """
         Check if operation is allowed.
 
@@ -143,12 +145,22 @@ class SafetyGuard:
             return (
                 False,
                 f"🚨 EMERGENCY STOP ACTIVE: All write operations disabled.\n"
-                f"Use disable_emergency_stop() to re-enable or edit {self.config.config_path}"
+                f"Use disable_emergency_stop() to re-enable or edit {self.config.config_path}",
             )
 
-        # Check if approval required (will be handled by Claude Desktop's approval system)
+        # Check if approval required
         if self.config.requires_approval(operation_name):
-            return True, f"⚠️  This is a destructive operation requiring approval"
+            # Check for explicit confirmation in parameters
+            confirmed = False
+            if operation_details:
+                confirmed = operation_details.get("confirmed", False)
+
+            if not confirmed:
+                return (
+                    False,
+                    f"⚠️  This is a destructive operation requiring approval. Set 'confirmed=True' to execute.",
+                )
+            return True, "Operation confirmed and allowed"
 
         # Just informational warning
         if self.config.should_warn(operation_name):
@@ -161,7 +173,7 @@ class SafetyGuard:
         operation_name: str,
         success: bool = True,
         operation_details: Optional[Dict] = None,
-        result: Optional[str] = None
+        result: Optional[str] = None,
     ) -> None:
         """
         Record that an operation was performed with full details for rollback.
@@ -184,11 +196,13 @@ class SafetyGuard:
         self,
         operation_name: str,
         operation_details: Optional[Dict],
-        result: Optional[str]
+        result: Optional[str],
     ) -> None:
         """Save detailed operation log for potential rollback."""
         try:
-            detailed_log_path = str(Path.home() / ".mm" / "detailed_operation_log.jsonl")
+            detailed_log_path = str(
+                Path.home() / ".mm" / "detailed_operation_log.jsonl"
+            )
             log_file = Path(detailed_log_path)
             log_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -198,7 +212,9 @@ class SafetyGuard:
                 "operation": operation_name,
                 "parameters": operation_details or {},
                 "result_preview": result[:500] if result else None,  # First 500 chars
-                "rollback_info": self._generate_rollback_info(operation_name, operation_details, result)
+                "rollback_info": self._generate_rollback_info(
+                    operation_name, operation_details, result
+                ),
             }
 
             # Append to JSONL file (one JSON object per line)
@@ -209,104 +225,123 @@ class SafetyGuard:
             logger.error(f"Failed to save detailed operation log: {e}")
 
     def _generate_rollback_info(
-        self,
-        operation_name: str,
-        params: Optional[Dict],
-        result: Optional[str]
+        self, operation_name: str, params: Optional[Dict], result: Optional[str]
     ) -> Dict:
         """Generate rollback information for an operation."""
-        rollback = {
-            "reversible": False,
-            "reverse_operation": None,
-            "notes": ""
-        }
+        rollback = {"reversible": False, "reverse_operation": None, "notes": ""}
 
         if not params:
             return rollback
 
         # Delete operations - save what was deleted for recreation
         if operation_name == "delete_transaction":
-            rollback.update({
-                "reversible": True,
-                "reverse_operation": "create_transaction",
-                "notes": f"To recreate: Use transaction details from get_transaction_details({params.get('transaction_id')})",
-                "deleted_id": params.get("transaction_id")
-            })
+            rollback.update(
+                {
+                    "reversible": True,
+                    "reverse_operation": "create_transaction",
+                    "notes": f"To recreate: Use transaction details from get_transaction_details({params.get('transaction_id')})",
+                    "deleted_id": params.get("transaction_id"),
+                }
+            )
 
         elif operation_name == "delete_account":
-            rollback.update({
-                "reversible": True,
-                "reverse_operation": "create_manual_account",
-                "notes": f"To recreate: Use account details from get_accounts before deletion",
-                "deleted_id": params.get("account_id")
-            })
+            rollback.update(
+                {
+                    "reversible": True,
+                    "reverse_operation": "create_manual_account",
+                    "notes": f"To recreate: Use account details from get_accounts before deletion",
+                    "deleted_id": params.get("account_id"),
+                }
+            )
 
         elif operation_name == "delete_transaction_category":
-            rollback.update({
-                "reversible": True,
-                "reverse_operation": "create_transaction_category",
-                "notes": f"To recreate: Use category details from get_transaction_categories before deletion",
-                "deleted_id": params.get("category_id")
-            })
+            rollback.update(
+                {
+                    "reversible": True,
+                    "reverse_operation": "create_transaction_category",
+                    "notes": f"To recreate: Use category details from get_transaction_categories before deletion",
+                    "deleted_id": params.get("category_id"),
+                }
+            )
 
         elif operation_name == "delete_transaction_categories":
-            rollback.update({
-                "reversible": True,
-                "reverse_operation": "create_transaction_category (multiple)",
-                "notes": f"To recreate: Use category details from get_transaction_categories before deletion",
-                "deleted_ids": params.get("category_ids", "").split(",")
-            })
+            rollback.update(
+                {
+                    "reversible": True,
+                    "reverse_operation": "create_transaction_category (multiple)",
+                    "notes": f"To recreate: Use category details from get_transaction_categories before deletion",
+                    "deleted_ids": params.get("category_ids", "").split(","),
+                }
+            )
 
         # Update operations - save original values
         elif operation_name == "update_transaction":
-            rollback.update({
-                "reversible": True,
-                "reverse_operation": "update_transaction",
-                "notes": f"To undo: Get original values from transaction history",
-                "modified_id": params.get("transaction_id"),
-                "modified_fields": {k: v for k, v in params.items() if k != "transaction_id" and v is not None}
-            })
+            rollback.update(
+                {
+                    "reversible": True,
+                    "reverse_operation": "update_transaction",
+                    "notes": f"To undo: Get original values from transaction history",
+                    "modified_id": params.get("transaction_id"),
+                    "modified_fields": {
+                        k: v
+                        for k, v in params.items()
+                        if k != "transaction_id" and v is not None
+                    },
+                }
+            )
 
         elif operation_name == "update_account":
-            rollback.update({
-                "reversible": True,
-                "reverse_operation": "update_account",
-                "notes": f"To undo: Get original values from account history",
-                "modified_id": params.get("account_id"),
-                "modified_fields": {k: v for k, v in params.items() if k != "account_id" and v is not None}
-            })
+            rollback.update(
+                {
+                    "reversible": True,
+                    "reverse_operation": "update_account",
+                    "notes": f"To undo: Get original values from account history",
+                    "modified_id": params.get("account_id"),
+                    "modified_fields": {
+                        k: v
+                        for k, v in params.items()
+                        if k != "account_id" and v is not None
+                    },
+                }
+            )
 
         # Create operations - save created ID for deletion
         elif operation_name == "create_transaction":
             # Try to extract ID from result
             created_id = self._extract_id_from_result(result)
-            rollback.update({
-                "reversible": True,
-                "reverse_operation": "delete_transaction",
-                "notes": "To undo: Delete the created transaction",
-                "created_id": created_id,
-                "creation_params": params
-            })
+            rollback.update(
+                {
+                    "reversible": True,
+                    "reverse_operation": "delete_transaction",
+                    "notes": "To undo: Delete the created transaction",
+                    "created_id": created_id,
+                    "creation_params": params,
+                }
+            )
 
         elif operation_name == "create_manual_account":
             created_id = self._extract_id_from_result(result)
-            rollback.update({
-                "reversible": True,
-                "reverse_operation": "delete_account",
-                "notes": "To undo: Delete the created account",
-                "created_id": created_id,
-                "creation_params": params
-            })
+            rollback.update(
+                {
+                    "reversible": True,
+                    "reverse_operation": "delete_account",
+                    "notes": "To undo: Delete the created account",
+                    "created_id": created_id,
+                    "creation_params": params,
+                }
+            )
 
         elif operation_name == "create_transaction_category":
             created_id = self._extract_id_from_result(result)
-            rollback.update({
-                "reversible": True,
-                "reverse_operation": "delete_transaction_category",
-                "notes": "To undo: Delete the created category",
-                "created_id": created_id,
-                "creation_params": params
-            })
+            rollback.update(
+                {
+                    "reversible": True,
+                    "reverse_operation": "delete_transaction_category",
+                    "notes": "To undo: Delete the created category",
+                    "created_id": created_id,
+                    "creation_params": params,
+                }
+            )
 
         return rollback
 
@@ -374,16 +409,25 @@ def require_safety_check(operation_name: str):
 
     def decorator(func):
         import functools
+        import inspect
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             guard = get_safety_guard()
 
+            # Retrieve all arguments including defaults
+            sig = inspect.signature(func)
+            bound_args = sig.bind(*args, **kwargs)
+            bound_args.apply_defaults()
+            operation_details = dict(bound_args.arguments)
+
             # Check if operation is allowed
-            allowed, message = guard.check_operation(operation_name)
+            allowed, message = guard.check_operation(operation_name, operation_details)
             if not allowed:
                 logger.warning(f"Operation '{operation_name}' blocked: {message}")
-                return json.dumps({"error": "Operation blocked", "reason": message}, indent=2)
+                return json.dumps(
+                    {"error": "Operation blocked", "reason": message}, indent=2
+                )
 
             # Log informational message if needed
             if message and message != "Operation allowed":
@@ -393,21 +437,12 @@ def require_safety_check(operation_name: str):
             try:
                 result = func(*args, **kwargs)
 
-                # Record operation with full details for rollback
-                operation_details = kwargs.copy()
-                # Also capture positional args with their parameter names
-                import inspect
-                sig = inspect.signature(func)
-                param_names = list(sig.parameters.keys())
-                for i, arg in enumerate(args):
-                    if i < len(param_names):
-                        operation_details[param_names[i]] = arg
-
+                # Record operation
                 guard.record_operation(
                     operation_name,
                     success=True,
                     operation_details=operation_details,
-                    result=result
+                    result=result,
                 )
                 return result
             except Exception as e:

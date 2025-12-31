@@ -730,7 +730,7 @@ def is_accounts_refresh_complete() -> str:
 
 @mcp.tool()
 @require_safety_check("delete_transaction")
-def delete_transaction(transaction_id: str) -> str:
+def delete_transaction(transaction_id: str, confirmed: bool = False) -> str:
     """
     Delete a transaction from Monarch Money.
 
@@ -783,7 +783,7 @@ def create_transaction_category(name: str, group_id: Optional[str] = None) -> st
 
 @mcp.tool()
 @require_safety_check("delete_transaction_category")
-def delete_transaction_category(category_id: str) -> str:
+def delete_transaction_category(category_id: str, confirmed: bool = False) -> str:
     """
     Delete a transaction category.
 
@@ -805,7 +805,7 @@ def delete_transaction_category(category_id: str) -> str:
 
 @mcp.tool()
 @require_safety_check("delete_transaction_categories")
-def delete_transaction_categories(category_ids: str) -> str:
+def delete_transaction_categories(category_ids: str, confirmed: bool = False) -> str:
     """
     Delete multiple transaction categories.
 
@@ -870,7 +870,7 @@ def create_manual_account(
 
 @mcp.tool()
 @require_safety_check("delete_account")
-def delete_account(account_id: str) -> str:
+def delete_account(account_id: str, confirmed: bool = False) -> str:
     """
     Delete an account from Monarch Money.
 
@@ -1034,7 +1034,9 @@ def set_budget_amount(category_id: str, amount: float) -> str:
 
 @mcp.tool()
 @require_safety_check("upload_account_balance_history")
-def upload_account_balance_history(account_id: str, csv_data: str) -> str:
+def upload_account_balance_history(
+    account_id: str, csv_data: str, confirmed: bool = False
+) -> str:
     """
     Upload account balance history from CSV data.
 

@@ -481,7 +481,26 @@ def get_account_history(
 
         async def _get_history():
             client = await get_monarch_client()
-            return await client.get_account_history(account_id=account_id)
+            history = await client.get_account_history(account_id=account_id)
+            
+            # Client-side filtering since SDK doesn't support date params
+            if start_date or end_date:
+                filtered_history = []
+                for entry in history:
+                    # Assumes entry has a 'date' field in YYYY-MM-DD format
+                    entry_date = entry.get("date")
+                    if not entry_date:
+                        filtered_history.append(entry)
+                        continue
+                        
+                    if start_date and entry_date < start_date:
+                        continue
+                    if end_date and entry_date > end_date:
+                        continue
+                    filtered_history.append(entry)
+                return filtered_history
+                
+            return history
 
         history = run_async(_get_history())
         return json.dumps(history, indent=2, default=str)
@@ -491,153 +510,9 @@ def get_account_history(
 
 
 @mcp.tool()
-def get_account_type_options() -> str:
-    """Get all available account types and subtypes in Monarch Money."""
-    try:
-
-        async def _get_types():
-            client = await get_monarch_client()
-            return await client.get_account_type_options()
-
-        types_data = run_async(_get_types())
-        return json.dumps(types_data, indent=2, default=str)
-    except Exception as e:
-        logger.error(f"Failed to get account type options: {e}")
-        return f"Error getting account type options: {str(e)}"
-
-
-@mcp.tool()
-def get_institutions() -> str:
-    """Get all linked financial institutions."""
-    try:
-
-        async def _get_institutions():
-            client = await get_monarch_client()
-            return await client.get_institutions()
-
-        institutions = run_async(_get_institutions())
-        return json.dumps(institutions, indent=2, default=str)
-    except Exception as e:
-        logger.error(f"Failed to get institutions: {e}")
-        return f"Error getting institutions: {str(e)}"
-
-
-@mcp.tool()
-def get_transaction_categories() -> str:
-    """Get all transaction categories."""
-    try:
-
-        async def _get_categories():
-            client = await get_monarch_client()
-            return await client.get_transaction_categories()
-
-        categories = run_async(_get_categories())
-        return json.dumps(categories, indent=2, default=str)
-    except Exception as e:
-        logger.error(f"Failed to get transaction categories: {e}")
-        return f"Error getting transaction categories: {str(e)}"
-
-
-@mcp.tool()
-def get_transaction_category_groups() -> str:
-    """Get all transaction category groups."""
-    try:
-
-        async def _get_groups():
-            client = await get_monarch_client()
-            return await client.get_transaction_category_groups()
-
-        groups = run_async(_get_groups())
-        return json.dumps(groups, indent=2, default=str)
-    except Exception as e:
-        logger.error(f"Failed to get transaction category groups: {e}")
-        return f"Error getting transaction category groups: {str(e)}"
-
-
-@mcp.tool()
-def get_transaction_tags() -> str:
-    """Get all transaction tags."""
-    try:
-
-        async def _get_tags():
-            client = await get_monarch_client()
-            return await client.get_transaction_tags()
-
-        tags = run_async(_get_tags())
-        return json.dumps(tags, indent=2, default=str)
-    except Exception as e:
-        logger.error(f"Failed to get transaction tags: {e}")
-        return f"Error getting transaction tags: {str(e)}"
-
-
-@mcp.tool()
-def get_transaction_details(transaction_id: str) -> str:
-    """
-    Get detailed information about a specific transaction.
-
-    Args:
-        transaction_id: The ID of the transaction
-    """
-    try:
-
-        async def _get_details():
-            client = await get_monarch_client()
-            return await client.get_transaction_details(transaction_id)
-
-        details = run_async(_get_details())
-        return json.dumps(details, indent=2, default=str)
-    except Exception as e:
-        logger.error(f"Failed to get transaction details: {e}")
-        return f"Error getting transaction details: {str(e)}"
-
-
-@mcp.tool()
-def get_transaction_splits(transaction_id: str) -> str:
-    """
-    Get split information for a specific transaction.
-
-    Args:
-        transaction_id: The ID of the transaction
-    """
-    try:
-
-        async def _get_splits():
-            client = await get_monarch_client()
-            return await client.get_transaction_splits(transaction_id)
-
-        splits = run_async(_get_splits())
-        return json.dumps(splits, indent=2, default=str)
-    except Exception as e:
-        logger.error(f"Failed to get transaction splits: {e}")
-        return f"Error getting transaction splits: {str(e)}"
-
-
-@mcp.tool()
-def get_recurring_transactions() -> str:
-    """Get all recurring transactions with merchant and account details."""
-    try:
-
-        async def _get_recurring():
-            client = await get_monarch_client()
-            return await client.get_recurring_transactions()
-
-        recurring = run_async(_get_recurring())
-        return json.dumps(recurring, indent=2, default=str)
-    except Exception as e:
-        logger.error(f"Failed to get recurring transactions: {e}")
-        return f"Error getting recurring transactions: {str(e)}"
-
-
-@mcp.tool()
-def get_transactions_summary(
-    start_date: Optional[str] = None, end_date: Optional[str] = None
-) -> str:
+def get_transactions_summary() -> str:
     """
     Get aggregated transaction summary data.
-
-    Args:
-        start_date: Start date in YYYY-MM-DD format (optional)
-        end_date: End date in YYYY-MM-DD format (optional)
     """
     try:
 

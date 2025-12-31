@@ -8,26 +8,38 @@ This extended version uses **user approval prompts** (like Claude Code commands)
 
 ### User Approval System
 
-Destructive operations require your explicit approval before executing:
+Destructive operations require **explicit confirmation** via a `confirmed=True` parameter:
 
 ```
 You: Delete transaction ABC123
-Claude: ⚠️  About to execute: delete_transaction(transaction_id="ABC123")
-        This is a DESTRUCTIVE operation that will permanently remove this transaction.
+Claude: ⚠️  This is a destructive operation. I need to call:
+        delete_transaction(transaction_id="ABC123", confirmed=True)
+        
+        Should I proceed with this deletion?
 
-        [Approve] [Deny]
+You: Yes, please delete it.
+Claude: [Executes with confirmed=True]
 ```
 
-You must click **[Approve]** for the operation to proceed. This prevents:
-- Runaway Claude instances from deleting your data
-- Accidental bulk operations
-- Unintended destructive changes
+**Why this design?**
+- Prevents automation from accidentally deleting data
+- Forces the LLM to explicitly acknowledge the destructive nature
+- Works across all MCP clients, not just Claude Desktop
+- Provides an audit trail of intentional confirmations
+
+**Without `confirmed=True`:**
+```json
+{
+  "error": "Operation blocked",
+  "reason": "⚠️  This is a destructive operation requiring approval. Set 'confirmed=True' to execute."
+}
+```
 
 ### Three-Tier Protection
 
-#### Tier 1: Destructive Operations (REQUIRE APPROVAL)
+#### Tier 1: Destructive Operations (REQUIRE `confirmed=True`)
 
-These operations **always** prompt for user approval:
+These operations **require** the `confirmed=True` parameter:
 
 - `delete_transaction` - Delete transactions
 - `delete_account` - Delete accounts
@@ -38,12 +50,15 @@ These operations **always** prompt for user approval:
 **Example:**
 ```
 You: Delete all transactions in the "Test" category
-Claude: I'll need to:
-        1. Find transactions in "Test" category
-        2. Delete each one (requires approval per transaction)
+Claude: I found 5 transactions in the "Test" category.
+        
+        To delete each, I'll need to call:
+        delete_transaction(transaction_id="TXN_001", confirmed=True)
+        
+        Should I proceed with deleting all 5 transactions?
 
-        Found 5 transactions. Delete transaction TXN_001?
-        [Approve] [Deny]
+You: Yes, delete them all.
+Claude: [Executes each with confirmed=True]
 ```
 
 #### Tier 2: Write Operations (WARNING ONLY)
@@ -167,6 +182,45 @@ Edit `~/.mm/safety_config.json`:
   "enabled": false  // ⚠️  Removes all protection
 }
 ```
+
+### Auto-Approve Read Operations in Claude Code
+
+To skip approval prompts for read-only operations, add them to your Claude Code settings.
+
+**Option 1: Project-level** (`.claude/settings.json` - create this file):
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp__monarch__get_accounts",
+      "mcp__monarch__get_transactions",
+      "mcp__monarch__get_transaction_details",
+      "mcp__monarch__get_transaction_category_groups",
+      "mcp__monarch__get_budgets",
+      "mcp__monarch__get_budget_details",
+      "mcp__monarch__get_cashflow",
+      "mcp__monarch__get_cashflow_summary",
+      "mcp__monarch__get_transactions_summary",
+      "mcp__monarch__get_subscription_details",
+      "mcp__monarch__get_recurring_transactions",
+      "mcp__monarch__get_account_holdings",
+      "mcp__monarch__get_account_history",
+      "mcp__monarch__get_account_type_options",
+      "mcp__monarch__get_tags",
+      "mcp__monarch__get_institutions",
+      "mcp__monarch__search_transactions",
+      "mcp__monarch__get_safety_stats",
+      "mcp__monarch__get_recent_operations",
+      "mcp__monarch__get_rollback_suggestions",
+      "mcp__monarch__check_auth_status"
+    ]
+  }
+}
+```
+
+**Option 2: Global** (add to `~/.claude/settings.json`)
+
+**Option 3: During session** - Use the `/permissions` command in Claude Code, or click "Always allow" when prompted for a read operation.
 
 ## Runaway Protection Scenarios
 

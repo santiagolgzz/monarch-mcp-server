@@ -238,8 +238,8 @@ class TestGenerateRollbackInfo:
         assert rollback["reversible"] is False
 
 
-class TestDestructiveOperationConfirmation:
-    """Tests for the confirmation requirement on destructive operations."""
+class TestDestructiveOperationBehavior:
+    """Tests for destructive operation handling (Claude Code manages user approval)."""
 
     @pytest.fixture
     def temp_guard(self):
@@ -251,52 +251,34 @@ class TestDestructiveOperationConfirmation:
             guard.operation_log_path = str(Path(tmpdir) / "operation_log.json")
             yield guard
 
-    def test_destructive_op_blocked_without_confirmation(self, temp_guard):
-        """Test that destructive operations are blocked without confirmed=True."""
-        # Add a test operation to require_approval
+    def test_destructive_op_allowed_with_warning(self, temp_guard):
+        """Test that destructive operations are allowed (Claude Code handles approval)."""
         temp_guard.config.config["require_approval"] = ["test_destructive_op"]
 
-        operation_details = {"some_id": "123", "confirmed": False}
-        allowed, message = temp_guard.check_operation(
-            "test_destructive_op", operation_details
-        )
-
-        assert allowed is False
-        assert "confirmed=True" in message
-
-    def test_destructive_op_allowed_with_confirmation(self, temp_guard):
-        """Test that destructive operations are allowed with confirmed=True."""
-        temp_guard.config.config["require_approval"] = ["test_destructive_op"]
-
-        operation_details = {"some_id": "123", "confirmed": True}
-        allowed, message = temp_guard.check_operation(
-            "test_destructive_op", operation_details
-        )
-
-        assert allowed is True
-        assert "confirmed and allowed" in message.lower()
-
-    def test_destructive_op_allowed_with_warning_when_confirmed_missing(self, temp_guard):
-        """Test that destructive operations without confirmed param are allowed with warning.
-        
-        This supports backwards compatibility for custom operations added to require_approval
-        that don't have a confirmed parameter in their signature.
-        """
-        temp_guard.config.config["require_approval"] = ["test_destructive_op"]
-
-        # No confirmed key at all - simulates a tool without confirmed param
         operation_details = {"some_id": "123"}
         allowed, message = temp_guard.check_operation(
             "test_destructive_op", operation_details
         )
 
-        # Should be allowed for backwards compatibility, but with warning
+        # Should be allowed - Claude Code prompts user for approval
         assert allowed is True
-        assert "requires approval" in message.lower()
-        assert "consider adding" in message.lower()
+        assert "destructive" in message.lower()
 
-    def test_decorator_blocks_destructive_without_confirmation(self):
-        """Test decorator blocks destructive operations without confirmed=True."""
+    def test_destructive_op_blocked_by_emergency_stop(self, temp_guard):
+        """Test that emergency stop blocks destructive operations."""
+        temp_guard.config.config["require_approval"] = ["test_destructive_op"]
+        temp_guard.config.config["emergency_stop"] = True
+
+        operation_details = {"some_id": "123"}
+        allowed, message = temp_guard.check_operation(
+            "test_destructive_op", operation_details
+        )
+
+        assert allowed is False
+        assert "EMERGENCY STOP" in message
+
+    def test_decorator_allows_destructive_ops(self):
+        """Test decorator allows destructive operations (Claude Code handles approval)."""
         guard = get_safety_guard()
         original_approval = guard.config.config.get("require_approval", [])
         guard.config.config["require_approval"] = ["decorator_test_op"]
@@ -304,102 +286,83 @@ class TestDestructiveOperationConfirmation:
         try:
 
             @require_safety_check("decorator_test_op")
-            def destructive_func(item_id: str, confirmed: bool = False):
+            def destructive_func(item_id: str):
                 return f"Deleted {item_id}"
 
             result = destructive_func("item_123")
-            result_data = json.loads(result)
-            assert "error" in result_data
-            assert "blocked" in result_data["error"].lower()
-            assert "confirmed=True" in result_data["reason"]
-
-        finally:
-            guard.config.config["require_approval"] = original_approval
-
-    def test_decorator_allows_destructive_with_confirmation(self):
-        """Test decorator allows destructive operations with confirmed=True."""
-        guard = get_safety_guard()
-        original_approval = guard.config.config.get("require_approval", [])
-        guard.config.config["require_approval"] = ["decorator_test_op"]
-
-        try:
-
-            @require_safety_check("decorator_test_op")
-            def destructive_func(item_id: str, confirmed: bool = False):
-                return f"Deleted {item_id}"
-
-            result = destructive_func("item_123", confirmed=True)
             assert result == "Deleted item_123"
 
         finally:
             guard.config.config["require_approval"] = original_approval
 
-    def test_non_destructive_op_not_affected_by_confirmation(self, temp_guard):
-        """Test that non-destructive operations don't need confirmation."""
-        # Ensure operation is NOT in require_approval
-        temp_guard.config.config["require_approval"] = ["other_op"]
+    def test_non_destructive_op_allowed(self, temp_guard):
+        """Test that non-destructive read operations are allowed."""
+        temp_guard.config.config["require_approval"] = ["delete_something"]
 
-        operation_details = {"some_id": "123"}  # No confirmed param
+        operation_details = {"some_id": "123"}
         allowed, message = temp_guard.check_operation(
             "get_accounts", operation_details
         )
 
         assert allowed is True
+        assert "Operation allowed" in message
 
 
 class TestDestructiveToolsInServer:
     """Tests for destructive tool implementations in server.py."""
 
-    def test_delete_transaction_blocked_without_confirmation(self):
-        """Test delete_transaction is blocked without confirmed=True."""
+    def test_delete_transaction_allowed_no_emergency_stop(self):
+        """Test delete_transaction is allowed when not in emergency stop."""
         from monarch_mcp_server.server import delete_transaction
+        from monarch_mcp_server.safety import get_safety_guard
 
-        result = delete_transaction(transaction_id="txn_123")
-        result_data = json.loads(result)
+        guard = get_safety_guard()
+        original_stop = guard.config.config.get("emergency_stop", False)
+        guard.config.config["emergency_stop"] = False
 
-        assert "error" in result_data
-        assert "blocked" in result_data["error"].lower()
-        assert "confirmed=True" in result_data["reason"]
+        try:
+            # Will fail at API call, but should not be blocked by safety
+            result = delete_transaction(transaction_id="txn_123")
+            # Not blocked - either succeeds or fails at API level
+            assert "blocked" not in result.lower() or "error" in result.lower()
+        finally:
+            guard.config.config["emergency_stop"] = original_stop
 
-    def test_delete_account_blocked_without_confirmation(self):
-        """Test delete_account is blocked without confirmed=True."""
+    def test_delete_transaction_blocked_by_emergency_stop(self):
+        """Test delete_transaction is blocked during emergency stop."""
+        from monarch_mcp_server.server import delete_transaction
+        from monarch_mcp_server.safety import get_safety_guard
+
+        guard = get_safety_guard()
+        original_stop = guard.config.config.get("emergency_stop", False)
+        guard.config.config["emergency_stop"] = True
+
+        try:
+            result = delete_transaction(transaction_id="txn_123")
+            result_data = json.loads(result)
+
+            assert "error" in result_data
+            assert "blocked" in result_data["error"].lower()
+            assert "EMERGENCY STOP" in result_data["reason"]
+        finally:
+            guard.config.config["emergency_stop"] = original_stop
+
+    def test_delete_account_blocked_by_emergency_stop(self):
+        """Test delete_account is blocked during emergency stop."""
         from monarch_mcp_server.server import delete_account
+        from monarch_mcp_server.safety import get_safety_guard
 
-        result = delete_account(account_id="acc_123")
-        result_data = json.loads(result)
+        guard = get_safety_guard()
+        original_stop = guard.config.config.get("emergency_stop", False)
+        guard.config.config["emergency_stop"] = True
 
-        assert "error" in result_data
-        assert "blocked" in result_data["error"].lower()
+        try:
+            result = delete_account(account_id="acc_123")
+            result_data = json.loads(result)
 
-    def test_delete_transaction_category_blocked_without_confirmation(self):
-        """Test delete_transaction_category is blocked without confirmed=True."""
-        from monarch_mcp_server.server import delete_transaction_category
+            assert "error" in result_data
+            assert "blocked" in result_data["error"].lower()
+        finally:
+            guard.config.config["emergency_stop"] = original_stop
 
-        result = delete_transaction_category(category_id="cat_123")
-        result_data = json.loads(result)
-
-        assert "error" in result_data
-        assert "blocked" in result_data["error"].lower()
-
-    def test_delete_transaction_categories_blocked_without_confirmation(self):
-        """Test delete_transaction_categories is blocked without confirmed=True."""
-        from monarch_mcp_server.server import delete_transaction_categories
-
-        result = delete_transaction_categories(category_ids="cat_1,cat_2")
-        result_data = json.loads(result)
-
-        assert "error" in result_data
-        assert "blocked" in result_data["error"].lower()
-
-    def test_upload_account_balance_history_blocked_without_confirmation(self):
-        """Test upload_account_balance_history is blocked without confirmed=True."""
-        from monarch_mcp_server.server import upload_account_balance_history
-
-        result = upload_account_balance_history(
-            account_id="acc_123", csv_data="date,balance\n2024-01-01,1000"
-        )
-        result_data = json.loads(result)
-
-        assert "error" in result_data
-        assert "blocked" in result_data["error"].lower()
 

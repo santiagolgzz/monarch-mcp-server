@@ -134,13 +134,16 @@ class SafetyGuard:
         """
         Check if operation is allowed.
 
+        Note: User approval for destructive operations is handled by Claude Code/Desktop's
+        built-in tool approval system. This method only handles emergency stop and logging.
+
         Returns:
             Tuple of (allowed: bool, message: str)
         """
         if not self.config.config.get("enabled", True):
             return True, "Safety checks disabled"
 
-        # Emergency stop check
+        # Emergency stop check - blocks ALL write operations
         if self.config.config.get("emergency_stop", False):
             return (
                 False,
@@ -148,28 +151,11 @@ class SafetyGuard:
                 f"Use disable_emergency_stop() to re-enable or edit {self.config.config_path}",
             )
 
-        # Check if approval required
+        # Log warning for destructive operations (approval handled by Claude Code/Desktop)
         if self.config.requires_approval(operation_name):
-            # Only enforce confirmed check if the parameter exists in operation_details
-            # This allows custom operations added to require_approval to still work
-            # even if they don't have a confirmed parameter
-            if operation_details and "confirmed" in operation_details:
-                if not operation_details["confirmed"]:
-                    return (
-                        False,
-                        f"⚠️  This is a destructive operation requiring approval. Set 'confirmed=True' to execute.",
-                    )
-                return True, "Operation confirmed and allowed"
-            else:
-                # No confirmed parameter - allow with warning for backwards compatibility
-                # This handles custom operations added to require_approval
-                return (
-                    True,
-                    f"⚠️  Destructive operation '{operation_name}' requires approval. "
-                    f"Consider adding 'confirmed' parameter for explicit confirmation.",
-                )
+            return True, f"⚠️  Destructive operation: {operation_name}"
 
-        # Just informational warning
+        # Informational warning for write operations
         if self.config.should_warn(operation_name):
             return True, f"ℹ️  Executing write operation: {operation_name}"
 

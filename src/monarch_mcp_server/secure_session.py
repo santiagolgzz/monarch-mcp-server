@@ -11,8 +11,13 @@ from monarchmoney import MonarchMoney
 logger = logging.getLogger(__name__)
 
 # Keyring service identifiers
+# Keyring service identifiers
 KEYRING_SERVICE = "com.mcp.monarch-mcp-server"
 KEYRING_USERNAME = "monarch-token"
+
+# Standardize session file location to user's home directory
+from pathlib import Path
+DEFAULT_SESSION_FILE = Path.home() / ".mm" / "mm_session.pickle"
 
 
 class SecureMonarchSession:
@@ -44,12 +49,10 @@ class SecureMonarchSession:
 
         # 2. Fallback to pickle file (standard library behavior)
         try:
-            from pathlib import Path
             import pickle
             
-            session_file = Path.home() / ".mm" / "mm_session.pickle"
-            if session_file.exists():
-                with open(session_file, "rb") as f:
+            if DEFAULT_SESSION_FILE.exists():
+                with open(DEFAULT_SESSION_FILE, "rb") as f:
                     data = pickle.load(f)
                     token = data.get("token")
                     if token:
@@ -78,11 +81,9 @@ class SecureMonarchSession:
 
         # Clean up the library's native session file too
         try:
-            from pathlib import Path
-            session_file = Path.home() / ".mm" / "mm_session.pickle"
-            if session_file.exists():
-                session_file.unlink()
-                logger.info("🗑️ Deleted mm_session.pickle")
+            if DEFAULT_SESSION_FILE.exists():
+                DEFAULT_SESSION_FILE.unlink()
+                logger.info(f"🗑️ Deleted {DEFAULT_SESSION_FILE}")
         except Exception as e:
             logger.error(f"❌ Failed to delete mm_session.pickle: {e}")
 
@@ -91,7 +92,8 @@ class SecureMonarchSession:
         # First try to load session using library's native persistence (loads cookies!)
         mm = MonarchMoney()
         try:
-            mm.load_session()
+            # Explicitly use the default session file path
+            mm.load_session(filename=str(DEFAULT_SESSION_FILE))
             if mm.token:
                 logger.info("✅ MonarchMoney client loaded with native session (cookies+token)")
                 return mm
@@ -118,8 +120,10 @@ class SecureMonarchSession:
             
             # 2. Save native session pickle (persists cookies for long sessions)
             try:
-                mm.save_session()
-                logger.info("✅ Full session (cookies) saved to mm_session.pickle")
+                # Be sure to create the directory if it doesn't exist
+                DEFAULT_SESSION_FILE.parent.mkdir(parents=True, exist_ok=True)
+                mm.save_session(filename=str(DEFAULT_SESSION_FILE))
+                logger.info(f"✅ Full session (cookies) saved to {DEFAULT_SESSION_FILE}")
             except Exception as e:
                 logger.warning(f"⚠️ Could not save native session pickle: {e}")
         else:
@@ -131,12 +135,10 @@ class SecureMonarchSession:
         Uses absolute paths based on user's home directory to avoid
         accidentally cleaning up files in wrong working directories.
         """
-        from pathlib import Path
         
-        home = Path.home()
         cleanup_paths = [
-            # home / ".mm" / "mm_session.pickle",  <-- KEEP THIS ONE!
-            home / "monarch_session.json",
+            # home / ".mm" / "mm_session.pickle",  <-- KEEP THIS ONE! (Handled by delete_token now)
+            Path.home() / "monarch_session.json",
         ]
 
         for path in cleanup_paths:

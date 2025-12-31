@@ -150,17 +150,24 @@ class SafetyGuard:
 
         # Check if approval required
         if self.config.requires_approval(operation_name):
-            # Check for explicit confirmation in parameters
-            confirmed = False
-            if operation_details:
-                confirmed = operation_details.get("confirmed", False)
-
-            if not confirmed:
+            # Only enforce confirmed check if the parameter exists in operation_details
+            # This allows custom operations added to require_approval to still work
+            # even if they don't have a confirmed parameter
+            if operation_details and "confirmed" in operation_details:
+                if not operation_details["confirmed"]:
+                    return (
+                        False,
+                        f"⚠️  This is a destructive operation requiring approval. Set 'confirmed=True' to execute.",
+                    )
+                return True, "Operation confirmed and allowed"
+            else:
+                # No confirmed parameter - allow with warning for backwards compatibility
+                # This handles custom operations added to require_approval
                 return (
-                    False,
-                    f"⚠️  This is a destructive operation requiring approval. Set 'confirmed=True' to execute.",
+                    True,
+                    f"⚠️  Destructive operation '{operation_name}' requires approval. "
+                    f"Consider adding 'confirmed' parameter for explicit confirmation.",
                 )
-            return True, "Operation confirmed and allowed"
 
         # Just informational warning
         if self.config.should_warn(operation_name):

@@ -276,18 +276,24 @@ class TestDestructiveOperationConfirmation:
         assert allowed is True
         assert "confirmed and allowed" in message.lower()
 
-    def test_destructive_op_blocked_when_confirmed_missing(self, temp_guard):
-        """Test that destructive operations are blocked when confirmed param is missing."""
+    def test_destructive_op_allowed_with_warning_when_confirmed_missing(self, temp_guard):
+        """Test that destructive operations without confirmed param are allowed with warning.
+        
+        This supports backwards compatibility for custom operations added to require_approval
+        that don't have a confirmed parameter in their signature.
+        """
         temp_guard.config.config["require_approval"] = ["test_destructive_op"]
 
-        # No confirmed key at all
+        # No confirmed key at all - simulates a tool without confirmed param
         operation_details = {"some_id": "123"}
         allowed, message = temp_guard.check_operation(
             "test_destructive_op", operation_details
         )
 
-        assert allowed is False
-        assert "confirmed=True" in message
+        # Should be allowed for backwards compatibility, but with warning
+        assert allowed is True
+        assert "requires approval" in message.lower()
+        assert "consider adding" in message.lower()
 
     def test_decorator_blocks_destructive_without_confirmation(self):
         """Test decorator blocks destructive operations without confirmed=True."""

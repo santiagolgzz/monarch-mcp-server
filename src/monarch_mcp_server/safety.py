@@ -66,7 +66,7 @@ class SafetyConfig:
             config_file = Path(self.config_path)
             config_file.parent.mkdir(parents=True, exist_ok=True)
             with open(config_file, "w") as f:
-                json.dump(self.config, indent=2, fp=f)
+                json.dump(self.config, f, indent=2)
         except Exception as e:
             logger.error(f"Failed to save safety config: {e}")
 

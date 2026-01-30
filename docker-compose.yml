@@ -1,0 +1,24 @@
+# Docker Compose for Monarch Money MCP Server
+# Use this for local testing or simple deployments
+
+services:
+  monarch-mcp:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Required: API key for authentication
+      - MCP_API_KEY=${MCP_API_KEY}
+      # Required: Monarch Money token (get from login_setup.py)
+      - MONARCH_TOKEN=${MONARCH_TOKEN}
+      # Optional: Enable debug mode
+      - DEBUG=${DEBUG:-false}
+      # Optional: Custom port (default 8000)
+      - PORT=${PORT:-8000}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped

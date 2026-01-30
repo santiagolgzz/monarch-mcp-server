@@ -37,9 +37,21 @@ class SecureMonarchSession:
             raise
 
     def load_token(self) -> Optional[str]:
-        """Load the authentication token from querying keyring or session file."""
+        """Load the authentication token from environment, keyring, or session file.
+
+        Priority order:
+        1. MONARCH_TOKEN environment variable (for cloud deployment)
+        2. System keyring (for local use)
+        3. Pickle file fallback (legacy support)
+        """
+        # 1. Try environment variable first (for cloud/container deployment)
+        env_token = os.getenv("MONARCH_TOKEN")
+        if env_token:
+            logger.info("✅ Token loaded from MONARCH_TOKEN environment variable")
+            return env_token
+
         try:
-            # 1. Try keyring first
+            # 2. Try keyring second (local use)
             token = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
             if token:
                 logger.info("✅ Token loaded from keyring")

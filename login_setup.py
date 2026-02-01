@@ -8,8 +8,6 @@ import asyncio
 import os
 import getpass
 import shutil
-import inspect
-import traceback
 import sys
 from pathlib import Path
 
@@ -17,9 +15,14 @@ from pathlib import Path
 src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
 
-from monarchmoney import MonarchMoney, RequireMFAException
+from monarchmoney import MonarchMoney, RequireMFAException, MonarchMoneyEndpoints
 from dotenv import load_dotenv
 from monarch_mcp_server.secure_session import secure_session
+
+# PATCH: Monarch Money rebranded from monarchmoney.com to monarch.com
+# The library hasn't been updated yet (as of v0.1.15), so we monkey-patch the BASE_URL
+# See: https://github.com/hammem/monarchmoney/issues/184
+MonarchMoneyEndpoints.BASE_URL = "https://api.monarch.com"
 
 async def main():
     load_dotenv()
@@ -53,7 +56,7 @@ async def main():
             print("You should enable MFA for your Monarch Money account.")
             print("MFA adds an extra layer of security to protect your financial data.")
             print("\nTo enable MFA:")
-            print("1. Log into Monarch Money at https://monarchmoney.com")
+            print("1. Log into Monarch Money at https://app.monarch.com")
             print("2. Go to Settings → Security")
             print("3. Enable Two-Factor Authentication")
             print("4. Follow the setup instructions\n")

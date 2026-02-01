@@ -6,7 +6,12 @@ import keyring
 import logging
 import os
 from typing import Optional
-from monarchmoney import MonarchMoney
+from monarchmoney import MonarchMoney, MonarchMoneyEndpoints
+
+# PATCH: Monarch Money rebranded from monarchmoney.com to monarch.com
+# The library hasn't been updated yet (as of v0.1.15), so we monkey-patch the BASE_URL
+# See: https://github.com/hammem/monarchmoney/issues/184
+MonarchMoneyEndpoints.BASE_URL = "https://api.monarch.com"
 
 logger = logging.getLogger(__name__)
 

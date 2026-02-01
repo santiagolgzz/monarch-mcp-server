@@ -9,8 +9,13 @@ import json
 
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
-from monarchmoney import MonarchMoney, RequireMFAException
+from monarchmoney import MonarchMoney, RequireMFAException, MonarchMoneyEndpoints
 from pydantic import BaseModel, Field
+
+# PATCH: Monarch Money rebranded from monarchmoney.com to monarch.com
+# The library hasn't been updated yet (as of v0.1.15), so we monkey-patch the BASE_URL
+# See: https://github.com/hammem/monarchmoney/issues/184
+MonarchMoneyEndpoints.BASE_URL = "https://api.monarch.com"
 
 from monarch_mcp_server.secure_session import secure_session
 from monarch_mcp_server.safety import get_safety_guard, require_safety_check
@@ -181,7 +186,7 @@ def get_accounts() -> str:
         return json.dumps(account_list, indent=2, default=str)
     except Exception as e:
         logger.error(f"Failed to get accounts: {e}")
-        return f"Error getting accounts: {str(e)}"
+        return format_error(e, "get_accounts")
 
 
 @mcp.tool()
@@ -245,7 +250,7 @@ def get_transactions(
         return json.dumps(transaction_list, indent=2, default=str)
     except Exception as e:
         logger.error(f"Failed to get transactions: {e}")
-        return f"Error getting transactions: {str(e)}"
+        return format_error(e, "get_transactions")
 
 
 @mcp.tool()
@@ -277,6 +282,34 @@ def get_budgets() -> str:
     except Exception as e:
         logger.error(f"Failed to get budgets: {e}")
         return f"Error getting budgets: {str(e)}"
+
+
+@mcp.tool()
+def get_transaction_categories() -> str:
+    """Get all transaction categories from Monarch Money with their IDs."""
+    try:
+
+        async def _get_categories():
+            client = await get_monarch_client()
+            return await client.get_transaction_categories()
+
+        categories = run_async(_get_categories())
+
+        # Format categories for display
+        category_list = []
+        for cat in categories.get("categories", []):
+            category_info = {
+                "id": cat.get("id"),
+                "name": cat.get("name"),
+                "icon": cat.get("icon"),
+                "group": cat.get("group", {}).get("name") if cat.get("group") else None,
+            }
+            category_list.append(category_info)
+
+        return json.dumps(category_list, indent=2, default=str)
+    except Exception as e:
+        logger.error(f"Failed to get transaction categories: {e}")
+        return f"Error getting transaction categories: {str(e)}"
 
 
 @mcp.tool()
@@ -338,10 +371,10 @@ def get_account_holdings(account_id: str) -> str:
 def create_transaction(
     account_id: str,
     amount: float,
-    description: str,
+    merchant_name: str,
+    category_id: str,
     date: str,
-    category_id: Optional[str] = None,
-    merchant_name: Optional[str] = None,
+    notes: Optional[str] = None,
 ) -> str:
     """
     Create a new transaction in Monarch Money.
@@ -349,17 +382,18 @@ def create_transaction(
     Args:
         account_id: The account ID to add the transaction to
         amount: Transaction amount (positive for income, negative for expenses)
-        description: Transaction description
+        merchant_name: Merchant name for the transaction
+        category_id: Category ID for the transaction
         date: Transaction date in YYYY-MM-DD format
-        category_id: Optional category ID
-        merchant_name: Optional merchant name
+        notes: Optional notes for the transaction
 
     Safety: Rate limited to 10/min, 100/day
     """
     try:
         # Validate required inputs
         validate_non_empty_string(account_id, "account_id")
-        validate_non_empty_string(description, "description")
+        validate_non_empty_string(merchant_name, "merchant_name")
+        validate_non_empty_string(category_id, "category_id")
         validated_date = validate_date_format(date, "date")
 
         async def _create_transaction():
@@ -368,14 +402,11 @@ def create_transaction(
             transaction_data = {
                 "account_id": account_id,
                 "amount": amount,
-                "description": description,
+                "merchant_name": merchant_name,
+                "category_id": category_id,
                 "date": validated_date,
+                "notes": notes or "",
             }
-
-            if category_id:
-                transaction_data["category_id"] = category_id
-            if merchant_name:
-                transaction_data["merchant_name"] = merchant_name
 
             return await client.create_transaction(**transaction_data)
 
@@ -383,10 +414,10 @@ def create_transaction(
 
         return json.dumps(result, indent=2, default=str)
     except ValidationError as e:
-        return f"Validation error: {str(e)}"
+        return format_error(e, "create_transaction")
     except Exception as e:
         logger.error(f"Failed to create transaction: {e}")
-        return f"Error creating transaction: {str(e)}"
+        return format_error(e, "create_transaction")
 
 
 @mcp.tool()
@@ -435,10 +466,10 @@ def update_transaction(
 
         return json.dumps(result, indent=2, default=str)
     except ValidationError as e:
-        return f"Validation error: {str(e)}"
+        return format_error(e, "update_transaction")
     except Exception as e:
         logger.error(f"Failed to update transaction: {e}")
-        return f"Error updating transaction: {str(e)}"
+        return format_error(e, "update_transaction")
 
 
 @mcp.tool()

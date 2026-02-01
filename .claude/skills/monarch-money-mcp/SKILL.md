@@ -13,10 +13,11 @@ Access ~40 tools for Monarch Money personal finance.
 ## Quick Start
 
 ```
-get_accounts              # List all accounts
-get_transactions          # Recent transactions
-get_budgets               # Budget vs actual
-get_cashflow              # Income vs expenses
+get_accounts                  # List all accounts
+get_transactions              # Recent transactions
+get_transaction_categories    # Get category IDs (needed for create)
+get_budgets                   # Budget vs actual
+get_cashflow                  # Income vs expenses
 ```
 
 ## Safety (CRITICAL)
@@ -30,11 +31,33 @@ get_cashflow              # Income vs expenses
 
 | Tool | Use |
 |------|-----|
-| `get_accounts` | Account balances |
+| `get_accounts` | Account balances (includes account IDs) |
 | `get_transactions` | Query with `limit`, `start_date`, `end_date` |
-| `get_recurring_transactions` | Subscriptions |
-| `create_transaction` | Add manual entry |
+| `get_transaction_categories` | Get category IDs for creating transactions |
+| `create_transaction` | Add manual entry (see params below) |
 | `delete_transaction` | ⚠️ Requires approval |
+
+## Creating Transactions
+
+`create_transaction` requires these parameters:
+- `account_id` (string) - Get from `get_accounts`
+- `amount` (number) - Positive for income, negative for expenses
+- `merchant_name` (string) - Name of the merchant
+- `category_id` (string) - Get from `get_transaction_categories`
+- `date` (string) - Format: YYYY-MM-DD
+- `notes` (string, optional) - Additional notes
+
+Example:
+```json
+{
+  "account_id": "192069965128778350",
+  "amount": -25.50,
+  "merchant_name": "Coffee Shop",
+  "category_id": "184644016420536591",
+  "date": "2025-12-15",
+  "notes": "Team coffee"
+}
+```
 
 ## Auth Error
 

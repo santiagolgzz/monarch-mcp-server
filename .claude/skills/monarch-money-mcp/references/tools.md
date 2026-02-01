@@ -29,10 +29,20 @@
 | `get_transaction_splits` | Split info | Read |
 | `get_transactions_summary` | Aggregated data | Read |
 | `get_recurring_transactions` | Subscriptions | Read |
-| `create_transaction` | Add transaction | Write |
+| `create_transaction` | Add transaction (see params below) | Write |
 | `update_transaction` | Modify transaction | Write |
 | `update_transaction_splits` | Modify splits | Write |
 | `delete_transaction` | Remove transaction | ⚠️ Approval |
+
+### create_transaction Parameters
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `account_id` | string | Yes | Account ID from `get_accounts` |
+| `amount` | number | Yes | Positive=income, Negative=expense |
+| `merchant_name` | string | Yes | Merchant/payee name |
+| `category_id` | string | Yes | Category ID from `get_transaction_categories` |
+| `date` | string | Yes | Format: YYYY-MM-DD |
+| `notes` | string | No | Optional notes |
 
 ## Categories (5 tools)
 | Tool | Description | Safety |

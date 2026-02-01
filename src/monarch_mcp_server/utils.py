@@ -114,12 +114,61 @@ def format_result(data: Any) -> str:
 
 
 def format_error(error: Exception, operation: str) -> str:
-    """Format an error message for user display."""
+    """
+    Format an error message for user display with actionable suggestions.
+
+    Analyzes the error and provides specific guidance on how to resolve it.
+    """
+    error_str = str(error)
+    error_lower = error_str.lower()
+
+    # Build suggestion based on error type
+    suggestion = ""
+
+    # 401 Unauthorized - session expired
+    if "401" in error_str or "unauthorized" in error_lower:
+        suggestion = "\n\n💡 FIX: Your session has expired. Run `python login_setup.py` to re-authenticate."
+
+    # Parameter mismatch errors (common when API changes)
+    elif "unexpected keyword argument" in error_lower:
+        # Extract the bad parameter name
+        import re
+        match = re.search(r"'(\w+)'", error_str)
+        bad_param = match.group(1) if match else "unknown"
+        suggestion = f"\n\n💡 FIX: The parameter '{bad_param}' is not accepted by the Monarch API. Check the tool's required parameters using introspection."
+
+    elif "missing" in error_lower and "required" in error_lower:
+        suggestion = "\n\n💡 FIX: A required parameter is missing. Use tool introspection to see all required parameters."
+
+    # Network/connection errors
+    elif any(term in error_lower for term in ["connection", "timeout", "network", "refused"]):
+        suggestion = "\n\n💡 FIX: Network error. Check your internet connection and try again."
+
+    # Rate limiting
+    elif "rate limit" in error_lower or "too many requests" in error_lower:
+        suggestion = "\n\n💡 FIX: Rate limit exceeded. Wait a moment before trying again. Use `get_safety_stats` to check current limits."
+
+    # Validation errors
+    elif "validation" in error_lower or "invalid" in error_lower:
+        if "date" in error_lower:
+            suggestion = "\n\n💡 FIX: Use date format YYYY-MM-DD (e.g., 2025-12-31)."
+        elif "amount" in error_lower:
+            suggestion = "\n\n💡 FIX: Amount should be a number. Positive for income, negative for expenses."
+        else:
+            suggestion = "\n\n💡 FIX: Check that all parameters have valid values."
+
+    # Not found errors
+    elif "not found" in error_lower or "404" in error_str:
+        suggestion = "\n\n💡 FIX: The requested resource was not found. Verify the ID exists using the appropriate get_* tool."
+
+    # Format the final message
     if isinstance(error, MonarchMCPError):
-        return f"Error in {operation}: {error}"
-    
-    classified = classify_exception(error)
-    return f"Error in {operation}: {classified}"
+        base_msg = f"Error in {operation}: {error}"
+    else:
+        classified = classify_exception(error)
+        base_msg = f"Error in {operation}: {classified}"
+
+    return base_msg + suggestion
 
 
 def monarch_tool(operation_name: str | None = None) -> Callable[[Callable[P, T]], Callable[P, str]]:

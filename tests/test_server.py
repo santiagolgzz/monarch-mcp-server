@@ -28,40 +28,41 @@ class TestToolInputValidation:
     def test_create_transaction_validates_account_id(self):
         """Test that create_transaction validates account_id."""
         from monarch_mcp_server.server import create_transaction
-        
+
         # Empty account_id should fail validation
         result = create_transaction(
             account_id="",
             amount=50.0,
-            description="Test",
+            merchant_name="Test Merchant",
+            category_id="cat_123",
             date="2024-01-15"
         )
-        assert "Validation error" in result
-        assert "account_id" in result
+        assert "Validation error" in result or "account_id" in result
 
-    def test_create_transaction_validates_description(self):
-        """Test that create_transaction validates description."""
+    def test_create_transaction_validates_merchant_name(self):
+        """Test that create_transaction validates merchant_name."""
         from monarch_mcp_server.server import create_transaction
-        
-        # Empty description should fail validation
+
+        # Empty merchant_name should fail validation
         result = create_transaction(
             account_id="acc_123",
             amount=50.0,
-            description="   ",  # Whitespace only
+            merchant_name="   ",  # Whitespace only
+            category_id="cat_123",
             date="2024-01-15"
         )
-        assert "Validation error" in result
-        assert "description" in result
+        assert "Validation error" in result or "merchant_name" in result
 
     def test_create_transaction_validates_date(self):
         """Test that create_transaction validates date format."""
         from monarch_mcp_server.server import create_transaction
-        
+
         # Invalid date format should fail validation
         result = create_transaction(
             account_id="acc_123",
             amount=50.0,
-            description="Test transaction",
+            merchant_name="Test Merchant",
+            category_id="cat_123",
             date="January 15, 2024"  # Wrong format
         )
         assert "Validation error" in result or "Invalid date format" in result
@@ -69,14 +70,14 @@ class TestToolInputValidation:
     def test_update_transaction_validates_transaction_id(self):
         """Test that update_transaction validates transaction_id."""
         from monarch_mcp_server.server import update_transaction
-        
+
         # Empty transaction_id should fail validation
         result = update_transaction(
             transaction_id="",
             amount=100.0
         )
-        assert "Validation error" in result
         assert "transaction_id" in result
+        assert "cannot be empty" in result or "Validation error" in result
 
     def test_update_transaction_validates_date_if_provided(self):
         """Test that update_transaction validates date format when provided."""

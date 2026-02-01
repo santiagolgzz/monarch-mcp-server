@@ -25,11 +25,15 @@ COPY src/ ./src/
 # Install the package
 RUN pip install --no-cache-dir .
 
-# Create .mm directory for session storage (if needed)
+# Create .mm directory for session storage in both locations
 RUN mkdir -p /home/mcpuser/.mm && chown -R mcpuser:mcpuser /home/mcpuser/.mm
+RUN mkdir -p /app/.mm && chown -R mcpuser:mcpuser /app/.mm
 
 # Switch to non-root user
 USER mcpuser
+
+# Set HOME so the app writes to the right place
+ENV HOME=/home/mcpuser
 
 # Expose the default port
 EXPOSE 8000

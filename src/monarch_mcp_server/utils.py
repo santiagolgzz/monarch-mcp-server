@@ -192,7 +192,7 @@ def monarch_tool(operation_name: str | None = None) -> Callable[[Callable[P, T]]
             return await client.get_accounts()
     """
     def decorator(func: Callable[P, T]) -> Callable[P, str]:
-        name = operation_name or func.__name__
+        name = operation_name or getattr(func, "__name__", "unknown")
         
         @functools.wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> str:

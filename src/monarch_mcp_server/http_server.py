@@ -22,7 +22,6 @@ Usage:
 
 import os
 import logging
-from typing import Any
 
 import uvicorn
 from starlette.applications import Starlette
@@ -55,12 +54,8 @@ def get_base_url() -> str:
     if railway_domain:
         return f"https://{railway_domain}"
 
-    # Check for Google Cloud Run
-    cloud_run_service = os.getenv("K_SERVICE")
-    cloud_run_region = os.getenv("CLOUD_RUN_REGION", "us-central1")
-    gcp_project = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT")
-    if cloud_run_service and gcp_project:
-        return f"https://{cloud_run_service}-{gcp_project}.{cloud_run_region}.run.app"
+    # Note: Cloud Run and other platforms require explicit BASE_URL configuration
+    # Cloud Run URLs use project numbers (not IDs) which aren't auto-discoverable
 
     # Local development
     host = os.getenv("HOST", "localhost")
@@ -75,7 +70,7 @@ def create_mcp_server() -> FastMCP:
     client_secret = os.getenv("GITHUB_CLIENT_SECRET", "")
 
     if not client_id or not client_secret:
-        logger.warning("GitHub OAuth credentials not set - server will fail auth requests")
+        logger.error("GitHub OAuth credentials not set - server will fail auth requests")
 
     # Create GitHub OAuth provider
     github_auth = GitHubProvider(
@@ -112,7 +107,6 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
         format_error,
         validate_date_format,
         validate_non_empty_string,
-        validate_positive_amount,
     )
     from monarch_mcp_server.exceptions import ValidationError
     from monarchmoney import MonarchMoney, MonarchMoneyEndpoints
@@ -170,12 +164,13 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
         try:
             async def _get_holdings():
                 client = await get_monarch_client()
-                return await client.get_account_holdings(account_id)
+                return await client.get_account_holdings(int(account_id))
 
             holdings = run_async(_get_holdings())
             return json.dumps(holdings, indent=2, default=str)
         except Exception as e:
-            return f"Error getting account holdings: {str(e)}"
+            logger.error(f"Failed to get account holdings: {e}")
+            return format_error(e, "get_account_holdings")
 
     @mcp.tool()
     def get_account_history(
@@ -187,12 +182,14 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
         try:
             async def _get_history():
                 client = await get_monarch_client()
-                history = await client.get_account_history(account_id=account_id)
+                history = await client.get_account_history(account_id=int(account_id))
 
                 # Client-side filtering since SDK doesn't support date params
+                # History is typically a dict with a list of entries
+                entries: list[dict] = history.get("history", []) if isinstance(history, dict) else []
                 if start_date or end_date:
                     filtered_history = []
-                    for entry in history:
+                    for entry in entries:
                         entry_date = entry.get("date")
                         if not entry_date:
                             filtered_history.append(entry)
@@ -202,14 +199,15 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
                         if end_date and entry_date > end_date:
                             continue
                         filtered_history.append(entry)
-                    return filtered_history
+                    return {"history": filtered_history}
 
                 return history
 
             history = run_async(_get_history())
             return json.dumps(history, indent=2, default=str)
         except Exception as e:
-            return f"Error getting account history: {str(e)}"
+            logger.error(f"Failed to get account history: {e}")
+            return format_error(e, "get_account_history")
 
     @mcp.tool()
     def get_transactions(
@@ -264,7 +262,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
             summary = run_async(_get_summary())
             return json.dumps(summary, indent=2, default=str)
         except Exception as e:
-            return f"Error getting transactions summary: {str(e)}"
+            logger.error(f"Failed to get transactions summary: {e}")
+            return format_error(e, "get_transactions_summary")
 
     @mcp.tool()
     def get_budgets() -> str:
@@ -289,7 +288,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
                 budget_list.append(budget_info)
             return json.dumps(budget_list, indent=2, default=str)
         except Exception as e:
-            return f"Error getting budgets: {str(e)}"
+            logger.error(f"Failed to get budgets: {e}")
+            return format_error(e, "get_budgets")
 
     @mcp.tool()
     def get_transaction_categories() -> str:
@@ -311,7 +311,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
                 category_list.append(category_info)
             return json.dumps(category_list, indent=2, default=str)
         except Exception as e:
-            return f"Error getting transaction categories: {str(e)}"
+            logger.error(f"Failed to get transaction categories: {e}")
+            return format_error(e, "get_transaction_categories")
 
     @mcp.tool()
     def get_cashflow(start_date: str | None = None, end_date: str | None = None) -> str:
@@ -329,7 +330,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
             cashflow = run_async(_get_cashflow())
             return json.dumps(cashflow, indent=2, default=str)
         except Exception as e:
-            return f"Error getting cashflow: {str(e)}"
+            logger.error(f"Failed to get cashflow: {e}")
+            return format_error(e, "get_cashflow")
 
     @mcp.tool()
     def get_cashflow_summary(
@@ -350,7 +352,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
             summary = run_async(_get_summary())
             return json.dumps(summary, indent=2, default=str)
         except Exception as e:
-            return f"Error getting cashflow summary: {str(e)}"
+            logger.error(f"Failed to get cashflow summary: {e}")
+            return format_error(e, "get_cashflow_summary")
 
     @mcp.tool()
     def get_subscription_details() -> str:
@@ -363,7 +366,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
             subscription = run_async(_get_subscription())
             return json.dumps(subscription, indent=2, default=str)
         except Exception as e:
-            return f"Error getting subscription details: {str(e)}"
+            logger.error(f"Failed to get subscription details: {e}")
+            return format_error(e, "get_subscription_details")
 
     @mcp.tool()
     def is_accounts_refresh_complete() -> str:
@@ -376,7 +380,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
             result = run_async(_check_refresh())
             return json.dumps({"refresh_complete": result}, indent=2, default=str)
         except Exception as e:
-            return f"Error checking refresh status: {str(e)}"
+            logger.error(f"Failed to check refresh status: {e}")
+            return format_error(e, "is_accounts_refresh_complete")
 
     @mcp.tool()
     def refresh_accounts() -> str:
@@ -384,12 +389,18 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
         try:
             async def _refresh_accounts():
                 client = await get_monarch_client()
-                return await client.request_accounts_refresh()
+                # Get all accounts to refresh
+                accounts = await client.get_accounts()
+                account_ids = [acc["id"] for acc in accounts.get("accounts", [])]
+                if not account_ids:
+                    return {"refreshed": False, "message": "No accounts found to refresh"}
+                return await client.request_accounts_refresh(account_ids)
 
             result = run_async(_refresh_accounts())
             return json.dumps(result, indent=2, default=str)
         except Exception as e:
-            return f"Error refreshing accounts: {str(e)}"
+            logger.error(f"Failed to refresh accounts: {e}")
+            return format_error(e, "refresh_accounts")
 
     @mcp.tool()
     def request_accounts_refresh_and_wait() -> str:
@@ -402,7 +413,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
             result = run_async(_refresh_and_wait())
             return json.dumps(result, indent=2, default=str)
         except Exception as e:
-            return f"Error refreshing and waiting: {str(e)}"
+            logger.error(f"Failed to refresh and wait: {e}")
+            return format_error(e, "request_accounts_refresh_and_wait")
 
     # ========== WRITE TOOLS (with safety decorator) ==========
 
@@ -437,15 +449,14 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
 
             async def _create_transaction():
                 client = await get_monarch_client()
-                transaction_data = {
-                    "account_id": account_id,
-                    "amount": amount,
-                    "merchant_name": merchant_name,
-                    "category_id": category_id,
-                    "date": validated_date,
-                    "notes": notes or "",
-                }
-                return await client.create_transaction(**transaction_data)
+                return await client.create_transaction(
+                    date=validated_date,  # type: ignore[arg-type]
+                    account_id=account_id,
+                    amount=amount,
+                    merchant_name=merchant_name,
+                    category_id=category_id,
+                    notes=notes or "",
+                )
 
             result = run_async(_create_transaction())
             return json.dumps(result, indent=2, default=str)
@@ -481,16 +492,13 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
 
             async def _update_transaction():
                 client = await get_monarch_client()
-                update_data = {"transaction_id": transaction_id}
-                if amount is not None:
-                    update_data["amount"] = amount
-                if description is not None:
-                    update_data["description"] = description
-                if category_id is not None:
-                    update_data["category_id"] = category_id
-                if validated_date is not None:
-                    update_data["date"] = validated_date
-                return await client.update_transaction(**update_data)
+                return await client.update_transaction(
+                    transaction_id=transaction_id,
+                    amount=amount,
+                    merchant_name=description,  # API uses merchant_name for description
+                    category_id=category_id,
+                    date=validated_date,
+                )
 
             result = run_async(_update_transaction())
             return json.dumps(result, indent=2, default=str)
@@ -511,42 +519,47 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
         Safety: HIGH RISK - Requires approval, logged for rollback
         """
         try:
+            validate_non_empty_string(transaction_id, "transaction_id")
+
             async def _delete_transaction():
                 client = await get_monarch_client()
                 return await client.delete_transaction(transaction_id)
 
             result = run_async(_delete_transaction())
             return json.dumps(result, indent=2, default=str)
+        except ValidationError as e:
+            logger.error(f"Failed to delete transaction: {e}")
+            return format_error(e, "delete_transaction")
         except Exception as e:
-            return f"Error deleting transaction: {str(e)}"
+            logger.error(f"Failed to delete transaction: {e}")
+            return format_error(e, "delete_transaction")
 
     @mcp.tool()
     @require_safety_check("create_transaction_category")
-    def create_transaction_category(name: str, group_id: str | None = None) -> str:
+    def create_transaction_category(name: str, group_id: str) -> str:
         """
         Create a new transaction category.
 
         Args:
             name: Name of the new category
-            group_id: Optional category group ID to assign the category to
+            group_id: Category group ID to assign the category to (use get_transaction_categories to find group IDs)
 
         Safety: Rate limited, logged for rollback
         """
         try:
+            validate_non_empty_string(group_id, "group_id")
+
             async def _create_category():
                 client = await get_monarch_client()
-                if group_id:
-                    return await client.create_transaction_category(
-                        transaction_category_name=name, group_id=group_id
-                    )
                 return await client.create_transaction_category(
-                    transaction_category_name=name, group_id=group_id
+                    group_id=group_id, transaction_category_name=name
                 )
 
             result = run_async(_create_category())
             return json.dumps(result, indent=2, default=str)
         except Exception as e:
-            return f"Error creating transaction category: {str(e)}"
+            logger.error(f"Failed to create transaction category: {e}")
+            return format_error(e, "create_transaction_category")
 
     @mcp.tool()
     @require_safety_check("delete_transaction_category")
@@ -567,7 +580,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
             result = run_async(_delete_category())
             return json.dumps(result, indent=2, default=str)
         except Exception as e:
-            return f"Error deleting transaction category: {str(e)}"
+            logger.error(f"Failed to delete transaction category: {e}")
+            return format_error(e, "delete_transaction_category")
 
     @mcp.tool()
     @require_safety_check("delete_transaction_categories")
@@ -589,7 +603,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
             result = run_async(_delete_categories())
             return json.dumps(result, indent=2, default=str)
         except Exception as e:
-            return f"Error deleting transaction categories: {str(e)}"
+            logger.error(f"Failed to delete transaction categories: {e}")
+            return format_error(e, "delete_transaction_categories")
 
     @mcp.tool()
     @require_safety_check("create_manual_account")
@@ -616,21 +631,22 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
 
             async def _create_account():
                 client = await get_monarch_client()
-                account_data = {
-                    "account_name": account_name,
-                    "account_type": account_type,
-                    "account_balance": current_balance,
-                }
-                if account_subtype:
-                    account_data["account_sub_type"] = account_subtype
-                return await client.create_manual_account(**account_data)
+                return await client.create_manual_account(
+                    account_type=account_type,
+                    account_sub_type=account_subtype or account_type,  # Use type as subtype if not provided
+                    is_in_net_worth=True,
+                    account_name=account_name,
+                    account_balance=current_balance,
+                )
 
             result = run_async(_create_account())
             return json.dumps(result, indent=2, default=str)
         except ValidationError as e:
-            return f"Validation error: {str(e)}"
+            logger.error(f"Failed to create manual account: {e}")
+            return format_error(e, "create_manual_account")
         except Exception as e:
-            return f"Error creating manual account: {str(e)}"
+            logger.error(f"Failed to create manual account: {e}")
+            return format_error(e, "create_manual_account")
 
     @mcp.tool()
     @require_safety_check("update_account")
@@ -654,19 +670,18 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
         try:
             async def _update_account():
                 client = await get_monarch_client()
-                update_data = {"account_id": account_id}
-                if name is not None:
-                    update_data["account_name"] = name
-                if balance is not None:
-                    update_data["account_balance"] = balance
-                if account_type is not None:
-                    update_data["account_type"] = account_type
-                return await client.update_account(**update_data)
+                return await client.update_account(
+                    account_id=account_id,
+                    account_name=name,
+                    account_balance=balance,
+                    account_type=account_type,
+                )
 
             result = run_async(_update_account())
             return json.dumps(result, indent=2, default=str)
         except Exception as e:
-            return f"Error updating account: {str(e)}"
+            logger.error(f"Failed to update account: {e}")
+            return format_error(e, "update_account")
 
     @mcp.tool()
     @require_safety_check("delete_account")
@@ -687,7 +702,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
             result = run_async(_delete_account())
             return json.dumps(result, indent=2, default=str)
         except Exception as e:
-            return f"Error deleting account: {str(e)}"
+            logger.error(f"Failed to delete account: {e}")
+            return format_error(e, "delete_account")
 
     @mcp.tool()
     @require_safety_check("create_tag")
@@ -706,16 +722,18 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
 
             async def _create_tag():
                 client = await get_monarch_client()
-                if color:
-                    return await client.create_tag(name=name, color=color)
-                return await client.create_tag(name=name)
+                # SDK requires color, default to a neutral gray if not provided
+                tag_color = color or "#808080"
+                return await client.create_transaction_tag(name=name, color=tag_color)
 
             result = run_async(_create_tag())
             return json.dumps(result, indent=2, default=str)
         except ValidationError as e:
-            return f"Validation error: {str(e)}"
+            logger.error(f"Failed to create tag: {e}")
+            return format_error(e, "create_tag")
         except Exception as e:
-            return f"Error creating tag: {str(e)}"
+            logger.error(f"Failed to create tag: {e}")
+            return format_error(e, "create_tag")
 
     @mcp.tool()
     @require_safety_check("set_transaction_tags")
@@ -738,7 +756,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
             result = run_async(_set_tags())
             return json.dumps(result, indent=2, default=str)
         except Exception as e:
-            return f"Error setting transaction tags: {str(e)}"
+            logger.error(f"Failed to set transaction tags: {e}")
+            return format_error(e, "set_transaction_tags")
 
     @mcp.tool()
     @require_safety_check("update_transaction_splits")
@@ -762,9 +781,11 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
             result = run_async(_update_splits())
             return json.dumps(result, indent=2, default=str)
         except json.JSONDecodeError as e:
-            return f"Error: Invalid JSON in splits_data: {str(e)}"
+            logger.error(f"Failed to update transaction splits - invalid JSON: {e}")
+            return format_error(e, "update_transaction_splits")
         except Exception as e:
-            return f"Error updating transaction splits: {str(e)}"
+            logger.error(f"Failed to update transaction splits: {e}")
+            return format_error(e, "update_transaction_splits")
 
     @mcp.tool()
     @require_safety_check("set_budget_amount")
@@ -781,12 +802,13 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
         try:
             async def _set_budget():
                 client = await get_monarch_client()
-                return await client.set_budget_amount(category_id, amount)
+                return await client.set_budget_amount(amount=amount, category_id=category_id)
 
             result = run_async(_set_budget())
             return json.dumps(result, indent=2, default=str)
         except Exception as e:
-            return f"Error setting budget amount: {str(e)}"
+            logger.error(f"Failed to set budget amount: {e}")
+            return format_error(e, "set_budget_amount")
 
     @mcp.tool()
     @require_safety_check("upload_account_balance_history")
@@ -812,7 +834,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
             result = run_async(_upload_history())
             return json.dumps(result, indent=2, default=str)
         except Exception as e:
-            return f"Error uploading account balance history: {str(e)}"
+            logger.error(f"Failed to upload account balance history: {e}")
+            return format_error(e, "upload_account_balance_history")
 
     # ========== SAFETY MANAGEMENT TOOLS ==========
 
@@ -824,7 +847,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
             stats = guard.get_operation_stats()
             return json.dumps(stats, indent=2, default=str)
         except Exception as e:
-            return f"Error getting safety stats: {str(e)}"
+            logger.error(f"Failed to get safety stats: {e}")
+            return format_error(e, "get_safety_stats")
 
     @mcp.tool()
     def enable_emergency_stop() -> str:
@@ -840,7 +864,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
             guard = get_safety_guard()
             return guard.enable_emergency_stop()
         except Exception as e:
-            return f"Error enabling emergency stop: {str(e)}"
+            logger.error(f"Failed to enable emergency stop: {e}")
+            return format_error(e, "enable_emergency_stop")
 
     @mcp.tool()
     def disable_emergency_stop() -> str:
@@ -853,7 +878,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
             guard = get_safety_guard()
             return guard.disable_emergency_stop()
         except Exception as e:
-            return f"Error disabling emergency stop: {str(e)}"
+            logger.error(f"Failed to disable emergency stop: {e}")
+            return format_error(e, "disable_emergency_stop")
 
     @mcp.tool()
     def get_recent_operations(limit: int = 10) -> str:
@@ -887,7 +913,7 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
                 for line in lines[-limit:]:
                     try:
                         operations.append(json.loads(line))
-                    except:
+                    except json.JSONDecodeError:
                         continue
 
             # Reverse to show most recent first
@@ -903,7 +929,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
                 default=str,
             )
         except Exception as e:
-            return f"Error getting recent operations: {str(e)}"
+            logger.error(f"Failed to get recent operations: {e}")
+            return format_error(e, "get_recent_operations")
 
     @mcp.tool()
     def get_rollback_suggestions(operation_index: int = 0) -> str:
@@ -929,7 +956,7 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
                 for line in f:
                     try:
                         operations.append(json.loads(line))
-                    except:
+                    except json.JSONDecodeError:
                         continue
 
             if not operations:
@@ -963,7 +990,7 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
 
                 # Provide specific rollback commands
                 if "deleted_id" in rollback:
-                    suggestion += f"💡 To undo: Recreate the deleted item using its original details\n"
+                    suggestion += "💡 To undo: Recreate the deleted item using its original details\n"
                     suggestion += f"   Deleted ID: {rollback['deleted_id']}\n"
 
                 elif "deleted_ids" in rollback:
@@ -971,14 +998,14 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
                     suggestion += f"   Deleted IDs: {', '.join(rollback['deleted_ids'])}\n"
 
                 elif "created_id" in rollback:
-                    suggestion += f"💡 To undo: Delete the created item\n"
+                    suggestion += "💡 To undo: Delete the created item\n"
                     suggestion += f"   Created ID: {rollback['created_id']}\n"
 
                 elif "modified_id" in rollback and "modified_fields" in rollback:
-                    suggestion += f"💡 To undo: Restore original values\n"
+                    suggestion += "💡 To undo: Restore original values\n"
                     suggestion += f"   Modified ID: {rollback['modified_id']}\n"
                     suggestion += f"   Changed fields: {', '.join(rollback['modified_fields'].keys())}\n"
-                    suggestion += f"   Note: You need the original values to restore\n"
+                    suggestion += "   Note: You need the original values to restore\n"
 
             else:
                 suggestion += "⚠️  This operation cannot be easily reversed.\n"
@@ -987,7 +1014,8 @@ def _register_monarch_tools(mcp: FastMCP) -> None:
             return suggestion
 
         except Exception as e:
-            return f"Error getting rollback suggestions: {str(e)}"
+            logger.error(f"Failed to get rollback suggestions: {e}")
+            return format_error(e, "get_rollback_suggestions")
 
     logger.info("Registered 32 Monarch Money tools with FastMCP server")
 

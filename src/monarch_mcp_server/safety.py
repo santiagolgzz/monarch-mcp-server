@@ -242,7 +242,7 @@ class SafetyGuard:
                 {
                     "reversible": True,
                     "reverse_operation": "create_manual_account",
-                    "notes": f"To recreate: Use account details from get_accounts before deletion",
+                    "notes": "To recreate: Use account details from get_accounts before deletion",
                     "deleted_id": params.get("account_id"),
                 }
             )
@@ -252,7 +252,7 @@ class SafetyGuard:
                 {
                     "reversible": True,
                     "reverse_operation": "create_transaction_category",
-                    "notes": f"To recreate: Use category details from get_transaction_categories before deletion",
+                    "notes": "To recreate: Use category details from get_transaction_categories before deletion",
                     "deleted_id": params.get("category_id"),
                 }
             )
@@ -262,7 +262,7 @@ class SafetyGuard:
                 {
                     "reversible": True,
                     "reverse_operation": "create_transaction_category (multiple)",
-                    "notes": f"To recreate: Use category details from get_transaction_categories before deletion",
+                    "notes": "To recreate: Use category details from get_transaction_categories before deletion",
                     "deleted_ids": params.get("category_ids", "").split(","),
                 }
             )
@@ -273,7 +273,7 @@ class SafetyGuard:
                 {
                     "reversible": True,
                     "reverse_operation": "update_transaction",
-                    "notes": f"To undo: Get original values from transaction history",
+                    "notes": "To undo: Get original values from transaction history",
                     "modified_id": params.get("transaction_id"),
                     "modified_fields": {
                         k: v
@@ -288,7 +288,7 @@ class SafetyGuard:
                 {
                     "reversible": True,
                     "reverse_operation": "update_account",
-                    "notes": f"To undo: Get original values from account history",
+                    "notes": "To undo: Get original values from account history",
                     "modified_id": params.get("account_id"),
                     "modified_fields": {
                         k: v
@@ -348,7 +348,7 @@ class SafetyGuard:
             for id_field in ["id", "transaction_id", "account_id", "category_id"]:
                 if id_field in result_data:
                     return str(result_data[id_field])
-        except:
+        except (json.JSONDecodeError, KeyError, TypeError):
             pass
         return None
 
@@ -438,7 +438,7 @@ def require_safety_check(operation_name: str):
                     result=result,
                 )
                 return result
-            except Exception as e:
+            except Exception:
                 guard.record_operation(operation_name, success=False)
                 raise
 

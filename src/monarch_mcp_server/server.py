@@ -3,13 +3,12 @@
 import os
 import logging
 import atexit
-from typing import Any, Dict, List, Optional, Union
-from datetime import datetime, date
+from typing import Optional
 import json
 
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
-from monarchmoney import MonarchMoney, RequireMFAException, MonarchMoneyEndpoints
+from monarchmoney import MonarchMoney, MonarchMoneyEndpoints
 from pydantic import BaseModel, Field
 
 # PATCH: Monarch Money rebranded from monarchmoney.com to monarch.com
@@ -17,22 +16,16 @@ from pydantic import BaseModel, Field
 # See: https://github.com/hammem/monarchmoney/issues/184
 MonarchMoneyEndpoints.BASE_URL = "https://api.monarch.com"
 
-from monarch_mcp_server.secure_session import secure_session
-from monarch_mcp_server.safety import get_safety_guard, require_safety_check
-from monarch_mcp_server.utils import (
+from monarch_mcp_server.secure_session import secure_session  # noqa: E402
+from monarch_mcp_server.safety import get_safety_guard, require_safety_check  # noqa: E402
+from monarch_mcp_server.utils import (  # noqa: E402
     run_async,
     shutdown_executor,
-    format_result,
     format_error,
     validate_date_format,
     validate_non_empty_string,
 )
-from monarch_mcp_server.exceptions import (
-    MonarchMCPError,
-    AuthenticationError,
-    SessionExpiredError,
-    NetworkError,
-    APIError,
+from monarch_mcp_server.exceptions import (  # noqa: E402
     ValidationError,
 )
 
@@ -356,7 +349,7 @@ def get_account_holdings(account_id: str) -> str:
 
         async def _get_holdings():
             client = await get_monarch_client()
-            return await client.get_account_holdings(account_id)
+            return await client.get_account_holdings(int(account_id))
 
         holdings = run_async(_get_holdings())
 
@@ -398,17 +391,14 @@ def create_transaction(
 
         async def _create_transaction():
             client = await get_monarch_client()
-
-            transaction_data = {
-                "account_id": account_id,
-                "amount": amount,
-                "merchant_name": merchant_name,
-                "category_id": category_id,
-                "date": validated_date,
-                "notes": notes or "",
-            }
-
-            return await client.create_transaction(**transaction_data)
+            return await client.create_transaction(
+                date=validated_date,  # type: ignore[arg-type]
+                account_id=account_id,
+                amount=amount,
+                merchant_name=merchant_name,
+                category_id=category_id,
+                notes=notes or "",
+            )
 
         result = run_async(_create_transaction())
 
@@ -448,19 +438,13 @@ def update_transaction(
 
         async def _update_transaction():
             client = await get_monarch_client()
-
-            update_data = {"transaction_id": transaction_id}
-
-            if amount is not None:
-                update_data["amount"] = amount
-            if description is not None:
-                update_data["description"] = description
-            if category_id is not None:
-                update_data["category_id"] = category_id
-            if validated_date is not None:
-                update_data["date"] = validated_date
-
-            return await client.update_transaction(**update_data)
+            return await client.update_transaction(
+                transaction_id=transaction_id,
+                amount=amount,
+                merchant_name=description,  # API uses merchant_name for description
+                category_id=category_id,
+                date=validated_date,
+            )
 
         result = run_async(_update_transaction())
 
@@ -479,7 +463,12 @@ def refresh_accounts() -> str:
 
         async def _refresh_accounts():
             client = await get_monarch_client()
-            return await client.request_accounts_refresh()
+            # Get all accounts to refresh
+            accounts = await client.get_accounts()
+            account_ids = [acc["id"] for acc in accounts.get("accounts", [])]
+            if not account_ids:
+                return {"refreshed": False, "message": "No accounts found to refresh"}
+            return await client.request_accounts_refresh(account_ids)
 
         result = run_async(_refresh_accounts())
 
@@ -512,25 +501,27 @@ def get_account_history(
 
         async def _get_history():
             client = await get_monarch_client()
-            history = await client.get_account_history(account_id=account_id)
-            
+            history = await client.get_account_history(account_id=int(account_id))
+
             # Client-side filtering since SDK doesn't support date params
+            # History is typically a dict with a list of entries
+            entries: list[dict] = history.get("history", []) if isinstance(history, dict) else []
             if start_date or end_date:
                 filtered_history = []
-                for entry in history:
+                for entry in entries:
                     # Assumes entry has a 'date' field in YYYY-MM-DD format
                     entry_date = entry.get("date")
                     if not entry_date:
                         filtered_history.append(entry)
                         continue
-                        
+
                     if start_date and entry_date < start_date:
                         continue
                     if end_date and entry_date > end_date:
                         continue
                     filtered_history.append(entry)
-                return filtered_history
-                
+                return {"history": filtered_history}
+
             return history
 
         history = run_async(_get_history())
@@ -650,29 +641,24 @@ def delete_transaction(transaction_id: str) -> str:
 
 @mcp.tool()
 @require_safety_check("create_transaction_category")
-def create_transaction_category(name: str, group_id: Optional[str] = None) -> str:
+def create_transaction_category(name: str, group_id: str) -> str:
     """
     Create a new transaction category.
 
     Args:
         name: Name of the new category
-        group_id: Optional category group ID to assign the category to
+        group_id: Category group ID to assign the category to (use get_transaction_categories to find group IDs)
 
     Safety: Rate limited to 5/min
     """
     try:
+        validate_non_empty_string(group_id, "group_id")
 
         async def _create_category():
             client = await get_monarch_client()
-            if group_id:
-                return await client.create_transaction_category(
-                    transaction_category_name=name, group_id=group_id
-                )
-            # Codex says group_id is required, but let's assume it might still be optional in some contexts or force it.
-            # However, tool def says optional. Let's pass via kwarg to be safe if it works.
-            # Actually Codex says "requires group_id", so client call failing is expected if None.
-            # But the tool signature allows Optional. We will pass what we have.
-            return await client.create_transaction_category(transaction_category_name=name, group_id=group_id)
+            return await client.create_transaction_category(
+                group_id=group_id, transaction_category_name=name
+            )
 
         result = run_async(_create_category())
         return json.dumps(result, indent=2, default=str)
@@ -750,14 +736,13 @@ def create_manual_account(
 
         async def _create_account():
             client = await get_monarch_client()
-            account_data = {
-                "account_name": account_name,
-                "account_type": account_type,
-                "account_balance": current_balance,
-            }
-            if account_subtype:
-                account_data["account_sub_type"] = account_subtype
-            return await client.create_manual_account(**account_data)
+            return await client.create_manual_account(
+                account_type=account_type,
+                account_sub_type=account_subtype or account_type,  # Use type as subtype if not provided
+                is_in_net_worth=True,
+                account_name=account_name,
+                account_balance=current_balance,
+            )
 
         result = run_async(_create_account())
         return json.dumps(result, indent=2, default=str)
@@ -811,14 +796,12 @@ def update_account(
 
         async def _update_account():
             client = await get_monarch_client()
-            update_data = {"account_id": account_id}
-            if name is not None:
-                update_data["account_name"] = name
-            if balance is not None:
-                update_data["account_balance"] = balance
-            if account_type is not None:
-                update_data["account_type"] = account_type
-            return await client.update_account(**update_data)
+            return await client.update_account(
+                account_id=account_id,
+                account_name=name,
+                account_balance=balance,
+                account_type=account_type,
+            )
 
         result = run_async(_update_account())
         return json.dumps(result, indent=2, default=str)
@@ -872,9 +855,9 @@ def create_tag(name: str, color: Optional[str] = None) -> str:
 
         async def _create_tag():
             client = await get_monarch_client()
-            if color:
-                return await client.create_tag(name=name, color=color)
-            return await client.create_tag(name=name)
+            # SDK requires color, default to a neutral gray if not provided
+            tag_color = color or "#808080"
+            return await client.create_transaction_tag(name=name, color=tag_color)
 
         result = run_async(_create_tag())
         return json.dumps(result, indent=2, default=str)
@@ -923,7 +906,7 @@ def set_budget_amount(category_id: str, amount: float) -> str:
 
         async def _set_budget():
             client = await get_monarch_client()
-            return await client.set_budget_amount(category_id, amount)
+            return await client.set_budget_amount(amount=amount, category_id=category_id)
 
         result = run_async(_set_budget())
         return json.dumps(result, indent=2, default=str)
@@ -1067,7 +1050,7 @@ def get_recent_operations(limit: int = 10) -> str:
             for line in lines[-limit:]:
                 try:
                     operations.append(json.loads(line))
-                except:
+                except json.JSONDecodeError:
                     continue
 
         # Reverse to show most recent first
@@ -1111,7 +1094,7 @@ def get_rollback_suggestions(operation_index: int = 0) -> str:
             for line in f:
                 try:
                     operations.append(json.loads(line))
-                except:
+                except json.JSONDecodeError:
                     continue
 
         if not operations:
@@ -1145,7 +1128,7 @@ def get_rollback_suggestions(operation_index: int = 0) -> str:
 
             # Provide specific rollback commands
             if "deleted_id" in rollback:
-                suggestion += f"💡 To undo: Recreate the deleted item using its original details\n"
+                suggestion += "💡 To undo: Recreate the deleted item using its original details\n"
                 suggestion += f"   Deleted ID: {rollback['deleted_id']}\n"
 
             elif "deleted_ids" in rollback:
@@ -1153,14 +1136,14 @@ def get_rollback_suggestions(operation_index: int = 0) -> str:
                 suggestion += f"   Deleted IDs: {', '.join(rollback['deleted_ids'])}\n"
 
             elif "created_id" in rollback:
-                suggestion += f"💡 To undo: Delete the created item\n"
+                suggestion += "💡 To undo: Delete the created item\n"
                 suggestion += f"   Created ID: {rollback['created_id']}\n"
 
             elif "modified_id" in rollback and "modified_fields" in rollback:
-                suggestion += f"💡 To undo: Restore original values\n"
+                suggestion += "💡 To undo: Restore original values\n"
                 suggestion += f"   Modified ID: {rollback['modified_id']}\n"
                 suggestion += f"   Changed fields: {', '.join(rollback['modified_fields'].keys())}\n"
-                suggestion += f"   Note: You need the original values to restore\n"
+                suggestion += "   Note: You need the original values to restore\n"
 
         else:
             suggestion += "⚠️  This operation cannot be easily reversed.\n"

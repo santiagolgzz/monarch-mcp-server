@@ -4,14 +4,16 @@ Secure session management for Monarch Money MCP Server using keyring.
 
 import logging
 import os
+from pathlib import Path
 from typing import Optional
+
 from monarchmoney import MonarchMoney, MonarchMoneyEndpoints
 
 # Try to import keyring, but make it optional for container deployments
 try:
     import keyring
     KEYRING_AVAILABLE = True
-except Exception:
+except ImportError:
     KEYRING_AVAILABLE = False
 
 # PATCH: Monarch Money rebranded from monarchmoney.com to monarch.com
@@ -27,7 +29,6 @@ KEYRING_SERVICE = "com.mcp.monarch-mcp-server"
 KEYRING_USERNAME = "monarch-token"
 
 # Standardize session file location to user's home directory
-from pathlib import Path
 DEFAULT_SESSION_FILE = Path.home() / ".mm" / "mm_session.pickle"
 
 

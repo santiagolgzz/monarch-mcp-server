@@ -4,7 +4,6 @@ Unified authentication and client management for Monarch Money.
 
 import os
 import logging
-from typing import Optional
 
 from monarchmoney import MonarchMoney
 from monarch_mcp_server.secure_session import secure_session

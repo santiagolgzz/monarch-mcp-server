@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from monarchmoney import MonarchMoney, MonarchMoneyEndpoints
+from monarchmoney import MonarchMoney
 
 # Try to import keyring, but make it optional for container deployments
 try:

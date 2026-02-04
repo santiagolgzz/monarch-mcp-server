@@ -12,7 +12,7 @@ from monarchmoney import MonarchMoneyEndpoints
 # See: https://github.com/hammem/monarchmoney/issues/184
 MonarchMoneyEndpoints.BASE_URL = "https://api.monarch.com"
 
-from monarch_mcp_server.exceptions import (
+from monarch_mcp_server.exceptions import (  # noqa: E402
     MonarchMCPError,
     AuthenticationError,
     SessionExpiredError,
@@ -23,7 +23,7 @@ from monarch_mcp_server.exceptions import (
     EmergencyStopError,
 )
 
-from monarch_mcp_server.utils import (
+from monarch_mcp_server.utils import (  # noqa: E402
     format_result,
     format_error,
     get_config_dir,
@@ -31,14 +31,14 @@ from monarch_mcp_server.utils import (
     validate_date_format,
 )
 
-from monarch_mcp_server.safety import (
+from monarch_mcp_server.safety import (  # noqa: E402
     SafetyConfig,
     SafetyGuard,
     get_safety_guard,
     require_safety_check,
 )
 
-from monarch_mcp_server.secure_session import (
+from monarch_mcp_server.secure_session import (  # noqa: E402
     SecureMonarchSession,
     secure_session,
 )

@@ -33,6 +33,10 @@ dependencies = [
     "keyring>=24.0.0",
     "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
+    # HTTP server dependencies for remote hosting
+    "starlette>=0.37.0",
+    "uvicorn[standard]>=0.29.0",
+    "fastmcp>=2.14.4",
 ]
 
 [project.optional-dependencies]
@@ -53,6 +57,7 @@ Upstream = "https://github.com/robcerda/monarch-mcp-server"
 
 [project.scripts]
 monarch-mcp-server = "monarch_mcp_server.server:main"
+monarch-mcp-http = "monarch_mcp_server.http_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

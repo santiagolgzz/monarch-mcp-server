@@ -17,12 +17,8 @@ sys.path.insert(0, str(src_path))
 
 from monarchmoney import MonarchMoney, RequireMFAException, MonarchMoneyEndpoints
 from dotenv import load_dotenv
+import monarch_mcp_server  # Triggers BASE_URL patch
 from monarch_mcp_server.secure_session import secure_session
-
-# PATCH: Monarch Money rebranded from monarchmoney.com to monarch.com
-# The library hasn't been updated yet (as of v0.1.15), so we monkey-patch the BASE_URL
-# See: https://github.com/hammem/monarchmoney/issues/184
-MonarchMoneyEndpoints.BASE_URL = "https://api.monarch.com"
 
 async def main():
     load_dotenv()

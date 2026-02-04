@@ -2,16 +2,19 @@
 Secure session management for Monarch Money MCP Server using keyring.
 """
 
-import keyring
 import logging
 import os
+from pathlib import Path
 from typing import Optional
+
 from monarchmoney import MonarchMoney, MonarchMoneyEndpoints
 
-# PATCH: Monarch Money rebranded from monarchmoney.com to monarch.com
-# The library hasn't been updated yet (as of v0.1.15), so we monkey-patch the BASE_URL
-# See: https://github.com/hammem/monarchmoney/issues/184
-MonarchMoneyEndpoints.BASE_URL = "https://api.monarch.com"
+# Try to import keyring, but make it optional for container deployments
+try:
+    import keyring
+    KEYRING_AVAILABLE = True
+except ImportError:
+    KEYRING_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +24,6 @@ KEYRING_SERVICE = "com.mcp.monarch-mcp-server"
 KEYRING_USERNAME = "monarch-token"
 
 # Standardize session file location to user's home directory
-from pathlib import Path
 DEFAULT_SESSION_FILE = Path.home() / ".mm" / "mm_session.pickle"
 
 
@@ -30,6 +32,10 @@ class SecureMonarchSession:
 
     def save_token(self, token: str) -> None:
         """Save the authentication token to the system keyring."""
+        if not KEYRING_AVAILABLE:
+            logger.info("⏭️ Keyring not available, skipping token save to keyring")
+            return
+
         try:
             keyring.set_password(KEYRING_SERVICE, KEYRING_USERNAME, token)
             logger.info("✅ Token saved securely to keyring")
@@ -38,19 +44,31 @@ class SecureMonarchSession:
             self._cleanup_old_session_files()
 
         except Exception as e:
-            logger.error(f"❌ Failed to save token to keyring: {e}")
-            raise
+            logger.warning(f"⚠️ Failed to save token to keyring: {e}")
 
     def load_token(self) -> Optional[str]:
-        """Load the authentication token from querying keyring or session file."""
-        try:
-            # 1. Try keyring first
-            token = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
-            if token:
-                logger.info("✅ Token loaded from keyring")
-                return token
-        except Exception as e:
-            logger.error(f"❌ Failed to load token from keyring: {e}")
+        """Load the authentication token from environment, keyring, or session file.
+
+        Priority order:
+        1. MONARCH_TOKEN environment variable (for cloud deployment)
+        2. System keyring (for local use)
+        3. Pickle file fallback (legacy support)
+        """
+        # 1. Try environment variable first (for cloud/container deployment)
+        env_token = os.getenv("MONARCH_TOKEN")
+        if env_token:
+            logger.info("✅ Token loaded from MONARCH_TOKEN environment variable")
+            return env_token
+
+        if KEYRING_AVAILABLE:
+            try:
+                # 2. Try keyring second (local use)
+                token = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
+                if token:
+                    logger.info("✅ Token loaded from keyring")
+                    return token
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to load token from keyring: {e}")
 
         # 2. Fallback to pickle file (standard library behavior)
         try:
@@ -71,15 +89,16 @@ class SecureMonarchSession:
 
     def delete_token(self) -> None:
         """Delete the authentication token from system keyring and session file."""
-        try:
-            keyring.delete_password(KEYRING_SERVICE, KEYRING_USERNAME)
-            logger.info("🗑️ Token deleted from keyring")
-        except Exception as e:
-            error_type = type(e).__name__
-            if "PasswordDeleteError" in error_type or "not found" in str(e).lower():
-                logger.info("🔍 No token found in keyring to delete")
-            else:
-                logger.error(f"❌ Failed to delete token from keyring: {e}")
+        if KEYRING_AVAILABLE:
+            try:
+                keyring.delete_password(KEYRING_SERVICE, KEYRING_USERNAME)
+                logger.info("🗑️ Token deleted from keyring")
+            except Exception as e:
+                error_type = type(e).__name__
+                if "PasswordDeleteError" in error_type or "not found" in str(e).lower():
+                    logger.info("🔍 No token found in keyring to delete")
+                else:
+                    logger.warning(f"⚠️ Failed to delete token from keyring: {e}")
 
         # Also clean up session files
         self._cleanup_old_session_files()

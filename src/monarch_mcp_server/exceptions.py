@@ -69,10 +69,3 @@ class EmergencyStopError(SafetyError):
         )
 
 
-class RateLimitError(MonarchMCPError):
-    """Raised when rate limits are exceeded."""
-
-    def __init__(self, operation: str, limit: str, details: str | None = None):
-        self.operation = operation
-        self.limit = limit
-        super().__init__(f"Rate limit exceeded for {operation}: {limit}", details)

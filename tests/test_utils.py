@@ -11,7 +11,6 @@ from monarch_mcp_server.utils import (
     format_result,
     format_error,
     validate_date_format,
-    validate_positive_amount,
     validate_non_empty_string,
     classify_exception,
 )
@@ -131,25 +130,6 @@ class TestValidateDateFormat:
         with pytest.raises(ValidationError) as exc_info:
             validate_date_format("bad-date", field_name="start_date")
         assert "start_date" in str(exc_info.value)
-
-
-class TestValidatePositiveAmount:
-    """Tests for validate_positive_amount function."""
-
-    def test_positive_amount(self):
-        """Test positive amount passes validation."""
-        result = validate_positive_amount(100.50)
-        assert result == 100.50
-
-    def test_zero_raises(self):
-        """Test zero raises ValidationError."""
-        with pytest.raises(ValidationError):
-            validate_positive_amount(0)
-
-    def test_negative_raises(self):
-        """Test negative amount raises ValidationError."""
-        with pytest.raises(ValidationError):
-            validate_positive_amount(-50.00)
 
 
 class TestValidateNonEmptyString:

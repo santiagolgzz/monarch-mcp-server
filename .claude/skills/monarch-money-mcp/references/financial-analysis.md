@@ -36,12 +36,20 @@ Total Savings = Retirement contributions (401k, IRA)
 Savings Rate = Total Savings / Gross Income
 ```
 
-Get retirement contributions from transactions:
+Get retirement contributions efficiently:
 ```python
-transactions = get_transactions(start_date="2025-01-01", end_date="2025-12-31")
-contributions = [t for t in transactions
-                 if t["category"] == "Paychecks"
-                 and t["account"] in ["401k", "HSA", "IRA"]]
+# Use get_transaction_stats to find total contributions without listing transactions
+stats = get_transaction_stats(
+    start_date="2025-01-01", 
+    end_date="2025-12-31",
+    category_id="paychecks_category_id"  # Filter by category if known
+)
+# sum_income will capture contributions if they are categorized as such
+```
+
+If you need precise filtering by account name or keywords, use `search_transactions`:
+```python
+results = search_transactions(query="401k contribution")
 ```
 
 ## Calculating Net Worth

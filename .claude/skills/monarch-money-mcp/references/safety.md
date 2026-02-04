@@ -32,7 +32,7 @@ Operations:
 ### Tier 3: Read Operations
 **No protection needed.**
 
-All `get_*` tools are completely safe.
+All `get_*` and `search_*` tools are completely safe.
 
 ## Emergency Controls
 

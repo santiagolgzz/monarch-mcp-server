@@ -20,28 +20,33 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Office/Business :: Financial",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "mcp[cli]>=1.0.0",
     "monarchmoney>=0.1.15",
     "gql>=3.4,<4.0",
     "keyring>=24.0.0",
     "python-dotenv>=1.0.0",
-    "pydantic>=2.0.0",
+    "pydantic>=2.10.0",  # 2.10+ required for Python 3.14 support
+    # HTTP server dependencies for remote hosting
+    "starlette>=0.37.0",
+    "uvicorn[standard]>=0.29.0",
+    "fastmcp>=2.14.4",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "mypy>=1.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.9.0",
+    "ty>=0.0.1a6",
     "pre-commit>=3.0.0",
 ]
 
@@ -53,24 +58,29 @@ Upstream = "https://github.com/robcerda/monarch-mcp-server"
 
 [project.scripts]
 monarch-mcp-server = "monarch_mcp_server.server:main"
+monarch-mcp-http = "monarch_mcp_server.http_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.black]
+[tool.ruff]
 line-length = 88
-target-version = ['py312']
+target-version = "py312"
 
-[tool.isort]
-profile = "black"
-line_length = 88
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = [
+    "E501",   # Line length handled by formatter
+    "B904",   # raise-without-from-inside-except - too noisy for validation errors
+    "B905",   # zip-without-explicit-strict - Python 3.10+ behavior is fine
+    "SIM117", # multiple-with-statements - sometimes clearer to nest
+]
 
-[tool.mypy]
-python_version = "3.12"
-strict = true
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.ty.environment]
+python-version = "3.12"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

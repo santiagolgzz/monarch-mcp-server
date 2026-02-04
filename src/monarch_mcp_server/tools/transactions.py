@@ -255,17 +255,19 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         client = await get_monarch_client()
 
         # Build kwargs dict, excluding None values to avoid overwriting existing data
-        kwargs: dict[str, str | float] = {"transaction_id": transaction_id}
+        update_data: dict[str, str | float] = {}
         if amount is not None:
-            kwargs["amount"] = amount
+            update_data["amount"] = amount
         if description is not None:
-            kwargs["merchant_name"] = description
+            update_data["merchant_name"] = description
         if category_id is not None:
-            kwargs["category_id"] = category_id
+            update_data["category_id"] = category_id
         if validated_date is not None:
-            kwargs["date"] = validated_date
+            update_data["date"] = validated_date
 
-        return await client.update_transaction(**kwargs)  # type: ignore[arg-type]
+        return await client.update_transaction(
+            transaction_id=transaction_id, **update_data
+        )  # type: ignore[arg-type]
 
     @mcp.tool()
     @require_safety_check("delete_transaction")

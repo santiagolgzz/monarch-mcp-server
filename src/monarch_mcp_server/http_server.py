@@ -48,15 +48,19 @@ def get_base_url() -> str:
 
 
 def create_mcp_server() -> FastMCP:
-    """Create the FastMCP server with GitHub OAuth and all Monarch tools."""
+    """Create the FastMCP server with GitHub OAuth and all Monarch tools.
 
+    Raises:
+        ValueError: If GitHub OAuth credentials are not configured.
+    """
     base_url = get_base_url()
     client_id = os.getenv("GITHUB_CLIENT_ID", "")
     client_secret = os.getenv("GITHUB_CLIENT_SECRET", "")
 
     if not client_id or not client_secret:
-        logger.error(
-            "GitHub OAuth credentials not set - server will fail auth requests"
+        raise ValueError(
+            "GitHub OAuth credentials required. "
+            "Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET environment variables."
         )
 
     # Create GitHub OAuth provider
@@ -85,24 +89,12 @@ def create_mcp_server() -> FastMCP:
 # Health check endpoint (public, no auth required)
 async def health_check(request: Request) -> Response:
     """Health check endpoint for monitoring and load balancers."""
-    from monarch_mcp_server.secure_session import secure_session
-
-    has_credentials = (
-        bool(os.getenv("MONARCH_TOKEN"))
-        or (bool(os.getenv("MONARCH_EMAIL")) and bool(os.getenv("MONARCH_PASSWORD")))
-        or secure_session.load_token() is not None
+    return JSONResponse(
+        {
+            "status": "healthy",
+            "service": "monarch-mcp-server",
+        }
     )
-    has_github_oauth = bool(os.getenv("GITHUB_CLIENT_ID"))
-
-    status = {
-        "status": "healthy",
-        "service": "monarch-mcp-server",
-        "has_monarch_credentials": has_credentials,
-        "github_oauth_configured": has_github_oauth,
-        "base_url": get_base_url(),
-    }
-
-    return JSONResponse(status)
 
 
 async def root(request: Request) -> Response:
@@ -155,8 +147,21 @@ def create_app() -> Starlette:
     return app
 
 
-# Create the ASGI app instance
-app = create_app()
+# Lazy app creation for ASGI servers (gunicorn, etc.)
+# This allows importing the module without requiring OAuth credentials
+_app: Starlette | None = None
+
+
+def get_app() -> Starlette:
+    """Get or create the ASGI application.
+
+    Raises:
+        ValueError: If OAuth credentials are not configured.
+    """
+    global _app
+    if _app is None:
+        _app = create_app()
+    return _app
 
 
 def main():
@@ -164,11 +169,12 @@ def main():
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
 
-    # Validate configuration
-    if not os.getenv("GITHUB_CLIENT_ID") or not os.getenv("GITHUB_CLIENT_SECRET"):
+    # Validate by attempting to create the app (will raise if misconfigured)
+    try:
+        application = get_app()
+    except ValueError as e:
         logger.error("=" * 60)
-        logger.error("ERROR: GitHub OAuth credentials required!")
-        logger.error("Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET")
+        logger.error(f"ERROR: {e}")
         logger.error("=" * 60)
         raise SystemExit(1)
 
@@ -179,7 +185,7 @@ def main():
     logger.info(f"Health check: {base_url}/health")
 
     uvicorn.run(
-        app,
+        application,
         host=host,
         port=port,
         log_level="info",

@@ -195,6 +195,92 @@ class TestRequireSafetyCheckDecorator:
         finally:
             guard.config.config["emergency_stop"] = original_stop
 
+    @pytest.mark.asyncio
+    async def test_decorator_records_failure_and_reraises(self):
+        """Test decorator records failure and re-raises when function throws."""
+        guard = get_safety_guard()
+        original_enabled = guard.config.config.get("enabled", True)
+        guard.config.config["enabled"] = False
+
+        # Track if record_operation was called with success=False
+        recorded_failures = []
+        original_record = guard.record_operation
+
+        def mock_record(op_name, success=True, **kwargs):
+            if not success:
+                recorded_failures.append(op_name)
+            return original_record(op_name, success=success, **kwargs)
+
+        try:
+
+            @require_safety_check("failing_op")
+            async def failing_func():
+                raise ValueError("Intentional test error")
+
+            guard.record_operation = mock_record
+
+            with pytest.raises(ValueError, match="Intentional test error"):
+                await failing_func()
+
+            # Verify failure was recorded
+            assert "failing_op" in recorded_failures
+
+        finally:
+            guard.config.config["enabled"] = original_enabled
+            guard.record_operation = original_record
+
+
+class TestRequireSafetyCheckSyncPath:
+    """Tests for sync function support in require_safety_check decorator."""
+
+    @pytest.mark.asyncio
+    async def test_sync_function_works(self):
+        """Test decorator works with synchronous functions."""
+        guard = get_safety_guard()
+        original_enabled = guard.config.config.get("enabled", True)
+        guard.config.config["enabled"] = False
+
+        try:
+
+            @require_safety_check("sync_test_op")
+            def sync_func(value: str) -> str:
+                return f"Result: {value}"
+
+            # The decorator returns an async wrapper, so we need to await it
+            result = await sync_func("test")
+            assert result == "Result: test"
+
+        finally:
+            guard.config.config["enabled"] = original_enabled
+
+    @pytest.mark.asyncio
+    async def test_sync_function_records_operation(self):
+        """Test decorator records operations for sync functions."""
+        from collections import defaultdict
+
+        guard = get_safety_guard()
+        original_enabled = guard.config.config.get("enabled", True)
+        guard.config.config["enabled"] = False
+
+        # Reset counts for this test
+        original_counts = guard.daily_counts
+        guard.daily_counts = defaultdict(lambda: defaultdict(int))
+
+        try:
+
+            @require_safety_check("sync_recorded_op")
+            def sync_func():
+                return "done"
+
+            await sync_func()
+
+            today = datetime.now().strftime("%Y-%m-%d")
+            assert guard.daily_counts[today]["sync_recorded_op"] == 1
+
+        finally:
+            guard.config.config["enabled"] = original_enabled
+            guard.daily_counts = original_counts
+
 
 class TestGenerateRollbackInfo:
     """Tests for rollback info generation."""

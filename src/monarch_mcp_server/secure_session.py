@@ -29,11 +29,15 @@ DEFAULT_SESSION_FILE = Path.home() / ".mm" / "mm_session.pickle"
 class SecureMonarchSession:
     """Manages Monarch Money sessions securely using the system keyring."""
 
-    def save_token(self, token: str) -> None:
-        """Save the authentication token to the system keyring."""
+    def save_token(self, token: str) -> bool:
+        """Save the authentication token to the system keyring.
+
+        Returns:
+            True if token was saved successfully, False otherwise.
+        """
         if not KEYRING_AVAILABLE:
             logger.info("⏭️ Keyring not available, skipping token save to keyring")
-            return
+            return False
 
         try:
             keyring.set_password(KEYRING_SERVICE, KEYRING_USERNAME, token)
@@ -41,9 +45,15 @@ class SecureMonarchSession:
 
             # Clean up any old insecure files
             self._cleanup_old_session_files()
+            return True
 
         except Exception as e:
-            logger.warning(f"⚠️ Failed to save token to keyring: {e}")
+            logger.error(
+                f"Failed to save token to keyring: {e}. "
+                "Ensure keyring backend is configured. "
+                "On Linux, install 'secretstorage' or configure gnome-keyring."
+            )
+            return False
 
     def load_token(self) -> str | None:
         """Load the authentication token from environment, keyring, or session file.

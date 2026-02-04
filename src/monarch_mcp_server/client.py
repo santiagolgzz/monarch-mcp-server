@@ -35,7 +35,11 @@ async def get_monarch_client() -> MonarchMoney:
             logger.debug("Using existing authenticated session")
             return client
     except Exception as e:
-        logger.warning(f"Failed to load secure session: {e}")
+        logger.error(
+            f"Failed to load secure session: {e}. "
+            "Run 'python login_setup.py' to re-authenticate, "
+            "or set MONARCH_EMAIL and MONARCH_PASSWORD environment variables."
+        )
 
     # 2. Try environment variables
     email = os.getenv("MONARCH_EMAIL")

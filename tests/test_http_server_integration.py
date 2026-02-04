@@ -1,4 +1,3 @@
-import importlib
 import os
 from unittest.mock import patch
 
@@ -8,7 +7,7 @@ from fastmcp import FastMCP
 
 @pytest.mark.asyncio
 async def test_http_server_registers_tools():
-    """Verify that http_server.py registers tools using the shared module."""
+    """Verify that http_server.py registers tools when creating the app."""
     # Mock environment for GitHub OAuth
     env = {
         "GITHUB_CLIENT_ID": "test_id",
@@ -17,11 +16,13 @@ async def test_http_server_registers_tools():
     }
 
     with patch.dict(os.environ, env):
-        with patch("monarch_mcp_server.tools.register_tools") as mock_register:
-            # Import and reload the module to trigger its setup code
-            import monarch_mcp_server.http_server
+        # Patch at the location where it's imported/used
+        with patch("monarch_mcp_server.http_server.register_tools") as mock_register:
+            # Import the function and call it - app is now lazy-loaded
+            from monarch_mcp_server.http_server import create_app
 
-            importlib.reload(monarch_mcp_server.http_server)
+            # create_app triggers create_mcp_server which registers tools
+            create_app()
 
             # Check if mock_register was called
             mock_register.assert_called()

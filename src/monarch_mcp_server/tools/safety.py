@@ -24,7 +24,7 @@ def register_safety_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     @tool_handler("get_safety_stats")
     async def get_safety_stats() -> dict:
-        """Get current safety statistics including rate limits and daily operation counts."""
+        """Get current safety statistics including daily operation counts and emergency stop status."""
         guard = get_safety_guard()
         return guard.get_operation_stats()
 
@@ -73,35 +73,32 @@ def register_safety_tools(mcp: FastMCP) -> None:
         }
 
     @mcp.tool()
+    @tool_handler("get_rollback_suggestions")
     async def get_rollback_suggestions(operation_index: int = 0) -> str:
         """Get detailed rollback suggestions for a recent operation."""
-        try:
-            detailed_log_path = Path.home() / ".mm" / "detailed_operation_log.jsonl"
+        detailed_log_path = Path.home() / ".mm" / "detailed_operation_log.jsonl"
 
-            if not detailed_log_path.exists():
-                return "No operations logged yet."
+        if not detailed_log_path.exists():
+            return "No operations logged yet."
 
-            # Read operations efficiently
-            # We need at least operation_index + 1 lines from the end
-            with open(detailed_log_path) as f:
-                # deque(f, maxlen=operation_index + 1) reads only what's needed
-                last_lines = deque(f, maxlen=operation_index + 1)
+        # Read operations efficiently
+        # We need at least operation_index + 1 lines from the end
+        with open(detailed_log_path) as f:
+            # deque(f, maxlen=operation_index + 1) reads only what's needed
+            last_lines = deque(f, maxlen=operation_index + 1)
 
-                if len(last_lines) <= operation_index:
-                    return f"Operation index {operation_index} not found. Only {len(last_lines)} operations logged."
+            if len(last_lines) <= operation_index:
+                return f"Operation index {operation_index} not found. Only {len(last_lines)} operations logged."
 
-                # The requested operation is the first in our deque
-                target_line = last_lines[0]
-                try:
-                    op = json.loads(target_line)
-                except json.JSONDecodeError:
-                    return "Failed to parse log entry."
+            # The requested operation is the first in our deque
+            target_line = last_lines[0]
+            op = json.loads(target_line)
 
-            # Generate rollback suggestions
-            rollback = op.get("rollback_info", {})
-            params = op.get("parameters", {})
+        # Generate rollback suggestions
+        rollback = op.get("rollback_info", {})
+        params = op.get("parameters", {})
 
-            suggestion = f"""Rollback Information
+        suggestion = f"""Rollback Information
 
 Timestamp: {op.get("timestamp")}
 Operation: {op.get("operation")}
@@ -111,26 +108,20 @@ Parameters: {json.dumps(params, indent=2)}
 
 """
 
-            if rollback.get("reversible"):
-                suggestion += f"""Reverse Operation: {rollback.get("reverse_operation")}
+        if rollback.get("reversible"):
+            suggestion += f"""Reverse Operation: {rollback.get("reverse_operation")}
 Instructions: {rollback.get("notes")}
 
 """
-                if "deleted_id" in rollback:
-                    suggestion += f"To undo: Recreate the deleted item using its original details\n   Deleted ID: {rollback['deleted_id']}\n"
-                elif "deleted_ids" in rollback:
-                    suggestion += f"To undo: Recreate {len(rollback['deleted_ids'])} deleted items\n   Deleted IDs: {', '.join(rollback['deleted_ids'])}\n"
-                elif "created_id" in rollback:
-                    suggestion += f"To undo: Delete the created item\n   Created ID: {rollback['created_id']}\n"
-                elif "modified_id" in rollback and "modified_fields" in rollback:
-                    suggestion += f"To undo: Restore original values\n   Modified ID: {rollback['modified_id']}\n   Changed fields: {', '.join(rollback['modified_fields'].keys())}\n"
-            else:
-                suggestion += "This operation cannot be easily reversed.\n   You may need to manually fix any issues in Monarch Money web interface.\n"
+            if "deleted_id" in rollback:
+                suggestion += f"To undo: Recreate the deleted item using its original details\n   Deleted ID: {rollback['deleted_id']}\n"
+            elif "deleted_ids" in rollback:
+                suggestion += f"To undo: Recreate {len(rollback['deleted_ids'])} deleted items\n   Deleted IDs: {', '.join(rollback['deleted_ids'])}\n"
+            elif "created_id" in rollback:
+                suggestion += f"To undo: Delete the created item\n   Created ID: {rollback['created_id']}\n"
+            elif "modified_id" in rollback and "modified_fields" in rollback:
+                suggestion += f"To undo: Restore original values\n   Modified ID: {rollback['modified_id']}\n   Changed fields: {', '.join(rollback['modified_fields'].keys())}\n"
+        else:
+            suggestion += "This operation cannot be easily reversed.\n   You may need to manually fix any issues in Monarch Money web interface.\n"
 
-            return suggestion
-
-        except Exception as e:
-            logger.error(f"Failed to get rollback suggestions: {e}")
-            from monarch_mcp_server.utils import format_error
-
-            return format_error(e, "get_rollback_suggestions")
+        return suggestion

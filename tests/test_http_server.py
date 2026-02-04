@@ -76,8 +76,7 @@ class TestCreateMCPServer:
 
     def test_missing_credentials_raises_error(self):
         """Verify create_mcp_server raises when GitHub credentials are missing."""
-        # GitHubProvider raises ValueError when credentials are empty
-        # We need to import inside the test to get fresh function reference
+        # create_mcp_server now validates credentials and raises ValueError
 
         import monarch_mcp_server.http_server as http_server_module
 
@@ -89,8 +88,8 @@ class TestCreateMCPServer:
                 "BASE_URL": "http://localhost:8000",
             },
         ):
-            with pytest.raises(ValueError, match="client_id is required"):
-                # Call the function directly - it will fail on GitHubProvider init
+            with pytest.raises(ValueError, match="GitHub OAuth credentials required"):
+                # Call the function directly - it validates credentials early
                 http_server_module.create_mcp_server()
 
     def test_with_credentials(self):
@@ -115,31 +114,21 @@ class TestHealthCheck:
     """Tests for the health_check endpoint."""
 
     @pytest.mark.asyncio
-    async def test_with_monarch_token(self):
-        """Verify health check detects MONARCH_TOKEN."""
-        with patch.dict(
-            os.environ,
-            {
-                "MONARCH_TOKEN": "test_token",
-                "GITHUB_CLIENT_ID": "test_id",
-                "GITHUB_CLIENT_SECRET": "test_secret",
-            },
-        ):
-            with patch(
-                "monarch_mcp_server.secure_session.SecureMonarchSession.load_token",
-                return_value=None,
-            ):
-                from starlette.requests import Request
+    async def test_returns_minimal_info(self):
+        """Verify health check returns only status and service (no credential info)."""
+        import json
 
-                from monarch_mcp_server.http_server import health_check
+        from starlette.requests import Request
 
-                mock_request = MagicMock(spec=Request)
-                response = await health_check(mock_request)
+        from monarch_mcp_server.http_server import health_check
 
-                assert response.status_code == 200
-                data = response.body.decode()
-                assert "healthy" in data
-                assert "has_monarch_credentials" in data
+        mock_request = MagicMock(spec=Request)
+        response = await health_check(mock_request)
+
+        assert response.status_code == 200
+        data = json.loads(response.body.decode())
+        # Should only contain status and service - no credential info
+        assert data == {"status": "healthy", "service": "monarch-mcp-server"}
 
     @pytest.mark.asyncio
     async def test_without_credentials(self):
@@ -172,63 +161,25 @@ class TestHealthCheck:
 
     @pytest.mark.asyncio
     async def test_response_structure(self):
-        """Verify health check response contains expected fields."""
-        with patch.dict(
-            os.environ,
-            {
-                "GITHUB_CLIENT_ID": "test_id",
-                "GITHUB_CLIENT_SECRET": "test_secret",
-                "BASE_URL": "http://localhost:8000",
-            },
-        ):
-            with patch(
-                "monarch_mcp_server.secure_session.SecureMonarchSession.load_token",
-                return_value="token",
-            ):
-                import json
+        """Verify health check response contains only minimal fields."""
+        import json
 
-                from starlette.requests import Request
+        from starlette.requests import Request
 
-                from monarch_mcp_server.http_server import health_check
+        from monarch_mcp_server.http_server import health_check
 
-                mock_request = MagicMock(spec=Request)
-                response = await health_check(mock_request)
+        mock_request = MagicMock(spec=Request)
+        response = await health_check(mock_request)
 
-                data = json.loads(response.body.decode())
+        data = json.loads(response.body.decode())
 
-                assert "status" in data
-                assert "service" in data
-                assert "has_monarch_credentials" in data
-                assert "github_oauth_configured" in data
-                assert "base_url" in data
-
-    @pytest.mark.asyncio
-    async def test_with_email_password(self):
-        """Verify health check detects email/password credentials."""
-        with patch.dict(
-            os.environ,
-            {
-                "MONARCH_EMAIL": "test@example.com",
-                "MONARCH_PASSWORD": "password123",
-                "GITHUB_CLIENT_ID": "test_id",
-                "GITHUB_CLIENT_SECRET": "test_secret",
-            },
-        ):
-            with patch(
-                "monarch_mcp_server.secure_session.SecureMonarchSession.load_token",
-                return_value=None,
-            ):
-                import json
-
-                from starlette.requests import Request
-
-                from monarch_mcp_server.http_server import health_check
-
-                mock_request = MagicMock(spec=Request)
-                response = await health_check(mock_request)
-
-                data = json.loads(response.body.decode())
-                assert data["has_monarch_credentials"] is True
+        # Health endpoint should only expose status and service
+        # NOT credential status (security: no information disclosure)
+        assert "status" in data
+        assert "service" in data
+        assert "has_monarch_credentials" not in data
+        assert "github_oauth_configured" not in data
+        assert "base_url" not in data
 
 
 class TestRootEndpoint:

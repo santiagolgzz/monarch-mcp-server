@@ -134,12 +134,17 @@ def register_account_tools(mcp: FastMCP) -> None:
     ) -> dict:
         """Update account settings or balance."""
         client = await get_monarch_client()
-        return await client.update_account(
-            account_id=account_id,
-            account_name=name,
-            account_balance=balance,
-            account_type=account_type,
-        )
+
+        # Build kwargs dict, excluding None values to avoid overwriting existing data
+        update_data: dict[str, str | float] = {}
+        if name is not None:
+            update_data["account_name"] = name
+        if balance is not None:
+            update_data["account_balance"] = balance
+        if account_type is not None:
+            update_data["account_type"] = account_type
+
+        return await client.update_account(account_id=account_id, **update_data)
 
     @mcp.tool()
     @require_safety_check("delete_account")

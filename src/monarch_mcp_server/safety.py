@@ -381,15 +381,12 @@ class SafetyGuard:
         return "✅ Emergency stop deactivated. Write operations are now enabled."
 
 
-# Global instance
-_safety_guard: SafetyGuard | None = None
+# Global instance - eagerly initialized to avoid race conditions in async context
+_safety_guard = SafetyGuard()
 
 
 def get_safety_guard() -> SafetyGuard:
-    """Get or create the global safety guard instance."""
-    global _safety_guard
-    if _safety_guard is None:
-        _safety_guard = SafetyGuard()
+    """Get the global safety guard instance."""
     return _safety_guard
 
 
@@ -444,9 +441,9 @@ def require_safety_check(operation_name: str):
                     result=result,
                 )
                 return result
-            except Exception:
+            except Exception as e:
                 guard.record_operation(operation_name, success=False)
-                raise
+                raise e
 
         return wrapper
 

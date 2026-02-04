@@ -1,5 +1,5 @@
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastmcp import FastMCP
@@ -10,6 +10,46 @@ from monarch_mcp_server.tools import register_tools
 @pytest.fixture
 def mcp():
     return FastMCP("test")
+
+
+@pytest.mark.asyncio
+async def test_create_transaction_success(mcp):
+    """Verify create_transaction successfully creates a transaction."""
+    register_tools(mcp)
+
+    mock_client = AsyncMock()
+    mock_client.create_transaction.return_value = {
+        "id": "txn_new_123",
+        "date": "2024-01-15",
+        "amount": -50.0,
+        "merchant": {"name": "Test Merchant"},
+        "category": {"id": "cat_123", "name": "Food"},
+        "account": {"id": "acc_123", "displayName": "Checking"},
+    }
+
+    with patch(
+        "monarch_mcp_server.tools.transactions.get_monarch_client",
+        return_value=mock_client,
+    ):
+        with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
+            mock_guard.return_value.check_operation.return_value = (True, "OK")
+            mock_guard.return_value.record_operation = MagicMock()
+
+            tool = await mcp._tool_manager.get_tool("create_transaction")
+            result = await tool.fn(
+                account_id="acc_123",
+                amount=-50.0,
+                merchant_name="Test Merchant",
+                category_id="cat_123",
+                date="2024-01-15",
+            )
+
+            data = json.loads(result)
+            assert data["id"] == "txn_new_123"
+            assert data["amount"] == -50.0
+
+            # Verify SDK was called
+            mock_client.create_transaction.assert_called_once()
 
 
 @pytest.mark.asyncio

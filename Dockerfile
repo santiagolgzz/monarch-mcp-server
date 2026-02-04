@@ -14,10 +14,6 @@ RUN useradd --create-home --shell /bin/bash mcpuser
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy project files
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
@@ -25,9 +21,8 @@ COPY src/ ./src/
 # Install the package
 RUN pip install --no-cache-dir .
 
-# Create .mm directory for session storage in both locations
+# Create .mm directory for session storage
 RUN mkdir -p /home/mcpuser/.mm && chown -R mcpuser:mcpuser /home/mcpuser/.mm
-RUN mkdir -p /app/.mm && chown -R mcpuser:mcpuser /app/.mm
 
 # Switch to non-root user
 USER mcpuser

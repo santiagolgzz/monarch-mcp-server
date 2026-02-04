@@ -66,35 +66,31 @@ def register_account_tools(mcp: FastMCP) -> None:
             raise ValidationError(f"Invalid account_id: {account_id}. Must be numeric.")
 
         client = await get_monarch_client()
-        history = await client.get_account_history(account_id=acc_id)
+        history_data = await client.get_account_history(account_id=acc_id)
 
-        # Client-side filtering since SDK doesn't support date params
-        entries: list[dict] = history.get("history", []) if isinstance(history, dict) else []
+        # Handle both dict and list return types from SDK
+        if isinstance(history_data, dict):
+            entries = history_data.get("history", [])
+        elif isinstance(history_data, list):
+            entries = history_data
+        else:
+            entries = []
 
         if start_date or end_date:
-            filtered_history = []
+            filtered_entries = []
             for entry in entries:
                 entry_date = entry.get("date")
                 if not entry_date:
-                    filtered_history.append(entry)
+                    filtered_entries.append(entry)
                     continue
                 if start_date and entry_date < start_date:
                     continue
                 if end_date and entry_date > end_date:
                     continue
-                filtered_history.append(entry)
+                filtered_entries.append(entry)
+            return {"history": filtered_entries}
 
-            # Standardize return format
-            if isinstance(history, dict):
-                history["history"] = filtered_history
-            else:
-                history = {"history": filtered_history}
-
-        # Ensure consistent wrapper even if no filtering applied
-        if not isinstance(history, dict) or "history" not in history:
-            history = {"history": entries if not isinstance(history, dict) else history}
-
-        return history
+        return {"history": entries}
 
     @mcp.tool()
     @tool_handler("get_account_type_options")

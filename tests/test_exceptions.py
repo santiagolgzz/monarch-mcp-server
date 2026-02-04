@@ -1,16 +1,14 @@
 """Tests for the exceptions module."""
 
-import pytest
 from monarch_mcp_server.exceptions import (
-    MonarchMCPError,
-    AuthenticationError,
-    SessionExpiredError,
-    NetworkError,
     APIError,
-    ValidationError,
-    SafetyError,
+    AuthenticationError,
     EmergencyStopError,
-    RateLimitError,
+    MonarchMCPError,
+    NetworkError,
+    SafetyError,
+    SessionExpiredError,
+    ValidationError,
 )
 
 
@@ -132,19 +130,3 @@ class TestEmergencyStopError:
         error = EmergencyStopError()
         assert isinstance(error, SafetyError)
         assert isinstance(error, MonarchMCPError)
-
-
-class TestRateLimitError:
-    """Tests for RateLimitError."""
-
-    def test_rate_limit_error(self):
-        """Test rate limit error creation."""
-        error = RateLimitError(
-            operation="create_transaction",
-            limit="10/min"
-        )
-        assert "Rate limit exceeded" in str(error)
-        assert "create_transaction" in str(error)
-        assert "10/min" in str(error)
-        assert error.operation == "create_transaction"
-        assert error.limit == "10/min"

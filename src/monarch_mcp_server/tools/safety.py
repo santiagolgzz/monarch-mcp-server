@@ -103,17 +103,17 @@ def register_safety_tools(mcp: FastMCP) -> None:
 
             suggestion = f"""Rollback Information
 
-Timestamp: {op.get('timestamp')}
-Operation: {op.get('operation')}
+Timestamp: {op.get("timestamp")}
+Operation: {op.get("operation")}
 Parameters: {json.dumps(params, indent=2)}
 
-{'REVERSIBLE' if rollback.get('reversible') else 'NOT EASILY REVERSIBLE'}
+{"REVERSIBLE" if rollback.get("reversible") else "NOT EASILY REVERSIBLE"}
 
 """
 
             if rollback.get("reversible"):
-                suggestion += f"""Reverse Operation: {rollback.get('reverse_operation')}
-Instructions: {rollback.get('notes')}
+                suggestion += f"""Reverse Operation: {rollback.get("reverse_operation")}
+Instructions: {rollback.get("notes")}
 
 """
                 if "deleted_id" in rollback:
@@ -132,4 +132,5 @@ Instructions: {rollback.get('notes')}
         except Exception as e:
             logger.error(f"Failed to get rollback suggestions: {e}")
             from monarch_mcp_server.utils import format_error
+
             return format_error(e, "get_rollback_suggestions")

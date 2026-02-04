@@ -2,14 +2,14 @@
 
 import json
 import logging
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 from .exceptions import (
-    MonarchMCPError,
-    AuthenticationError,
-    NetworkError,
     APIError,
+    AuthenticationError,
+    MonarchMCPError,
+    NetworkError,
     ValidationError,
 )
 
@@ -32,34 +32,46 @@ def get_config_path(filename: str) -> Path:
 def classify_exception(e: Exception) -> MonarchMCPError:
     """
     Classify a generic exception into a specific MonarchMCPError type.
-    
+
     This helps provide better error messages to users.
     """
     error_str = str(e).lower()
     error_type = type(e).__name__
-    
+
     # Authentication errors
-    if any(term in error_str for term in ["auth", "login", "credential", "token", "session"]):
+    if any(
+        term in error_str
+        for term in ["auth", "login", "credential", "token", "session"]
+    ):
         if "expired" in error_str:
             from .exceptions import SessionExpiredError
+
             return SessionExpiredError(str(e))
         return AuthenticationError(details=str(e))
-    
+
     # Network errors
-    if any(term in error_str for term in ["connection", "timeout", "network", "dns", "refused"]):
+    if any(
+        term in error_str
+        for term in ["connection", "timeout", "network", "dns", "refused"]
+    ):
         return NetworkError(details=str(e))
-    
+
     if "ClientError" in error_type or "HTTPError" in error_type:
         return NetworkError(details=str(e))
-    
+
     # API errors
-    if any(term in error_str for term in ["api", "invalid", "not found", "400", "404", "500"]):
+    if any(
+        term in error_str
+        for term in ["api", "invalid", "not found", "400", "404", "500"]
+    ):
         return APIError(str(e))
-    
+
     # Validation errors
-    if any(term in error_str for term in ["validation", "invalid", "required", "missing"]):
+    if any(
+        term in error_str for term in ["validation", "invalid", "required", "missing"]
+    ):
         return ValidationError(str(e))
-    
+
     # Default to generic error
     return MonarchMCPError(str(e))
 
@@ -89,6 +101,7 @@ def format_error(error: Exception, operation: str) -> str:
     elif "unexpected keyword argument" in error_lower:
         # Extract the bad parameter name
         import re
+
         match = re.search(r"'(\w+)'", error_str)
         bad_param = match.group(1) if match else "unknown"
         suggestion = f"\n\n💡 FIX: The parameter '{bad_param}' is not accepted by the Monarch API. Check the tool's required parameters using introspection."
@@ -97,8 +110,12 @@ def format_error(error: Exception, operation: str) -> str:
         suggestion = "\n\n💡 FIX: A required parameter is missing. Use tool introspection to see all required parameters."
 
     # Network/connection errors
-    elif any(term in error_lower for term in ["connection", "timeout", "network", "refused"]):
-        suggestion = "\n\n💡 FIX: Network error. Check your internet connection and try again."
+    elif any(
+        term in error_lower for term in ["connection", "timeout", "network", "refused"]
+    ):
+        suggestion = (
+            "\n\n💡 FIX: Network error. Check your internet connection and try again."
+        )
 
     # Rate limiting
     elif "rate limit" in error_lower or "too many requests" in error_lower:
@@ -130,27 +147,25 @@ def format_error(error: Exception, operation: str) -> str:
 def validate_date_format(date_str: str | None, field_name: str = "date") -> str | None:
     """
     Validate that a date string is in YYYY-MM-DD format.
-    
+
     Returns the date string if valid, raises ValidationError if invalid.
     """
     if date_str is None:
         return None
-    
+
     import re
+
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
         raise ValidationError(
             f"Invalid date format for {field_name}. Expected YYYY-MM-DD, got: {date_str}",
-            field=field_name
+            field=field_name,
         )
-    
+
     return date_str
 
 
 def validate_non_empty_string(value: str | None, field_name: str) -> str:
     """Validate that a string is not empty."""
     if not value or not value.strip():
-        raise ValidationError(
-            f"{field_name} cannot be empty",
-            field=field_name
-        )
+        raise ValidationError(f"{field_name} cannot be empty", field=field_name)
     return value.strip()

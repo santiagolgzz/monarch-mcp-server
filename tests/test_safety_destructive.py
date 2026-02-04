@@ -1,7 +1,8 @@
+import json
+from unittest.mock import AsyncMock, patch
 
 import pytest
-import json
-from unittest.mock import MagicMock, patch, AsyncMock
+
 
 class TestDestructiveToolsInServer:
     """Tests for destructive tool implementations using registered tools."""
@@ -9,10 +10,11 @@ class TestDestructiveToolsInServer:
     @pytest.mark.asyncio
     async def test_delete_transaction_allowed_no_emergency_stop(self):
         """Test delete_transaction is allowed when not in emergency stop."""
-        from monarch_mcp_server.tools import register_tools
-        from monarch_mcp_server.safety import get_safety_guard
         from fastmcp import FastMCP
-        
+
+        from monarch_mcp_server.safety import get_safety_guard
+        from monarch_mcp_server.tools import register_tools
+
         mcp = FastMCP("test")
         register_tools(mcp)
 
@@ -22,12 +24,14 @@ class TestDestructiveToolsInServer:
 
         try:
             # We need to mock get_monarch_client to avoid actual API calls
-            with patch("monarch_mcp_server.tools.transactions.get_monarch_client") as mock_client:
+            with patch(
+                "monarch_mcp_server.tools.transactions.get_monarch_client"
+            ) as mock_client:
                 mock_client.return_value.delete_transaction = AsyncMock()
-                
+
                 tool = await mcp._tool_manager.get_tool("delete_transaction")
                 result = await tool.fn(transaction_id="txn_123")
-                
+
                 # Should not be blocked
                 assert "blocked" not in result.lower()
         finally:
@@ -36,10 +40,11 @@ class TestDestructiveToolsInServer:
     @pytest.mark.asyncio
     async def test_delete_transaction_blocked_by_emergency_stop(self):
         """Test delete_transaction is blocked during emergency stop."""
-        from monarch_mcp_server.tools import register_tools
-        from monarch_mcp_server.safety import get_safety_guard
         from fastmcp import FastMCP
-        
+
+        from monarch_mcp_server.safety import get_safety_guard
+        from monarch_mcp_server.tools import register_tools
+
         mcp = FastMCP("test")
         register_tools(mcp)
 
@@ -50,7 +55,7 @@ class TestDestructiveToolsInServer:
         try:
             tool = await mcp._tool_manager.get_tool("delete_transaction")
             result = await tool.fn(transaction_id="txn_123")
-            
+
             result_data = json.loads(result)
             assert "error" in result_data
             assert "blocked" in result_data["error"].lower()
@@ -61,10 +66,11 @@ class TestDestructiveToolsInServer:
     @pytest.mark.asyncio
     async def test_delete_account_blocked_by_emergency_stop(self):
         """Test delete_account is blocked during emergency stop."""
-        from monarch_mcp_server.tools import register_tools
-        from monarch_mcp_server.safety import get_safety_guard
         from fastmcp import FastMCP
-        
+
+        from monarch_mcp_server.safety import get_safety_guard
+        from monarch_mcp_server.tools import register_tools
+
         mcp = FastMCP("test")
         register_tools(mcp)
 
@@ -75,7 +81,7 @@ class TestDestructiveToolsInServer:
         try:
             tool = await mcp._tool_manager.get_tool("delete_account")
             result = await tool.fn(account_id="acc_123")
-            
+
             result_data = json.loads(result)
             assert "error" in result_data
             assert "blocked" in result_data["error"].lower()

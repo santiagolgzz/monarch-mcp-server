@@ -32,8 +32,7 @@ jobs:
           uv sync --extra dev
 
       - name: Run tests
-        run: |
-          uv run pytest tests/ -v --tb=short
+        run: uv run pytest tests/ -v --tb=short
 
   lint:
     name: Lint
@@ -54,13 +53,11 @@ jobs:
           uv venv --python 3.12
           uv sync --extra dev
 
-      - name: Check formatting with black
-        run: |
-          uv run black --check --diff src/ tests/
+      - name: Check linting with ruff
+        run: uv run ruff check src/ tests/
 
-      - name: Check imports with isort
-        run: |
-          uv run isort --check-only --diff src/ tests/
+      - name: Check formatting with ruff
+        run: uv run ruff format --check src/ tests/
 
   type-check:
     name: Type Check
@@ -81,7 +78,5 @@ jobs:
           uv venv --python 3.12
           uv sync --extra dev
 
-      - name: Run mypy
-        run: |
-          uv run mypy src/ --ignore-missing-imports || true
-        continue-on-error: true  # Start with warnings, can be made strict later
+      - name: Run ty
+        run: uv run ty check src/

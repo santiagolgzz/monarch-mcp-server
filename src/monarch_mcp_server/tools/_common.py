@@ -24,7 +24,9 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
-def tool_handler(operation_name: str) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[str]]]:
+def tool_handler(
+    operation_name: str,
+) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[str]]]:
     """
     Decorator that wraps tool functions with error handling and JSON serialization.
 
@@ -47,6 +49,7 @@ def tool_handler(operation_name: str) -> Callable[[Callable[P, Awaitable[T]]], C
             client = await get_monarch_client()
             return await client.create_transaction_tag(name=name)
     """
+
     def decorator(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[str]]:
         @functools.wraps(func)
         async def wrapper(*args: P.args, **kwargs: P.kwargs) -> str:
@@ -60,5 +63,7 @@ def tool_handler(operation_name: str) -> Callable[[Callable[P, Awaitable[T]]], C
             except Exception as e:
                 logger.error(f"Failed in {operation_name}: {e}")
                 return format_error(e, operation_name)
+
         return wrapper
+
     return decorator

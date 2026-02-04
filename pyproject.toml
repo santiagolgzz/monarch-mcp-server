@@ -43,9 +43,9 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "mypy>=1.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.9.0",
+    "ty>=0.0.1a6",
     "pre-commit>=3.0.0",
 ]
 
@@ -62,20 +62,24 @@ monarch-mcp-http = "monarch_mcp_server.http_server:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.black]
+[tool.ruff]
 line-length = 88
-target-version = ['py312']
+target-version = "py312"
 
-[tool.isort]
-profile = "black"
-line_length = 88
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = [
+    "E501",   # Line length handled by formatter
+    "B904",   # raise-without-from-inside-except - too noisy for validation errors
+    "B905",   # zip-without-explicit-strict - Python 3.10+ behavior is fine
+    "SIM117", # multiple-with-statements - sometimes clearer to nest
+]
 
-[tool.mypy]
-python_version = "3.12"
-strict = true
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.ty.environment]
+python-version = "3.12"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

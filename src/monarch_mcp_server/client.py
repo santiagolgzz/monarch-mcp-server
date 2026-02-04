@@ -2,26 +2,28 @@
 Unified authentication and client management for Monarch Money.
 """
 
-import os
 import logging
+import os
 
 from monarchmoney import MonarchMoney
-from monarch_mcp_server.secure_session import secure_session
+
 from monarch_mcp_server.exceptions import AuthenticationError
+from monarch_mcp_server.secure_session import secure_session
 
 logger = logging.getLogger(__name__)
+
 
 async def get_monarch_client() -> MonarchMoney:
     """
     Get an authenticated MonarchMoney client instance.
-    
+
     Priority:
     1. Existing secure session (keyring/file)
     2. Environment variables (MONARCH_EMAIL, MONARCH_PASSWORD, MONARCH_MFA_SECRET)
-    
+
     Returns:
         MonarchMoney: Authenticated client
-        
+
     Raises:
         AuthenticationError: If authentication fails or no credentials found
     """
@@ -37,16 +39,16 @@ async def get_monarch_client() -> MonarchMoney:
     # 2. Try environment variables
     email = os.getenv("MONARCH_EMAIL")
     password = os.getenv("MONARCH_PASSWORD")
-    
+
     if email and password:
         logger.info("Attempting login with environment variables")
         try:
             client = MonarchMoney()
             mfa_secret = os.getenv("MONARCH_MFA_SECRET")
-            
+
             # Login (this handles MFA if secret provided)
             await client.login(email, password, mfa_secret_key=mfa_secret)
-            
+
             # Save the new session
             secure_session.save_authenticated_session(client)
             return client

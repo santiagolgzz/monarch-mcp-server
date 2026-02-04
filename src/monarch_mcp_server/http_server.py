@@ -8,24 +8,22 @@ and other remote MCP clients. It wraps the server with:
 - Health check endpoint for monitoring
 """
 
-import os
 import logging
+import os
 
 import uvicorn
+from fastmcp import FastMCP
+from fastmcp.server.auth.providers.github import GitHubProvider
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
-from starlette.routing import Route, Mount
-
-from fastmcp import FastMCP
-from fastmcp.server.auth.providers.github import GitHubProvider
+from starlette.routing import Mount, Route
 
 from monarch_mcp_server.tools import register_tools
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -57,7 +55,9 @@ def create_mcp_server() -> FastMCP:
     client_secret = os.getenv("GITHUB_CLIENT_SECRET", "")
 
     if not client_id or not client_secret:
-        logger.error("GitHub OAuth credentials not set - server will fail auth requests")
+        logger.error(
+            "GitHub OAuth credentials not set - server will fail auth requests"
+        )
 
     # Create GitHub OAuth provider
     github_auth = GitHubProvider(
@@ -88,9 +88,9 @@ async def health_check(request: Request) -> Response:
     from monarch_mcp_server.secure_session import secure_session
 
     has_credentials = (
-        bool(os.getenv("MONARCH_TOKEN")) or
-        (bool(os.getenv("MONARCH_EMAIL")) and bool(os.getenv("MONARCH_PASSWORD"))) or
-        secure_session.load_token() is not None
+        bool(os.getenv("MONARCH_TOKEN"))
+        or (bool(os.getenv("MONARCH_EMAIL")) and bool(os.getenv("MONARCH_PASSWORD")))
+        or secure_session.load_token() is not None
     )
     has_github_oauth = bool(os.getenv("GITHUB_CLIENT_ID"))
 
@@ -108,17 +108,19 @@ async def health_check(request: Request) -> Response:
 async def root(request: Request) -> Response:
     """Root endpoint with basic info."""
     base_url = get_base_url()
-    return JSONResponse({
-        "service": "Monarch Money MCP Server",
-        "description": "MCP server for Monarch Money personal finance",
-        "endpoints": {
-            "/health": "Health check endpoint (public)",
-            "/mcp": "MCP endpoint (requires GitHub OAuth)",
-            "/.well-known/oauth-authorization-server": "OAuth discovery endpoint",
-        },
-        "auth": "GitHub OAuth - configure in Claude mobile app with OAuth client ID",
-        "oauth_discovery": f"{base_url}/.well-known/oauth-authorization-server",
-    })
+    return JSONResponse(
+        {
+            "service": "Monarch Money MCP Server",
+            "description": "MCP server for Monarch Money personal finance",
+            "endpoints": {
+                "/health": "Health check endpoint (public)",
+                "/mcp": "MCP endpoint (requires GitHub OAuth)",
+                "/.well-known/oauth-authorization-server": "OAuth discovery endpoint",
+            },
+            "auth": "GitHub OAuth - configure in Claude mobile app with OAuth client ID",
+            "oauth_discovery": f"{base_url}/.well-known/oauth-authorization-server",
+        }
+    )
 
 
 def create_app() -> Starlette:

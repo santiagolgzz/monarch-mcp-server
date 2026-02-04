@@ -1,13 +1,12 @@
 """Tests for the secure_session module."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from monarch_mcp_server.secure_session import (
-    SecureMonarchSession,
-    secure_session,
     KEYRING_SERVICE,
     KEYRING_USERNAME,
+    SecureMonarchSession,
+    secure_session,
 )
 
 
@@ -76,8 +75,8 @@ class TestSecureMonarchSession:
         session = SecureMonarchSession()
         # Should not raise - the actual code handles exceptions
         session.delete_token()
-        
-        # Verify delete_password was called  
+
+        # Verify delete_password was called
         mock_keyring.delete_password.assert_called_once()
 
     @patch("monarch_mcp_server.secure_session.keyring")
@@ -85,10 +84,10 @@ class TestSecureMonarchSession:
     def test_get_authenticated_client_success(self, mock_mm_class, mock_keyring):
         """Test getting authenticated client when token exists."""
         mock_keyring.get_password.return_value = "valid_token"
-        
+
         # Configure mock client to fail native load but succeed with token
         mock_client = MagicMock()
-        mock_client.token = None # Initially no token from load_session
+        mock_client.token = None  # Initially no token from load_session
         mock_mm_class.return_value = mock_client
 
         session = SecureMonarchSession()
@@ -105,7 +104,7 @@ class TestSecureMonarchSession:
     def test_get_authenticated_client_no_token(self, mock_mm_class, mock_keyring):
         """Test getting authenticated client when no token exists."""
         mock_keyring.get_password.return_value = None
-        
+
         # Mock client that fails native load
         mock_client = MagicMock()
         mock_client.token = None
@@ -121,7 +120,7 @@ class TestSecureMonarchSession:
     def test_get_authenticated_client_error(self, mock_mm_class, mock_keyring):
         """Test getting authenticated client when MonarchMoney raises error."""
         mock_keyring.get_password.return_value = "invalid_token"
-        
+
         # Setup side effect to fail on init with token
         # We need to handle the first init (empty) separately from second (with token)
         mock_mm_class.side_effect = [MagicMock(token=None), Exception("Invalid token")]
@@ -173,17 +172,17 @@ class TestCleanupMethod:
 
     def test_cleanup_uses_absolute_paths(self):
         """Test that cleanup method uses absolute paths based on home directory."""
-        from unittest.mock import patch
         from pathlib import Path
-        
+        from unittest.mock import patch
+
         session = SecureMonarchSession()
-        
+
         # Mock Path operations to verify absolute paths are used
-        with patch.object(Path, 'exists', return_value=False) as mock_exists:
-            with patch('monarch_mcp_server.secure_session.keyring'):
+        with patch.object(Path, "exists", return_value=False):
+            with patch("monarch_mcp_server.secure_session.keyring"):
                 # This should not raise even if paths don't exist
                 session._cleanup_old_session_files()
-        
+
         # Verify the method completed without error
         # The cleanup should check paths relative to home
         # Since we mocked exists to return False, no deletions happen
@@ -192,34 +191,33 @@ class TestCleanupMethod:
         """Test that cleanup only deletes files, not directories."""
         import tempfile
         from pathlib import Path
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a mock .mm directory with a pickle file
             mm_dir = Path(tmpdir) / ".mm"
             mm_dir.mkdir()
             pickle_file = mm_dir / "mm_session.pickle"
             pickle_file.write_text("fake pickle content")
-            
+
             session = SecureMonarchSession()
-            
+
             # Patch Path.home to return our temp dir
             # We need to patch where Path is used (after import in the method)
-            with patch('pathlib.Path.home', return_value=Path(tmpdir)):
-                with patch('monarch_mcp_server.secure_session.keyring'):
+            with patch("pathlib.Path.home", return_value=Path(tmpdir)):
+                with patch("monarch_mcp_server.secure_session.keyring"):
                     session._cleanup_old_session_files()
-            
+
             # The pickle file should still exist (we stopped cleaning it up)
             assert pickle_file.exists()
             # But the .mm directory should still exist (not deleted)
             assert mm_dir.exists()
-            
+
             # Verify that OTHER old files are still cleaned up
             json_file = Path(tmpdir) / "monarch_session.json"
             json_file.write_text("{}")
-            
-            with patch('pathlib.Path.home', return_value=Path(tmpdir)):
-                with patch('monarch_mcp_server.secure_session.keyring'):
-                    session._cleanup_old_session_files()
-            
-            assert not json_file.exists()
 
+            with patch("pathlib.Path.home", return_value=Path(tmpdir)):
+                with patch("monarch_mcp_server.secure_session.keyring"):
+                    session._cleanup_old_session_files()
+
+            assert not json_file.exists()

@@ -91,7 +91,11 @@ def register_category_tools(mcp: FastMCP) -> None:
         # Map results to category IDs for clearer output
         return {
             "results": [
-                {"category_id": cid, "deleted": isinstance(r, bool) and r, "error": str(r) if isinstance(r, BaseException) else None}
+                {
+                    "category_id": cid,
+                    "deleted": isinstance(r, bool) and r,
+                    "error": str(r) if isinstance(r, BaseException) else None,
+                }
                 for cid, r in zip(ids_list, results)
             ]
         }

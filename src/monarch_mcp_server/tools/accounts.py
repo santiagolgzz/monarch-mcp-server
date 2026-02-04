@@ -35,7 +35,9 @@ def register_account_tools(mcp: FastMCP) -> None:
                 "type": (account.get("type") or {}).get("name"),
                 "balance": account.get("currentBalance"),
                 "institution": (account.get("institution") or {}).get("name"),
-                "is_active": account.get("isActive") if "isActive" in account else not account.get("deactivatedAt"),
+                "is_active": account.get("isActive")
+                if "isActive" in account
+                else not account.get("deactivatedAt"),
             }
             account_list.append(account_info)
         return account_list

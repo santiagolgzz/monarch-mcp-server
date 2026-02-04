@@ -1,15 +1,14 @@
 """Tests for the exceptions module."""
 
-import pytest
 from monarch_mcp_server.exceptions import (
-    MonarchMCPError,
-    AuthenticationError,
-    SessionExpiredError,
-    NetworkError,
     APIError,
-    ValidationError,
-    SafetyError,
+    AuthenticationError,
     EmergencyStopError,
+    MonarchMCPError,
+    NetworkError,
+    SafetyError,
+    SessionExpiredError,
+    ValidationError,
 )
 
 
@@ -131,5 +130,3 @@ class TestEmergencyStopError:
         error = EmergencyStopError()
         assert isinstance(error, SafetyError)
         assert isinstance(error, MonarchMCPError)
-
-

@@ -1,9 +1,10 @@
 """Pytest configuration and fixtures."""
 
-import pytest
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 @pytest.fixture
@@ -18,7 +19,7 @@ def mock_monarch_client():
     """Create a mock MonarchMoney client."""
     mock_client = MagicMock()
     mock_client.token = "test_token_xyz"
-    
+
     # Set up async mock methods
     async def mock_get_accounts():
         return {
@@ -32,7 +33,7 @@ def mock_monarch_client():
                 }
             ]
         }
-    
+
     async def mock_get_transactions(**kwargs):
         return {
             "allTransactions": {
@@ -48,7 +49,7 @@ def mock_monarch_client():
                 ]
             }
         }
-    
+
     async def mock_get_budgets():
         return {
             "budgets": [
@@ -63,11 +64,11 @@ def mock_monarch_client():
                 }
             ]
         }
-    
+
     mock_client.get_accounts = mock_get_accounts
     mock_client.get_transactions = mock_get_transactions
     mock_client.get_budgets = mock_get_budgets
-    
+
     return mock_client
 
 
@@ -83,10 +84,10 @@ def mock_keyring():
 def isolated_safety_guard(temp_config_dir):
     """Create an isolated safety guard for testing."""
     from monarch_mcp_server.safety import SafetyConfig, SafetyGuard
-    
+
     config_path = str(temp_config_dir / "safety_config.json")
     config = SafetyConfig(config_path=config_path)
     guard = SafetyGuard(config=config)
     guard.operation_log_path = str(temp_config_dir / "operation_log.json")
-    
+
     return guard

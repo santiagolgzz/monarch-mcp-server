@@ -51,7 +51,9 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         if search:
             filters["search"] = search
 
-        transactions = await client.get_transactions(limit=limit, offset=offset, **filters)
+        transactions = await client.get_transactions(
+            limit=limit, offset=offset, **filters
+        )
         transaction_list = []
         for txn in transactions.get("allTransactions", {}).get("results", []):
             amount = txn.get("amount")
@@ -67,9 +69,13 @@ def register_transaction_tools(mcp: FastMCP) -> None:
                 "date": txn.get("date"),
                 "amount": amount,
                 "description": txn.get("description"),
-                "category": txn.get("category", {}).get("name") if txn.get("category") else None,
+                "category": txn.get("category", {}).get("name")
+                if txn.get("category")
+                else None,
                 "account": txn.get("account", {}).get("displayName"),
-                "merchant": txn.get("merchant", {}).get("name") if txn.get("merchant") else None,
+                "merchant": txn.get("merchant", {}).get("name")
+                if txn.get("merchant")
+                else None,
                 "is_pending": txn.get("isPending", False),
             }
             transaction_list.append(transaction_info)
@@ -95,8 +101,12 @@ def register_transaction_tools(mcp: FastMCP) -> None:
                 "date": txn.get("date"),
                 "amount": txn.get("amount"),
                 "description": txn.get("description"),
-                "category": txn.get("category", {}).get("name") if txn.get("category") else None,
-                "merchant": txn.get("merchant", {}).get("name") if txn.get("merchant") else None,
+                "category": txn.get("category", {}).get("name")
+                if txn.get("category")
+                else None,
+                "merchant": txn.get("merchant", {}).get("name")
+                if txn.get("merchant")
+                else None,
             }
             transaction_list.append(transaction_info)
         return transaction_list
@@ -133,12 +143,18 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             filters["category_ids"] = [category_id]
 
         # Fetch all transactions matching filters (up to limit for aggregation)
-        transactions = await client.get_transactions(limit=MAX_AGGREGATION_TRANSACTIONS, **filters)
+        transactions = await client.get_transactions(
+            limit=MAX_AGGREGATION_TRANSACTIONS, **filters
+        )
         results = transactions.get("allTransactions", {}).get("results", [])
 
         count = len(results)
-        sum_income = sum(txn.get("amount", 0) for txn in results if txn.get("amount", 0) > 0)
-        sum_expense = sum(txn.get("amount", 0) for txn in results if txn.get("amount", 0) < 0)
+        sum_income = sum(
+            txn.get("amount", 0) for txn in results if txn.get("amount", 0) > 0
+        )
+        sum_expense = sum(
+            txn.get("amount", 0) for txn in results if txn.get("amount", 0) < 0
+        )
         net = sum_income + sum_expense
 
         return {

@@ -1,5 +1,4 @@
-"""Monarch Money MCP Server - Main server implementation.
-"""
+"""Monarch Money MCP Server - Main server implementation."""
 
 import logging
 import os
@@ -11,8 +10,7 @@ from monarch_mcp_server.tools import register_tools
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -27,6 +25,7 @@ mcp = FastMCP(
 
 # Register all shared tools
 register_tools(mcp)
+
 
 @mcp.tool()
 def setup_authentication() -> str:
@@ -57,6 +56,7 @@ def check_auth_status() -> str:
     """Check if already authenticated with Monarch Money."""
     try:
         from monarch_mcp_server.secure_session import secure_session
+
         # Check if we have a token in the keyring
         token = secure_session.load_token()
         if token:

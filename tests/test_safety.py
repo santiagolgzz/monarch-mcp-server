@@ -1,11 +1,11 @@
 """Tests for the safety module."""
 
-import pytest
 import json
 import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 from datetime import datetime
+from pathlib import Path
+
+import pytest
 
 from monarch_mcp_server.safety import (
     SafetyConfig,
@@ -107,12 +107,13 @@ class TestSafetyGuard:
         """Test recording an operation."""
         # Reset counts to ensure clean state for this test
         from collections import defaultdict
+
         temp_guard.daily_counts = defaultdict(lambda: defaultdict(int))
-        
+
         temp_guard.record_operation(
             "create_transaction",
             success=True,
-            operation_details={"account_id": "123", "amount": 50.00}
+            operation_details={"account_id": "123", "amount": 50.00},
         )
 
         today = datetime.now().strftime("%Y-%m-%d")
@@ -122,8 +123,9 @@ class TestSafetyGuard:
         """Test getting operation statistics."""
         # Reset counts to ensure clean state for this test
         from collections import defaultdict
+
         temp_guard.daily_counts = defaultdict(lambda: defaultdict(int))
-        
+
         temp_guard.record_operation("create_transaction", success=True)
         temp_guard.record_operation("create_transaction", success=True)
         temp_guard.record_operation("update_transaction", success=True)
@@ -155,35 +157,38 @@ class TestRequireSafetyCheckDecorator:
     @pytest.mark.asyncio
     async def test_decorator_allows_operation(self):
         """Test decorator allows operation when safety checks pass."""
+
         @require_safety_check("test_operation")
         async def test_func(value):
             return f"Result: {value}"
-    
+
         # Temporarily disable safety for test
         guard = get_safety_guard()
         original_enabled = guard.config.config.get("enabled", True)
         guard.config.config["enabled"] = False
-    
+
         try:
             result = await test_func("test")
             assert result == "Result: test"
         finally:
             guard.config.config["enabled"] = original_enabled
+
     @pytest.mark.asyncio
     async def test_decorator_blocks_on_emergency_stop(self):
         """Test decorator blocks operation during emergency stop."""
+
         @require_safety_check("test_operation")
         async def test_func():
             return "Should not execute"
-    
+
         guard = get_safety_guard()
         original_stop = guard.config.config.get("emergency_stop", False)
         guard.config.config["emergency_stop"] = True
-    
+
         try:
             result = await test_func()
             result_data = json.loads(result)
-            
+
             assert "error" in result_data
             assert "blocked" in result_data["error"]
             assert "EMERGENCY STOP" in result_data["reason"]
@@ -206,7 +211,9 @@ class TestGenerateRollbackInfo:
     def test_delete_transaction_rollback(self, temp_guard):
         """Test rollback info for delete_transaction."""
         params = {"transaction_id": "txn_123"}
-        rollback = temp_guard._generate_rollback_info("delete_transaction", params, None)
+        rollback = temp_guard._generate_rollback_info(
+            "delete_transaction", params, None
+        )
 
         assert rollback["reversible"] is True
         assert rollback["reverse_operation"] == "create_transaction"
@@ -216,7 +223,9 @@ class TestGenerateRollbackInfo:
         """Test rollback info for create_transaction."""
         params = {"account_id": "acc_123", "amount": 50.00}
         result = json.dumps({"id": "txn_new_456"})
-        rollback = temp_guard._generate_rollback_info("create_transaction", params, result)
+        rollback = temp_guard._generate_rollback_info(
+            "create_transaction", params, result
+        )
 
         assert rollback["reversible"] is True
         assert rollback["reverse_operation"] == "delete_transaction"
@@ -224,8 +233,14 @@ class TestGenerateRollbackInfo:
 
     def test_update_transaction_rollback(self, temp_guard):
         """Test rollback info for update_transaction."""
-        params = {"transaction_id": "txn_123", "amount": 75.00, "description": "New desc"}
-        rollback = temp_guard._generate_rollback_info("update_transaction", params, None)
+        params = {
+            "transaction_id": "txn_123",
+            "amount": 75.00,
+            "description": "New desc",
+        }
+        rollback = temp_guard._generate_rollback_info(
+            "update_transaction", params, None
+        )
 
         assert rollback["reversible"] is True
         assert rollback["reverse_operation"] == "update_transaction"
@@ -281,9 +296,7 @@ class TestDestructiveOperationBehavior:
         assert "EMERGENCY STOP" in message
 
         @pytest.mark.asyncio
-
         async def test_decorator_allows_destructive_ops(self):
-
             """Test decorator allows destructive operations (Claude Code handles approval)."""
 
             guard = get_safety_guard()
@@ -292,26 +305,18 @@ class TestDestructiveOperationBehavior:
 
             guard.config.config["require_approval"] = ["decorator_test_op"]
 
-        
-
             try:
 
-        
-
                 @require_safety_check("decorator_test_op")
-
                 async def destructive_func(item_id: str):
 
                     return f"Deleted {item_id}"
-
-        
 
                 result = await destructive_func("item_123")
 
                 assert result == "Deleted item_123"
 
             finally:
-
                 guard.config.config["require_approval"] = original_approval
 
     def test_non_destructive_op_allowed(self, temp_guard):
@@ -319,12 +324,7 @@ class TestDestructiveOperationBehavior:
         temp_guard.config.config["require_approval"] = ["delete_something"]
 
         operation_details = {"some_id": "123"}
-        allowed, message = temp_guard.check_operation(
-            "get_accounts", operation_details
-        )
+        allowed, message = temp_guard.check_operation("get_accounts", operation_details)
 
         assert allowed is True
         assert "Operation allowed" in message
-
-
-

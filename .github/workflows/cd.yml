@@ -1,0 +1,52 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # Manual trigger option
+
+jobs:
+  deploy:
+    name: Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    # Only run if GCP is configured (skips gracefully for forks without secrets)
+    if: vars.GCP_PROJECT_ID != ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ vars.GCP_REGION || 'us-central1' }}-docker.pkg.dev
+
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE="${{ vars.GCP_REGION || 'us-central1' }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/monarch-mcp/server:${{ github.sha }}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        run: |
+          gcloud run deploy monarch-mcp-server \
+            --image ${{ vars.GCP_REGION || 'us-central1' }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/monarch-mcp/server:${{ github.sha }} \
+            --project ${{ vars.GCP_PROJECT_ID }} \
+            --platform managed \
+            --region ${{ vars.GCP_REGION || 'us-central1' }} \
+            --allow-unauthenticated \
+            --set-env-vars "GITHUB_CLIENT_ID=${{ vars.GITHUB_CLIENT_ID }}" \
+            --set-env-vars "GITHUB_CLIENT_SECRET=${{ secrets.GITHUB_CLIENT_SECRET }}" \
+            --set-env-vars "MONARCH_TOKEN=${{ secrets.MONARCH_TOKEN }}" \
+            --set-env-vars "BASE_URL=${{ vars.CLOUD_RUN_URL }}"
+
+      - name: Verify Deployment
+        run: |
+          echo "Checking health endpoint..."
+          curl -sf "${{ vars.CLOUD_RUN_URL }}/health" || echo "Health check pending (service may need a moment to start)"

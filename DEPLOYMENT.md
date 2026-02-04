@@ -57,7 +57,66 @@ Save both values - you'll need them for deployment.
 
 ## Step 3: Deploy the Server
 
-### Option A: Railway (Recommended - Easiest)
+### Option A: GitHub Actions + Cloud Run (Recommended - Automated)
+
+This repository includes a CD pipeline that automatically deploys to Google Cloud Run on every push to `main`. The workflow is designed to be **fork-friendly** — it only runs if you configure the required secrets.
+
+**One-time GCP Setup:**
+
+```bash
+# 1. Create Artifact Registry repository
+gcloud artifacts repositories create monarch-mcp \
+  --repository-format=docker \
+  --location=us-central1 \
+  --description="Monarch MCP Server images"
+
+# 2. Create service account for GitHub Actions
+gcloud iam service-accounts create github-actions-deployer \
+  --display-name="GitHub Actions Deployer"
+
+# 3. Grant permissions
+PROJECT_ID=$(gcloud config get-value project)
+SA_EMAIL="github-actions-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$SA_EMAIL" --role="roles/run.admin"
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$SA_EMAIL" --role="roles/artifactregistry.writer"
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:$SA_EMAIL" --role="roles/iam.serviceAccountUser"
+
+# 4. Create and download key
+gcloud iam service-accounts keys create ~/github-actions-key.json \
+  --iam-account=$SA_EMAIL
+cat ~/github-actions-key.json  # Copy this for GitHub Secrets
+```
+
+**GitHub Repository Configuration:**
+
+Go to Settings → Secrets and variables → Actions:
+
+*Variables* (not secret, but project-specific):
+- `GCP_PROJECT_ID` = your GCP project ID
+- `GCP_REGION` = `us-central1` (optional)
+- `GITHUB_CLIENT_ID` = your GitHub OAuth App client ID
+- `CLOUD_RUN_URL` = `https://monarch-mcp-server-xxxxx-uc.a.run.app` (set after first deploy)
+
+*Secrets* (encrypted):
+- `GCP_SA_KEY` = paste the entire JSON key file content
+- `GITHUB_CLIENT_SECRET` = your GitHub OAuth App secret
+- `MONARCH_TOKEN` = your Monarch Money token
+
+**First Deployment:**
+1. Configure the variables/secrets above (leave `CLOUD_RUN_URL` empty initially)
+2. Push to `main` or manually trigger the workflow
+3. Get the Cloud Run URL from the deployment output
+4. Set `CLOUD_RUN_URL` variable with the actual URL
+5. Update your GitHub OAuth App callback URL to: `https://your-cloud-run-url/auth/callback`
+6. Re-run the workflow to apply the correct BASE_URL
+
+After setup, every merge to `main` automatically deploys.
+
+### Option B: Railway (Easiest Manual Setup)
 
 [Railway](https://railway.app) offers simple deployment with free tier:
 

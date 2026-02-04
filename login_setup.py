@@ -8,8 +8,6 @@ import asyncio
 import os
 import getpass
 import shutil
-import inspect
-import traceback
 import sys
 from pathlib import Path
 
@@ -17,8 +15,9 @@ from pathlib import Path
 src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
 
-from monarchmoney import MonarchMoney, RequireMFAException
+from monarchmoney import MonarchMoney, RequireMFAException, MonarchMoneyEndpoints
 from dotenv import load_dotenv
+import monarch_mcp_server  # Triggers BASE_URL patch
 from monarch_mcp_server.secure_session import secure_session
 
 async def main():
@@ -53,7 +52,7 @@ async def main():
             print("You should enable MFA for your Monarch Money account.")
             print("MFA adds an extra layer of security to protect your financial data.")
             print("\nTo enable MFA:")
-            print("1. Log into Monarch Money at https://monarchmoney.com")
+            print("1. Log into Monarch Money at https://app.monarch.com")
             print("2. Go to Settings → Security")
             print("3. Enable Two-Factor Authentication")
             print("4. Follow the setup instructions\n")
@@ -142,14 +141,14 @@ async def main():
                 print("Try updating the library: pip install --upgrade monarchmoney")
                 return
         
-        # Save session securely to keyring
+        # Save session securely (keyring + pickle)
         try:
-            print(f"\n🔐 Saving session securely to system keyring...")
+            print(f"\n🔐 Saving session (Secure Keyring + Session File)...")
             secure_session.save_authenticated_session(mm)
-            print(f"✅ Session saved securely to keyring!")
+            print(f"✅ Session saved successfully!")
                 
         except Exception as save_error:
-            print(f"❌ Could not save session to keyring: {save_error}")
+            print(f"❌ Could not save session: {save_error}")
             print("You may need to run the login again.")
         
         print("\n🎉 Setup complete! You can now use these tools in Claude Desktop:")

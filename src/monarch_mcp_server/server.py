@@ -1,7 +1,6 @@
 """Monarch Money MCP Server - Main server implementation."""
 
 import logging
-import os
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
@@ -29,52 +28,60 @@ register_tools(mcp)
 
 @mcp.tool()
 def setup_authentication() -> str:
-    """Get instructions for setting up secure authentication with Monarch Money."""
-    return """🔐 Monarch Money - One-Time Setup
+    """Get instructions for setting up authentication with Monarch Money."""
+    return """🔐 Monarch Money Authentication
 
-1️⃣ Open Terminal and run:
-   python login_setup.py
+Option 1: Interactive Login (Recommended)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Run once to save session to your OS keyring:
 
-2️⃣ Enter your Monarch Money credentials when prompted
-   • Email and password
-   • 2FA code if you have MFA enabled
+  python login_setup.py
 
-3️⃣ Session will be saved automatically and last for weeks
+Session is stored securely (macOS Keychain, Windows Credential
+Manager, etc.) and persists for weeks across restarts.
 
-4️⃣ Start using Monarch tools in Claude Desktop:
-   • get_accounts - View all accounts
-   • get_transactions - Recent transactions
-   • get_budgets - Budget information
+Option 2: Environment Variables
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+For CI/CD or containers where keyring isn't available:
 
-✅ Session persists across Claude restarts
-✅ No need to re-authenticate frequently
-✅ All credentials stay secure in terminal"""
+  MONARCH_EMAIL=your@email.com
+  MONARCH_PASSWORD=your_password
+  MONARCH_MFA_SECRET=your_totp_secret  # Optional
+
+⚠️  Use secrets management in production, not plain env vars.
+
+Use check_auth_status to verify your connection."""
 
 
 @mcp.tool()
-def check_auth_status() -> str:
-    """Check if already authenticated with Monarch Money."""
+async def check_auth_status() -> str:
+    """Check if already authenticated with Monarch Money.
+
+    Verifies the connection by making a lightweight API call to Monarch's servers.
+    Works for both local (keyring) and remote (env var) authentication modes.
+    """
     try:
-        from monarch_mcp_server.secure_session import secure_session
+        from monarch_mcp_server.client import get_monarch_client
 
-        # Check if we have a token in the keyring
-        token = secure_session.load_token()
-        if token:
-            status = "✅ Authentication token found in secure keyring storage\n"
-        else:
-            status = "❌ No authentication token found in keyring\n"
+        # Try to get an authenticated client and verify it works
+        client = await get_monarch_client()
+        subscription = await client.get_subscription_details()
 
-        email = os.getenv("MONARCH_EMAIL")
-        if email:
-            status += f"📧 Environment email: {email}\n"
+        # Extract useful info from subscription
+        is_paid = subscription.get("hasPremiumEntitlement", False)
+        plan_type = "Premium" if is_paid else "Free/Trial"
 
-        status += (
-            "\n💡 Try get_accounts to test connection or run login_setup.py if needed."
-        )
+        return f"✅ Authenticated and connected to Monarch Money\n📊 Plan: {plan_type}"
 
-        return status
     except Exception as e:
-        return f"Error checking auth status: {str(e)}"
+        error_msg = str(e)
+        if "Authentication required" in error_msg:
+            return (
+                "❌ Not authenticated\n\n"
+                "For local use: Run `python login_setup.py`\n"
+                "For remote use: Set MONARCH_EMAIL and MONARCH_PASSWORD env vars"
+            )
+        return f"⚠️ Connection failed: {error_msg}"
 
 
 def main():

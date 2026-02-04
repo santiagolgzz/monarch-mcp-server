@@ -1,7 +1,6 @@
 """Tests for server.py - main server implementation."""
 
-import os
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastmcp import FastMCP
@@ -22,23 +21,28 @@ class TestSetupAuthentication:
     async def test_returns_instructions(self):
         """Verify setup_authentication returns setup instructions."""
         tool = await mcp._tool_manager.get_tool("setup_authentication")
-        # This is a sync tool that returns a string
         result = tool.fn()
 
         # Check key instruction elements are present
         assert "Monarch Money" in result
         assert "login_setup.py" in result
-        assert "credentials" in result.lower()
-        assert "get_accounts" in result
-        assert "get_transactions" in result
-        assert "get_budgets" in result
+        assert "MONARCH_EMAIL" in result
+        assert "MONARCH_PASSWORD" in result
 
     @pytest.mark.asyncio
-    async def test_mentions_2fa(self):
-        """Verify instructions mention 2FA support."""
+    async def test_mentions_interactive_as_recommended(self):
+        """Verify instructions recommend interactive login."""
         tool = await mcp._tool_manager.get_tool("setup_authentication")
         result = tool.fn()
-        assert "2FA" in result or "MFA" in result
+        assert "Recommended" in result
+        assert "Interactive" in result or "keyring" in result
+
+    @pytest.mark.asyncio
+    async def test_mentions_mfa(self):
+        """Verify instructions mention MFA support."""
+        tool = await mcp._tool_manager.get_tool("setup_authentication")
+        result = tool.fn()
+        assert "MFA" in result
 
     @pytest.mark.asyncio
     async def test_mentions_session_persistence(self):
@@ -52,71 +56,68 @@ class TestCheckAuthStatus:
     """Tests for the check_auth_status tool."""
 
     @pytest.mark.asyncio
-    async def test_with_token(self):
-        """Verify check_auth_status reports found token."""
+    async def test_with_valid_connection_premium(self):
+        """Verify check_auth_status reports successful connection for premium users."""
+        mock_client = MagicMock()
+        mock_client.get_subscription_details = AsyncMock(
+            return_value={"hasPremiumEntitlement": True}
+        )
+
         with patch(
-            "monarch_mcp_server.secure_session.SecureMonarchSession.load_token",
-            return_value="valid_token_123",
-        ):
-            with patch.dict(os.environ, {}, clear=True):
-                tool = await mcp._tool_manager.get_tool("check_auth_status")
-                result = tool.fn()
-
-            assert "found" in result.lower() or "token" in result.lower()
-
-    @pytest.mark.asyncio
-    async def test_without_token(self):
-        """Verify check_auth_status reports missing token."""
-        with patch(
-            "monarch_mcp_server.secure_session.SecureMonarchSession.load_token",
-            return_value=None,
-        ):
-            with patch.dict(os.environ, {}, clear=True):
-                tool = await mcp._tool_manager.get_tool("check_auth_status")
-                result = tool.fn()
-
-            assert "No" in result or "no" in result
-
-    @pytest.mark.asyncio
-    async def test_with_env_email(self):
-        """Verify check_auth_status reports environment email."""
-        with patch(
-            "monarch_mcp_server.secure_session.SecureMonarchSession.load_token",
-            return_value=None,
-        ):
-            with patch.dict(
-                os.environ, {"MONARCH_EMAIL": "test@example.com"}, clear=True
-            ):
-                tool = await mcp._tool_manager.get_tool("check_auth_status")
-                result = tool.fn()
-
-            assert "test@example.com" in result
-
-    @pytest.mark.asyncio
-    async def test_exception_handling(self):
-        """Verify check_auth_status handles exceptions gracefully."""
-        with patch(
-            "monarch_mcp_server.secure_session.SecureMonarchSession.load_token",
-            side_effect=Exception("Keyring access denied"),
+            "monarch_mcp_server.client.get_monarch_client",
+            return_value=mock_client,
         ):
             tool = await mcp._tool_manager.get_tool("check_auth_status")
-            result = tool.fn()
+            result = await tool.fn()
 
-            assert "Error" in result or "error" in result
-            assert "Keyring access denied" in result
+            assert "Authenticated" in result
+            assert "Premium" in result
 
     @pytest.mark.asyncio
-    async def test_suggests_next_steps(self):
-        """Verify check_auth_status provides helpful suggestions."""
-        with patch(
-            "monarch_mcp_server.secure_session.SecureMonarchSession.load_token",
-            return_value="token",
-        ):
-            with patch.dict(os.environ, {}, clear=True):
-                tool = await mcp._tool_manager.get_tool("check_auth_status")
-                result = tool.fn()
+    async def test_with_valid_connection_free(self):
+        """Verify check_auth_status shows plan info for free users."""
+        mock_client = MagicMock()
+        mock_client.get_subscription_details = AsyncMock(
+            return_value={"hasPremiumEntitlement": False}
+        )
 
-            assert "get_accounts" in result or "login_setup" in result
+        with patch(
+            "monarch_mcp_server.client.get_monarch_client",
+            return_value=mock_client,
+        ):
+            tool = await mcp._tool_manager.get_tool("check_auth_status")
+            result = await tool.fn()
+
+            assert "Authenticated" in result
+            assert "Free" in result or "Trial" in result
+
+    @pytest.mark.asyncio
+    async def test_not_authenticated(self):
+        """Verify check_auth_status reports when not authenticated."""
+        from monarch_mcp_server.exceptions import AuthenticationError
+
+        with patch(
+            "monarch_mcp_server.client.get_monarch_client",
+            side_effect=AuthenticationError("Authentication required!"),
+        ):
+            tool = await mcp._tool_manager.get_tool("check_auth_status")
+            result = await tool.fn()
+
+            assert "Not authenticated" in result or "❌" in result
+            assert "login_setup" in result.lower()
+
+    @pytest.mark.asyncio
+    async def test_connection_error(self):
+        """Verify check_auth_status handles connection errors."""
+        with patch(
+            "monarch_mcp_server.client.get_monarch_client",
+            side_effect=Exception("Network timeout"),
+        ):
+            tool = await mcp._tool_manager.get_tool("check_auth_status")
+            result = await tool.fn()
+
+            assert "failed" in result.lower()
+            assert "Network timeout" in result
 
 
 class TestMain:

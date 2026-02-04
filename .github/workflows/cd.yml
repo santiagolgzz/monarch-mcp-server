@@ -35,18 +35,19 @@ jobs:
       - name: Deploy to Cloud Run
         id: deploy
         run: |
-          gcloud run deploy monarch-mcp-server \
+          gcloud run deploy monarch-mcp \
             --image ${{ vars.GCP_REGION || 'us-central1' }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/monarch-mcp/server:${{ github.sha }} \
             --project ${{ vars.GCP_PROJECT_ID }} \
             --platform managed \
             --region ${{ vars.GCP_REGION || 'us-central1' }} \
             --allow-unauthenticated \
-            --set-env-vars "GITHUB_CLIENT_ID=${{ vars.GITHUB_CLIENT_ID }}" \
-            --set-env-vars "GITHUB_CLIENT_SECRET=${{ secrets.GITHUB_CLIENT_SECRET }}" \
-            --set-env-vars "MONARCH_TOKEN=${{ secrets.MONARCH_TOKEN }}" \
-            --set-env-vars "BASE_URL=${{ vars.CLOUD_RUN_URL }}"
+            --set-env-vars "GITHUB_CLIENT_ID=${{ vars.OAUTH_CLIENT_ID }}" \
+            --set-env-vars "GITHUB_CLIENT_SECRET=${{ secrets.OAUTH_CLIENT_SECRET }}" \
+            --set-env-vars "BASE_URL=${{ vars.CLOUD_RUN_URL }}" \
+            --set-secrets "MONARCH_EMAIL=monarch-email:latest,MONARCH_PASSWORD=monarch-password:latest,MONARCH_MFA_SECRET=monarch-mfa-secret:latest"
 
       - name: Verify Deployment
         run: |
           echo "Checking health endpoint..."
+          sleep 10  # Give service time to start
           curl -sf "${{ vars.CLOUD_RUN_URL }}/health" || echo "Health check pending (service may need a moment to start)"

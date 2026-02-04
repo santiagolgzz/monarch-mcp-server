@@ -2,10 +2,9 @@
 
 import json
 import logging
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional
-from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
@@ -13,14 +12,14 @@ logger = logging.getLogger(__name__)
 class SafetyConfig:
     """Configuration for safety protections."""
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: str | None = None):
         """Initialize safety configuration."""
         self.config_path = config_path or str(
             Path.home() / ".mm" / "safety_config.json"
         )
         self.config = self._load_config()
 
-    def _load_config(self) -> Dict:
+    def _load_config(self) -> dict:
         """Load safety configuration from file or use defaults."""
         default_config = {
             # Operations requiring user approval (will prompt in Claude Desktop)
@@ -48,7 +47,7 @@ class SafetyConfig:
         try:
             config_file = Path(self.config_path)
             if config_file.exists():
-                with open(config_file, "r") as f:
+                with open(config_file) as f:
                     loaded_config = json.load(f)
                 # Merge with defaults
                 for key in default_config:
@@ -82,13 +81,15 @@ class SafetyConfig:
 class SafetyGuard:
     """Safety guard using user approval model."""
 
-    def __init__(self, config: Optional[SafetyConfig] = None):
+    def __init__(self, config: SafetyConfig | None = None):
         """Initialize safety guard."""
         self.config = config or SafetyConfig()
         self.operation_log_path = str(Path.home() / ".mm" / "operation_log.json")
 
         # Track operations for statistics
-        self.daily_counts: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        self.daily_counts: dict[str, dict[str, int]] = defaultdict(
+            lambda: defaultdict(int)
+        )
         self._load_operation_log()
 
     def _load_operation_log(self) -> None:
@@ -96,11 +97,13 @@ class SafetyGuard:
         try:
             log_file = Path(self.operation_log_path)
             if log_file.exists():
-                with open(log_file, "r") as f:
+                with open(log_file) as f:
                     data = json.load(f)
                     today = datetime.now().strftime("%Y-%m-%d")
                     if today in data:
-                        self.daily_counts[today] = defaultdict(int, data[today].get("counts", {}))
+                        self.daily_counts[today] = defaultdict(
+                            int, data[today].get("counts", {})
+                        )
         except Exception as e:
             logger.warning(f"Failed to load operation log: {e}")
 
@@ -113,7 +116,7 @@ class SafetyGuard:
             # Load existing
             data = {}
             if log_file.exists():
-                with open(log_file, "r") as f:
+                with open(log_file) as f:
                     data = json.load(f)
 
             # Update today
@@ -129,7 +132,7 @@ class SafetyGuard:
             logger.error(f"Failed to save operation log: {e}")
 
     def check_operation(
-        self, operation_name: str, operation_details: Optional[Dict] = None
+        self, operation_name: str, operation_details: dict | None = None
     ) -> tuple[bool, str]:
         """
         Check if operation is allowed.
@@ -165,8 +168,8 @@ class SafetyGuard:
         self,
         operation_name: str,
         success: bool = True,
-        operation_details: Optional[Dict] = None,
-        result: Optional[str] = None,
+        operation_details: dict | None = None,
+        result: str | None = None,
     ) -> None:
         """
         Record that an operation was performed with full details for rollback.
@@ -188,8 +191,8 @@ class SafetyGuard:
     def _save_detailed_operation(
         self,
         operation_name: str,
-        operation_details: Optional[Dict],
-        result: Optional[str],
+        operation_details: dict | None,
+        result: str | None,
     ) -> None:
         """Save detailed operation log for potential rollback."""
         try:
@@ -218,8 +221,8 @@ class SafetyGuard:
             logger.error(f"Failed to save detailed operation log: {e}")
 
     def _generate_rollback_info(
-        self, operation_name: str, params: Optional[Dict], result: Optional[str]
-    ) -> Dict:
+        self, operation_name: str, params: dict | None, result: str | None
+    ) -> dict:
         """Generate rollback information for an operation."""
         rollback = {"reversible": False, "reverse_operation": None, "notes": ""}
 
@@ -242,7 +245,7 @@ class SafetyGuard:
                 {
                     "reversible": True,
                     "reverse_operation": "create_manual_account",
-                    "notes": f"To recreate: Use account details from get_accounts before deletion",
+                    "notes": "To recreate: Use account details from get_accounts before deletion",
                     "deleted_id": params.get("account_id"),
                 }
             )
@@ -252,7 +255,7 @@ class SafetyGuard:
                 {
                     "reversible": True,
                     "reverse_operation": "create_transaction_category",
-                    "notes": f"To recreate: Use category details from get_transaction_categories before deletion",
+                    "notes": "To recreate: Use category details from get_transaction_categories before deletion",
                     "deleted_id": params.get("category_id"),
                 }
             )
@@ -262,7 +265,7 @@ class SafetyGuard:
                 {
                     "reversible": True,
                     "reverse_operation": "create_transaction_category (multiple)",
-                    "notes": f"To recreate: Use category details from get_transaction_categories before deletion",
+                    "notes": "To recreate: Use category details from get_transaction_categories before deletion",
                     "deleted_ids": params.get("category_ids", "").split(","),
                 }
             )
@@ -273,7 +276,7 @@ class SafetyGuard:
                 {
                     "reversible": True,
                     "reverse_operation": "update_transaction",
-                    "notes": f"To undo: Get original values from transaction history",
+                    "notes": "To undo: Get original values from transaction history",
                     "modified_id": params.get("transaction_id"),
                     "modified_fields": {
                         k: v
@@ -288,7 +291,7 @@ class SafetyGuard:
                 {
                     "reversible": True,
                     "reverse_operation": "update_account",
-                    "notes": f"To undo: Get original values from account history",
+                    "notes": "To undo: Get original values from account history",
                     "modified_id": params.get("account_id"),
                     "modified_fields": {
                         k: v
@@ -338,7 +341,7 @@ class SafetyGuard:
 
         return rollback
 
-    def _extract_id_from_result(self, result: Optional[str]) -> Optional[str]:
+    def _extract_id_from_result(self, result: str | None) -> str | None:
         """Try to extract an ID from operation result."""
         if not result:
             return None
@@ -348,11 +351,11 @@ class SafetyGuard:
             for id_field in ["id", "transaction_id", "account_id", "category_id"]:
                 if id_field in result_data:
                     return str(result_data[id_field])
-        except:
+        except (json.JSONDecodeError, KeyError, TypeError):
             pass
         return None
 
-    def get_operation_stats(self) -> Dict:
+    def get_operation_stats(self) -> dict:
         """Get operation statistics for today."""
         today = datetime.now().strftime("%Y-%m-%d")
         return {
@@ -378,15 +381,12 @@ class SafetyGuard:
         return "✅ Emergency stop deactivated. Write operations are now enabled."
 
 
-# Global instance
-_safety_guard: Optional[SafetyGuard] = None
+# Global instance - eagerly initialized to avoid race conditions in async context
+_safety_guard = SafetyGuard()
 
 
 def get_safety_guard() -> SafetyGuard:
-    """Get or create the global safety guard instance."""
-    global _safety_guard
-    if _safety_guard is None:
-        _safety_guard = SafetyGuard()
+    """Get the global safety guard instance."""
     return _safety_guard
 
 
@@ -405,7 +405,7 @@ def require_safety_check(operation_name: str):
         import inspect
 
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        async def wrapper(*args, **kwargs):
             guard = get_safety_guard()
 
             # Retrieve all arguments including defaults
@@ -428,7 +428,10 @@ def require_safety_check(operation_name: str):
 
             # Execute operation
             try:
-                result = func(*args, **kwargs)
+                if inspect.iscoroutinefunction(func):
+                    result = await func(*args, **kwargs)
+                else:
+                    result = func(*args, **kwargs)
 
                 # Record operation
                 guard.record_operation(
@@ -440,7 +443,7 @@ def require_safety_check(operation_name: str):
                 return result
             except Exception as e:
                 guard.record_operation(operation_name, success=False)
-                raise
+                raise e
 
         return wrapper
 

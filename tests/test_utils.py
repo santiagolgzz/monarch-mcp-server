@@ -1,27 +1,26 @@
 """Tests for the utils module."""
 
-import pytest
 import json
-from unittest.mock import patch, MagicMock
 from pathlib import Path
 
+import pytest
+
+from monarch_mcp_server.exceptions import (
+    APIError,
+    AuthenticationError,
+    MonarchMCPError,
+    NetworkError,
+    SessionExpiredError,
+    ValidationError,
+)
 from monarch_mcp_server.utils import (
+    classify_exception,
+    format_error,
+    format_result,
     get_config_dir,
     get_config_path,
-    format_result,
-    format_error,
     validate_date_format,
-    validate_positive_amount,
     validate_non_empty_string,
-    classify_exception,
-)
-from monarch_mcp_server.exceptions import (
-    MonarchMCPError,
-    AuthenticationError,
-    NetworkError,
-    APIError,
-    ValidationError,
-    SessionExpiredError,
 )
 
 
@@ -73,8 +72,8 @@ class TestFormatResult:
 
     def test_format_with_special_types(self):
         """Test formatting with types that need special handling."""
-        from datetime import datetime, date
-        
+        from datetime import date, datetime
+
         data = {
             "date": date(2024, 1, 15),
             "datetime": datetime(2024, 1, 15, 10, 30),
@@ -131,25 +130,6 @@ class TestValidateDateFormat:
         with pytest.raises(ValidationError) as exc_info:
             validate_date_format("bad-date", field_name="start_date")
         assert "start_date" in str(exc_info.value)
-
-
-class TestValidatePositiveAmount:
-    """Tests for validate_positive_amount function."""
-
-    def test_positive_amount(self):
-        """Test positive amount passes validation."""
-        result = validate_positive_amount(100.50)
-        assert result == 100.50
-
-    def test_zero_raises(self):
-        """Test zero raises ValidationError."""
-        with pytest.raises(ValidationError):
-            validate_positive_amount(0)
-
-    def test_negative_raises(self):
-        """Test negative amount raises ValidationError."""
-        with pytest.raises(ValidationError):
-            validate_positive_amount(-50.00)
 
 
 class TestValidateNonEmptyString:

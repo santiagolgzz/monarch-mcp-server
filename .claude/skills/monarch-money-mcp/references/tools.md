@@ -21,13 +21,15 @@
 | `request_accounts_refresh_and_wait` | Blocking refresh | Read |
 | `is_accounts_refresh_complete` | Check refresh status | Read |
 
-## Transactions (9 tools)
+## Transactions (11 tools)
 | Tool | Description | Safety |
 |------|-------------|--------|
-| `get_transactions` | Query transactions | Read |
+| `get_transaction_stats` | **PRIMARY ANALYTICS**. Returns sum/count with filters. | Read |
+| `search_transactions` | **PRIMARY SEARCH**. Keyword search across all fields. | Read |
+| `get_transactions` | Query list of full transaction objects. | Read |
 | `get_transaction_details` | Single transaction | Read |
 | `get_transaction_splits` | Split info | Read |
-| `get_transactions_summary` | Aggregated data | Read |
+| `get_transactions_summary` | Aggregated data (global only) | Read |
 | `get_recurring_transactions` | Subscriptions | Read |
 | `create_transaction` | Add transaction (see params below) | Write |
 | `update_transaction` | Modify transaction | Write |

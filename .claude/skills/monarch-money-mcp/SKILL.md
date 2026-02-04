@@ -50,10 +50,10 @@ get_cashflow                  # Income vs expenses
 Example:
 ```json
 {
-  "account_id": "192069965128778350",
+  "account_id": "<from get_accounts>",
   "amount": -25.50,
   "merchant_name": "Coffee Shop",
-  "category_id": "184644016420536591",
+  "category_id": "<from get_transaction_categories>",
   "date": "2025-12-15",
   "notes": "Team coffee"
 }

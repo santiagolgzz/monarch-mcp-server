@@ -33,7 +33,7 @@ dependencies = [
     "gql>=3.4,<4.0",
     "keyring>=24.0.0",
     "python-dotenv>=1.0.0",
-    "pydantic>=2.0.0",
+    "pydantic>=2.10.0",  # 2.10+ required for Python 3.14 support
     # HTTP server dependencies for remote hosting
     "starlette>=0.37.0",
     "uvicorn[standard]>=0.29.0",

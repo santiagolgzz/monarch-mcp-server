@@ -362,7 +362,7 @@ class SafetyGuard:
 
         if isinstance(result, dict):
             for id_field in ["id", "transaction_id", "account_id", "category_id"]:
-                if id_field in result:
+                if id_field in result and result[id_field] is not None:
                     return str(result[id_field])
             return None
 
@@ -372,7 +372,7 @@ class SafetyGuard:
                 return None
             # Common ID field names
             for id_field in ["id", "transaction_id", "account_id", "category_id"]:
-                if id_field in result_data:
+                if id_field in result_data and result_data[id_field] is not None:
                     return str(result_data[id_field])
         except (json.JSONDecodeError, KeyError, TypeError):
             pass

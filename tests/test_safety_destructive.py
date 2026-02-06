@@ -26,7 +26,9 @@ class TestDestructiveToolsInServer:
             with patch(
                 "monarch_mcp_server.tools.transactions.get_monarch_client"
             ) as mock_client:
-                mock_client.return_value.delete_transaction = AsyncMock(return_value=True)
+                mock_client.return_value.delete_transaction = AsyncMock(
+                    return_value=True
+                )
 
                 tool = await mcp._tool_manager.get_tool("delete_transaction")
                 result = await tool.fn(transaction_id="txn_123")

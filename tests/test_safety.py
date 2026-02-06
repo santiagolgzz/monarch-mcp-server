@@ -187,7 +187,7 @@ class TestRequireSafetyCheckDecorator:
 
         try:
             result = await test_func()
-            result_data = json.loads(result)
+            result_data = result
 
             assert "error" in result_data
             assert "blocked" in result_data["error"]

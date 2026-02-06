@@ -23,9 +23,7 @@ async def test_get_safety_stats_async(mcp):
         mock_guard.return_value.get_operation_stats.return_value = {"daily_count": 5}
 
         tool = await mcp._tool_manager.get_tool("get_safety_stats")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert data["daily_count"] == 5
 
 
@@ -47,9 +45,7 @@ async def test_get_recent_operations_optimized(mcp, tmp_path):
 
     with patch("pathlib.Path.home", return_value=tmp_path):
         tool = await mcp._tool_manager.get_tool("get_recent_operations")
-        result = await tool.fn(limit=1)
-
-        data = json.loads(result)
+        data = await tool.fn(limit=1)
         assert data["count"] == 1
         assert data["operations"][0]["operation"] == "update"
 
@@ -61,9 +57,7 @@ async def test_get_recent_operations_no_log_file(mcp, tmp_path):
 
     with patch("pathlib.Path.home", return_value=tmp_path):
         tool = await mcp._tool_manager.get_tool("get_recent_operations")
-        result = await tool.fn(limit=10)
-
-        data = json.loads(result)
+        data = await tool.fn(limit=10)
         assert data["operations"] == []
         assert "No operations" in data["message"] or data["count"] == 0
 
@@ -87,9 +81,7 @@ async def test_get_recent_operations_limit_capped_at_50(mcp, tmp_path):
     with patch("pathlib.Path.home", return_value=tmp_path):
         tool = await mcp._tool_manager.get_tool("get_recent_operations")
         # Request 100, should be capped to 50
-        result = await tool.fn(limit=100)
-
-        data = json.loads(result)
+        data = await tool.fn(limit=100)
         assert data["count"] <= 50
 
 
@@ -114,9 +106,7 @@ async def test_get_recent_operations_skips_invalid_json(mcp, tmp_path):
 
     with patch("pathlib.Path.home", return_value=tmp_path):
         tool = await mcp._tool_manager.get_tool("get_recent_operations")
-        result = await tool.fn(limit=10)
-
-        data = json.loads(result)
+        data = await tool.fn(limit=10)
         # Should have 2 valid operations, skipping the invalid line
         assert data["count"] == 2
 
@@ -133,9 +123,7 @@ async def test_get_recent_operations_empty_file(mcp, tmp_path):
 
     with patch("pathlib.Path.home", return_value=tmp_path):
         tool = await mcp._tool_manager.get_tool("get_recent_operations")
-        result = await tool.fn(limit=10)
-
-        data = json.loads(result)
+        data = await tool.fn(limit=10)
         assert data["count"] == 0
         assert data["operations"] == []
 

@@ -1,4 +1,3 @@
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -27,13 +26,13 @@ class TestDestructiveToolsInServer:
             with patch(
                 "monarch_mcp_server.tools.transactions.get_monarch_client"
             ) as mock_client:
-                mock_client.return_value.delete_transaction = AsyncMock()
+                mock_client.return_value.delete_transaction = AsyncMock(return_value=True)
 
                 tool = await mcp._tool_manager.get_tool("delete_transaction")
                 result = await tool.fn(transaction_id="txn_123")
 
                 # Should not be blocked
-                assert "blocked" not in result.lower()
+                assert result["deleted"] in (True, False)
         finally:
             guard.config.config["emergency_stop"] = original_stop
 
@@ -56,7 +55,7 @@ class TestDestructiveToolsInServer:
             tool = await mcp._tool_manager.get_tool("delete_transaction")
             result = await tool.fn(transaction_id="txn_123")
 
-            result_data = json.loads(result)
+            result_data = result
             assert "error" in result_data
             assert "blocked" in result_data["error"].lower()
             assert "EMERGENCY STOP" in result_data["reason"]
@@ -82,7 +81,7 @@ class TestDestructiveToolsInServer:
             tool = await mcp._tool_manager.get_tool("delete_account")
             result = await tool.fn(account_id="acc_123")
 
-            result_data = json.loads(result)
+            result_data = result
             assert "error" in result_data
             assert "blocked" in result_data["error"].lower()
         finally:

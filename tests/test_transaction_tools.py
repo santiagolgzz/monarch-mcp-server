@@ -1,4 +1,3 @@
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -36,15 +35,13 @@ async def test_create_transaction_success(mcp):
             mock_guard.return_value.record_operation = MagicMock()
 
             tool = await mcp._tool_manager.get_tool("create_transaction")
-            result = await tool.fn(
+            data = await tool.fn(
                 account_id="acc_123",
                 amount=-50.0,
                 merchant_name="Test Merchant",
                 category_id="cat_123",
                 date="2024-01-15",
             )
-
-            data = json.loads(result)
             assert data["id"] == "txn_new_123"
             assert data["amount"] == -50.0
 
@@ -90,9 +87,7 @@ async def test_get_transactions_async(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_transactions")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert data == []
 
 
@@ -124,9 +119,7 @@ async def test_get_transactions_null_category(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_transactions")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert len(data) == 1
         assert data[0]["category"] is None
 
@@ -159,9 +152,7 @@ async def test_get_transactions_null_merchant(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_transactions")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert len(data) == 1
         assert data[0]["merchant"] is None
 
@@ -201,9 +192,7 @@ async def test_amount_filtering_with_none(mcp):
     ):
         tool = await mcp._tool_manager.get_tool("get_transactions")
         # Filter with min_amount - should skip txn_1 with None amount
-        result = await tool.fn(min_amount=-150.0)
-
-        data = json.loads(result)
+        data = await tool.fn(min_amount=-150.0)
         # Should include both - None amount skips the filter check
         assert len(data) == 2
 
@@ -221,9 +210,7 @@ async def test_transaction_stats_empty(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_transaction_stats")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert data["count"] == 0
         assert data["sum_income"] == 0
         assert data["sum_expense"] == 0
@@ -246,9 +233,7 @@ async def test_delete_transaction_bool_result(mcp):
             mock_guard.return_value.check_operation.return_value = (True, None)
 
             tool = await mcp._tool_manager.get_tool("delete_transaction")
-            result = await tool.fn(transaction_id="txn_to_delete")
-
-            data = json.loads(result)
+            data = await tool.fn(transaction_id="txn_to_delete")
             assert data["deleted"] is True
             assert data["transaction_id"] == "txn_to_delete"
 
@@ -268,12 +253,8 @@ async def test_update_splits_invalid_json(mcp):
             mock_guard.return_value.check_operation.return_value = (True, None)
 
             tool = await mcp._tool_manager.get_tool("update_transaction_splits")
-            result = await tool.fn(
-                transaction_id="txn_123", splits_data="not valid json"
-            )
-
-            # Should return error
-            assert "error" in result.lower()
+            with pytest.raises(RuntimeError, match="Expecting value"):
+                await tool.fn(transaction_id="txn_123", splits_data="not valid json")
 
 
 @pytest.mark.asyncio
@@ -302,9 +283,7 @@ async def test_search_transactions(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("search_transactions")
-        result = await tool.fn(query="coffee")
-
-        data = json.loads(result)
+        data = await tool.fn(query="coffee")
         assert len(data) == 1
         assert data[0]["description"] == "Coffee Shop"
         mock_client.get_transactions.assert_called_once()
@@ -327,8 +306,6 @@ async def test_get_transaction_details(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_transaction_details")
-        result = await tool.fn(transaction_id="txn_123")
-
-        data = json.loads(result)
+        data = await tool.fn(transaction_id="txn_123")
         assert data["id"] == "txn_123"
         mock_client.get_transaction_details.assert_called_once_with("txn_123")

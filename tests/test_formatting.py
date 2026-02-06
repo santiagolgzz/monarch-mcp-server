@@ -1,4 +1,3 @@
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -35,9 +34,7 @@ async def test_get_accounts_formats_response(mcp):
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
         tool = await mcp._tool_manager.get_tool("get_accounts")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert isinstance(data, list)
         assert data[0]["name"] == "Checking"
         assert data[0]["balance"] == 1000.50
@@ -69,9 +66,7 @@ async def test_get_transactions_formats_response(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_transactions")
-        result = await tool.fn(limit=1)
-
-        data = json.loads(result)
+        data = await tool.fn(limit=1)
         assert isinstance(data, list)
         assert data[0]["description"] == "Grocery Store"
         assert data[0]["amount"] == -50.25

@@ -92,7 +92,10 @@ def register_safety_tools(mcp: FastMCP) -> None:
 
             # The requested operation is the first in our deque
             target_line = last_lines[0]
-            op = json.loads(target_line)
+            try:
+                op = json.loads(target_line)
+            except json.JSONDecodeError:
+                return "Failed to parse operation log entry: invalid JSON."
 
         # Generate rollback suggestions
         rollback = op.get("rollback_info", {})

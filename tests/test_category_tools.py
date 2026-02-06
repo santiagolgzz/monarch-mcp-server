@@ -1,6 +1,5 @@
 """Tests for category management tools."""
 
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -42,9 +41,7 @@ async def test_get_categories_with_group(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_transaction_categories")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert len(data) == 2
         assert data[0]["name"] == "Groceries"
         assert data[0]["group"] == "Food & Dining"
@@ -73,9 +70,7 @@ async def test_get_categories_null_group(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_transaction_categories")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert len(data) == 1
         assert data[0]["group"] is None
 
@@ -101,9 +96,7 @@ async def test_get_tags_missing_color(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_transaction_tags")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert len(data) == 1
         assert data[0]["name"] == "Important"
         assert data[0]["color"] is None
@@ -127,9 +120,7 @@ async def test_get_category_groups(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_transaction_category_groups")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert "groups" in data
         mock_client.get_transaction_category_groups.assert_called_once()
 
@@ -149,10 +140,8 @@ async def test_create_category_validation(mcp):
             mock_guard.return_value.check_operation.return_value = (True, None)
 
             tool = await mcp._tool_manager.get_tool("create_transaction_category")
-            result = await tool.fn(name="New Category", group_id="")
-
-            # Should return error for empty group_id
-            assert "error" in result.lower() or "validation" in result.lower()
+            with pytest.raises(RuntimeError, match="group_id cannot be empty"):
+                await tool.fn(name="New Category", group_id="")
 
 
 @pytest.mark.asyncio
@@ -174,9 +163,7 @@ async def test_create_category_success(mcp):
             mock_guard.return_value.check_operation.return_value = (True, None)
 
             tool = await mcp._tool_manager.get_tool("create_transaction_category")
-            result = await tool.fn(name="Coffee", group_id="grp_food")
-
-            data = json.loads(result)
+            data = await tool.fn(name="Coffee", group_id="grp_food")
             assert data["id"] == "new_cat_123"
             mock_client.create_transaction_category.assert_called_once_with(
                 group_id="grp_food", transaction_category_name="Coffee"
@@ -199,9 +186,7 @@ async def test_delete_category_false_result(mcp):
             mock_guard.return_value.check_operation.return_value = (True, None)
 
             tool = await mcp._tool_manager.get_tool("delete_transaction_category")
-            result = await tool.fn(category_id="cat_123")
-
-            data = json.loads(result)
+            data = await tool.fn(category_id="cat_123")
             assert data["deleted"] is False
             assert data["category_id"] == "cat_123"
 
@@ -226,9 +211,7 @@ async def test_delete_categories_mixed_results(mcp):
             mock_guard.return_value.check_operation.return_value = (True, None)
 
             tool = await mcp._tool_manager.get_tool("delete_transaction_categories")
-            result = await tool.fn(category_ids="cat_1,cat_2")
-
-            data = json.loads(result)
+            data = await tool.fn(category_ids="cat_1,cat_2")
             assert "results" in data
             assert len(data["results"]) == 2
             assert data["results"][0]["deleted"] is True

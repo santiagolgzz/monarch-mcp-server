@@ -5,7 +5,6 @@ Contains shared decorator and constants used across all tool modules.
 """
 
 import functools
-import json
 import logging
 from collections.abc import Awaitable, Callable
 from typing import ParamSpec, TypeVar
@@ -26,20 +25,19 @@ T = TypeVar("T")
 
 def tool_handler(
     operation_name: str,
-) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[str]]]:
+) -> Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[T]]]:
     """
-    Decorator that wraps tool functions with error handling and JSON serialization.
+    Decorator that wraps tool functions with error handling.
 
     This decorator:
     1. Catches all exceptions and formats them using format_error()
-    2. Serializes dict/list results to JSON with indent=2
-    3. Passes through string results unchanged (already formatted)
+    2. Returns native Python objects so MCP can build typed structured content
 
     Args:
         operation_name: Name of the operation for error messages and logging.
 
     Returns:
-        Decorated function that returns a JSON string.
+        Decorated function that preserves the wrapped function's return type.
 
     Example:
         @mcp.tool()
@@ -50,19 +48,17 @@ def tool_handler(
             return await client.create_transaction_tag(name=name)
     """
 
-    def decorator(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[str]]:
+    def decorator(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
         @functools.wraps(func)
-        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> str:
+        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             try:
                 result = await func(*args, **kwargs)
-                # Pass through strings (already formatted)
-                if isinstance(result, str):
-                    return result
-                # Serialize dicts/lists to JSON
-                return json.dumps(result, indent=2, default=str)
+                return result
             except Exception as e:
                 logger.error(f"Failed in {operation_name}: {e}")
-                return format_error(e, operation_name)
+                # Propagate as an exception so MCP surfaces it as a tool error
+                # rather than attempting to validate an incompatible return shape.
+                raise RuntimeError(format_error(e, operation_name)) from e
 
         return wrapper
 

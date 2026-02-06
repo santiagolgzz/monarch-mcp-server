@@ -1,4 +1,3 @@
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -25,9 +24,7 @@ async def test_get_transaction_categories_async(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_transaction_categories")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert data == []
 
 
@@ -44,9 +41,7 @@ async def test_get_transaction_tags_async(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_transaction_tags")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert data == []
 
 
@@ -69,9 +64,7 @@ async def test_get_subscription_details_success(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_subscription_details")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert "subscription" in data
         mock_client.get_subscription_details.assert_called_once()
 
@@ -89,10 +82,8 @@ async def test_get_subscription_details_error(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_subscription_details")
-        result = await tool.fn()
-
-        # Should return error message, not crash
-        assert "error" in result.lower()
+        with pytest.raises(RuntimeError, match="API error"):
+            await tool.fn()
 
 
 @pytest.mark.asyncio
@@ -113,9 +104,7 @@ async def test_get_institutions_success(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_institutions")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert "institutions" in data
         assert len(data["institutions"]) == 2
         mock_client.get_institutions.assert_called_once()
@@ -134,10 +123,8 @@ async def test_get_institutions_error(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_institutions")
-        result = await tool.fn()
-
-        # Should return error message, not crash
-        assert "error" in result.lower()
+        with pytest.raises(RuntimeError, match="Network error"):
+            await tool.fn()
 
 
 @pytest.mark.asyncio
@@ -158,9 +145,7 @@ async def test_get_subscription_with_trial_data(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_subscription_details")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert data["subscription"]["status"] == "trial"
 
 
@@ -177,7 +162,5 @@ async def test_get_institutions_empty(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_institutions")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert data["institutions"] == []

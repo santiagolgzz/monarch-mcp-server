@@ -1,6 +1,5 @@
 """Tests for budget management tools."""
 
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -47,9 +46,7 @@ async def test_get_budgets_success(mcp):
         "monarch_mcp_server.tools.budgets.get_monarch_client", return_value=mock_client
     ):
         tool = await mcp._tool_manager.get_tool("get_budgets")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert len(data) == 2
         assert data[0]["id"] == "bud_1"
         assert data[0]["name"] == "Groceries"
@@ -72,9 +69,7 @@ async def test_get_budgets_empty_list(mcp):
         "monarch_mcp_server.tools.budgets.get_monarch_client", return_value=mock_client
     ):
         tool = await mcp._tool_manager.get_tool("get_budgets")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert data == []
 
 
@@ -102,9 +97,7 @@ async def test_get_budgets_missing_category(mcp):
         "monarch_mcp_server.tools.budgets.get_monarch_client", return_value=mock_client
     ):
         tool = await mcp._tool_manager.get_tool("get_budgets")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert len(data) == 1
         assert data[0]["category"] is None  # Empty dict returns None for name
 
@@ -121,9 +114,7 @@ async def test_get_budgets_missing_budgets_key(mcp):
         "monarch_mcp_server.tools.budgets.get_monarch_client", return_value=mock_client
     ):
         tool = await mcp._tool_manager.get_tool("get_budgets")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert data == []
 
 
@@ -147,9 +138,7 @@ async def test_set_budget_amount_success(mcp):
             mock_guard.return_value.check_operation.return_value = (True, None)
 
             tool = await mcp._tool_manager.get_tool("set_budget_amount")
-            result = await tool.fn(category_id="cat_123", amount=750.0)
-
-            data = json.loads(result)
+            data = await tool.fn(category_id="cat_123", amount=750.0)
             assert data["success"] is True
             mock_client.set_budget_amount.assert_called_once_with(
                 amount=750.0, category_id="cat_123"
@@ -176,9 +165,7 @@ async def test_get_budgets_partial_data(mcp):
         "monarch_mcp_server.tools.budgets.get_monarch_client", return_value=mock_client
     ):
         tool = await mcp._tool_manager.get_tool("get_budgets")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert len(data) == 1
         assert data[0]["id"] == "bud_1"
         assert data[0]["name"] is None

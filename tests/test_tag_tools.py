@@ -1,6 +1,5 @@
 """Tests for tag management tools."""
 
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -33,9 +32,7 @@ async def test_create_tag_with_default_color(mcp):
             mock_guard.return_value.check_operation.return_value = (True, None)
 
             tool = await mcp._tool_manager.get_tool("create_tag")
-            result = await tool.fn(name="New Tag")
-
-            data = json.loads(result)
+            data = await tool.fn(name="New Tag")
             assert data["id"] == "tag_123"
             # Verify default color was passed
             mock_client.create_transaction_tag.assert_called_once_with(
@@ -62,9 +59,7 @@ async def test_create_tag_with_custom_color(mcp):
             mock_guard.return_value.check_operation.return_value = (True, None)
 
             tool = await mcp._tool_manager.get_tool("create_tag")
-            result = await tool.fn(name="Important", color="#FF0000")
-
-            data = json.loads(result)
+            data = await tool.fn(name="Important", color="#FF0000")
             assert data["color"] == "#FF0000"
             mock_client.create_transaction_tag.assert_called_once_with(
                 name="Important", color="#FF0000"
@@ -85,10 +80,8 @@ async def test_create_tag_empty_name_error(mcp):
             mock_guard.return_value.check_operation.return_value = (True, None)
 
             tool = await mcp._tool_manager.get_tool("create_tag")
-            result = await tool.fn(name="")
-
-            # Should return error message
-            assert "error" in result.lower() or "validation" in result.lower()
+            with pytest.raises(RuntimeError, match="name cannot be empty"):
+                await tool.fn(name="")
 
 
 @pytest.mark.asyncio
@@ -106,9 +99,7 @@ async def test_set_transaction_tags_single(mcp):
             mock_guard.return_value.check_operation.return_value = (True, None)
 
             tool = await mcp._tool_manager.get_tool("set_transaction_tags")
-            result = await tool.fn(transaction_id="txn_123", tag_ids="tag_1")
-
-            data = json.loads(result)
+            data = await tool.fn(transaction_id="txn_123", tag_ids="tag_1")
             assert data["success"] is True
             mock_client.set_transaction_tags.assert_called_once_with(
                 "txn_123", ["tag_1"]
@@ -131,11 +122,9 @@ async def test_set_transaction_tags_multiple_with_whitespace(mcp):
 
             tool = await mcp._tool_manager.get_tool("set_transaction_tags")
             # Tags with whitespace around them
-            result = await tool.fn(
+            data = await tool.fn(
                 transaction_id="txn_456", tag_ids="tag_1 , tag_2, tag_3 "
             )
-
-            data = json.loads(result)
             assert data["success"] is True
             # Should strip whitespace from each tag
             mock_client.set_transaction_tags.assert_called_once_with(

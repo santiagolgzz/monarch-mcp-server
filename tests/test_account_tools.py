@@ -1,4 +1,3 @@
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -34,9 +33,7 @@ async def test_get_accounts_async(mcp):
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
         tool = await mcp._tool_manager.get_tool("get_accounts")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert len(data) == 1
         assert data[0]["name"] == "Test"
 
@@ -57,8 +54,7 @@ async def test_get_account_history_consistency(mcp):
     ):
         tool = await mcp._tool_manager.get_tool("get_account_history")
         # Test without filtering
-        result = await tool.fn(account_id="1")
-        data = json.loads(result)
+        data = await tool.fn(account_id="1")
         assert "history" in data
         assert len(data["history"]) == 1
 
@@ -74,9 +70,8 @@ async def test_account_id_casting_safety(mcp):
     ):
         tool = await mcp._tool_manager.get_tool("get_account_holdings")
         # Test with invalid ID
-        result = await tool.fn(account_id="invalid")
-        assert "error" in result.lower()
-        assert "invalid account_id" in result.lower()
+        with pytest.raises(RuntimeError, match="Invalid account_id"):
+            await tool.fn(account_id="invalid")
 
 
 @pytest.mark.asyncio
@@ -96,9 +91,7 @@ async def test_get_account_holdings_valid_id(mcp):
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
         tool = await mcp._tool_manager.get_tool("get_account_holdings")
-        result = await tool.fn(account_id="12345")
-
-        data = json.loads(result)
+        data = await tool.fn(account_id="12345")
         assert "holdings" in data
         assert len(data["holdings"]) == 2
         mock_client.get_account_holdings.assert_called_once_with(12345)
@@ -122,11 +115,9 @@ async def test_get_account_history_date_filtering(mcp):
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
         tool = await mcp._tool_manager.get_tool("get_account_history")
-        result = await tool.fn(
+        data = await tool.fn(
             account_id="1", start_date="2024-01-10", end_date="2024-01-20"
         )
-
-        data = json.loads(result)
         assert len(data["history"]) == 1
         assert data["history"][0]["date"] == "2024-01-15"
 
@@ -147,9 +138,7 @@ async def test_get_account_history_list_format(mcp):
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
         tool = await mcp._tool_manager.get_tool("get_account_history")
-        result = await tool.fn(account_id="1")
-
-        data = json.loads(result)
+        data = await tool.fn(account_id="1")
         assert "history" in data
         assert len(data["history"]) == 2
 
@@ -171,9 +160,7 @@ async def test_get_account_type_options(mcp):
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
         tool = await mcp._tool_manager.get_tool("get_account_type_options")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert "types" in data
         mock_client.get_account_type_options.assert_called_once()
 
@@ -196,13 +183,11 @@ async def test_create_manual_account_success(mcp):
             mock_guard.return_value.check_operation.return_value = (True, None)
 
             tool = await mcp._tool_manager.get_tool("create_manual_account")
-            result = await tool.fn(
+            data = await tool.fn(
                 account_name="My New Account",
                 account_type="checking",
                 current_balance=1000.0,
             )
-
-            data = json.loads(result)
             assert data["id"] == "new_acc_123"
             mock_client.create_manual_account.assert_called_once()
 
@@ -251,9 +236,7 @@ async def test_update_account_success(mcp):
             mock_guard.return_value.check_operation.return_value = (True, None)
 
             tool = await mcp._tool_manager.get_tool("update_account")
-            result = await tool.fn(account_id="acc_123", name="Updated Name")
-
-            data = json.loads(result)
+            data = await tool.fn(account_id="acc_123", name="Updated Name")
             assert data["name"] == "Updated Name"
 
 
@@ -272,9 +255,7 @@ async def test_delete_account_bool_result(mcp):
             mock_guard.return_value.check_operation.return_value = (True, None)
 
             tool = await mcp._tool_manager.get_tool("delete_account")
-            result = await tool.fn(account_id="acc_to_delete")
-
-            data = json.loads(result)
+            data = await tool.fn(account_id="acc_to_delete")
             assert data["deleted"] is True
             assert data["account_id"] == "acc_to_delete"
 
@@ -295,9 +276,7 @@ async def test_upload_account_balance_history(mcp):
 
             tool = await mcp._tool_manager.get_tool("upload_account_balance_history")
             csv_data = "date,balance\n2024-01-01,1000\n2024-01-02,1050"
-            result = await tool.fn(account_id="acc_123", csv_data=csv_data)
-
-            data = json.loads(result)
+            data = await tool.fn(account_id="acc_123", csv_data=csv_data)
             assert data["uploaded"] is True
             assert data["account_id"] == "acc_123"
 
@@ -325,9 +304,7 @@ async def test_get_accounts_name_fallback(mcp):
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
         tool = await mcp._tool_manager.get_tool("get_accounts")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert data[0]["name"] == "Fallback Name"
 
 
@@ -353,9 +330,7 @@ async def test_get_accounts_missing_type(mcp):
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
         tool = await mcp._tool_manager.get_tool("get_accounts")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert data[0]["type"] is None
         assert data[0]["institution"] is None
 
@@ -391,8 +366,6 @@ async def test_get_accounts_is_active_field(mcp):
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
         tool = await mcp._tool_manager.get_tool("get_accounts")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert data[0]["is_active"] is True
         assert data[1]["is_active"] is False

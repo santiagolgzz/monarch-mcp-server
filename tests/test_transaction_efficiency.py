@@ -1,4 +1,3 @@
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -36,9 +35,7 @@ async def test_get_transactions_filters_by_amount_range(mcp):
         tool = await mcp._tool_manager.get_tool("get_transactions")
 
         # Test filtering for Medium transactions
-        result = await tool.fn(min_amount=40.0, max_amount=60.0)
-
-        data = json.loads(result)
+        data = await tool.fn(min_amount=40.0, max_amount=60.0)
         assert len(data) == 1
         assert data[0]["id"] == "2"
 
@@ -100,9 +97,7 @@ async def test_get_transaction_stats_logic(mcp):
     ):
         # This will fail until implemented
         tool = await mcp._tool_manager.get_tool("get_transaction_stats")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         assert data["count"] == 3
         assert data["sum_income"] == 100.0
         assert data["sum_expense"] == -75.0
@@ -136,9 +131,7 @@ async def test_get_transactions_payload_is_optimized(mcp):
         return_value=mock_client,
     ):
         tool = await mcp._tool_manager.get_tool("get_transactions")
-        result = await tool.fn()
-
-        data = json.loads(result)
+        data = await tool.fn()
         txn = data[0]
         # Check essential fields are there
         assert "id" in txn

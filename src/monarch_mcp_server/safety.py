@@ -5,6 +5,7 @@ import logging
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +170,7 @@ class SafetyGuard:
         operation_name: str,
         success: bool = True,
         operation_details: dict | None = None,
-        result: str | None = None,
+        result: Any = None,
     ) -> None:
         """
         Record that an operation was performed with full details for rollback.
@@ -192,7 +193,7 @@ class SafetyGuard:
         self,
         operation_name: str,
         operation_details: dict | None,
-        result: str | None,
+        result: Any,
     ) -> None:
         """Save detailed operation log for potential rollback."""
         try:
@@ -207,7 +208,7 @@ class SafetyGuard:
                 "timestamp": datetime.now().isoformat(),
                 "operation": operation_name,
                 "parameters": operation_details or {},
-                "result_preview": result[:500] if result else None,  # First 500 chars
+                "result_preview": self._preview_result(result),
                 "rollback_info": self._generate_rollback_info(
                     operation_name, operation_details, result
                 ),
@@ -221,7 +222,7 @@ class SafetyGuard:
             logger.error(f"Failed to save detailed operation log: {e}")
 
     def _generate_rollback_info(
-        self, operation_name: str, params: dict | None, result: str | None
+        self, operation_name: str, params: dict | None, result: Any
     ) -> dict:
         """Generate rollback information for an operation."""
         rollback = {"reversible": False, "reverse_operation": None, "notes": ""}
@@ -341,15 +342,37 @@ class SafetyGuard:
 
         return rollback
 
-    def _extract_id_from_result(self, result: str | None) -> str | None:
-        """Try to extract an ID from operation result."""
-        if not result:
+    def _preview_result(self, result: Any) -> str | None:
+        """Build a compact preview string for operation logs."""
+        if result is None:
             return None
+
+        if isinstance(result, str):
+            return result[:500]
+
         try:
-            result_data = json.loads(result)
+            return json.dumps(result, default=str)[:500]
+        except (TypeError, ValueError):
+            return str(result)[:500]
+
+    def _extract_id_from_result(self, result: Any) -> str | None:
+        """Try to extract an ID from operation result."""
+        if result is None:
+            return None
+
+        if isinstance(result, dict):
+            for id_field in ["id", "transaction_id", "account_id", "category_id"]:
+                if id_field in result and result[id_field] is not None:
+                    return str(result[id_field])
+            return None
+
+        try:
+            result_data = json.loads(result) if isinstance(result, str) else result
+            if not isinstance(result_data, dict):
+                return None
             # Common ID field names
             for id_field in ["id", "transaction_id", "account_id", "category_id"]:
-                if id_field in result_data:
+                if id_field in result_data and result_data[id_field] is not None:
                     return str(result_data[id_field])
         except (json.JSONDecodeError, KeyError, TypeError):
             pass
@@ -418,9 +441,7 @@ def require_safety_check(operation_name: str):
             allowed, message = guard.check_operation(operation_name, operation_details)
             if not allowed:
                 logger.warning(f"Operation '{operation_name}' blocked: {message}")
-                return json.dumps(
-                    {"error": "Operation blocked", "reason": message}, indent=2
-                )
+                return {"error": "Operation blocked", "reason": message}
 
             # Log informational message if needed
             if message and message != "Operation allowed":

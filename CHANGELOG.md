@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- MCP tool responses now use native structured values (dict/list/str) end-to-end.
+- Removed legacy JSON-string assumptions in tests and safety logging paths.
+- Hard cutover: downstream consumers should not call `json.loads(...)` on tool results unless the tool explicitly returns a string.
+
 ## [2.0.0] - 2025-02-03
 
 ### Added - HTTP/SSE Server

@@ -129,7 +129,7 @@ class TestMain:
         """Verify main() calls mcp.run()."""
         main()
 
-        mock_mcp.run.assert_called_once()
+        mock_mcp.run.assert_called_once_with(show_banner=False)
         mock_logger.info.assert_called()
 
     @patch("monarch_mcp_server.server.mcp")

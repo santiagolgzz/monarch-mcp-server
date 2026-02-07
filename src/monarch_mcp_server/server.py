@@ -88,7 +88,8 @@ def main():
     """Main entry point for the server."""
     logger.info("Starting Monarch Money MCP Server...")
     try:
-        mcp.run()
+        # Stdio MCP servers must keep stdout clean for JSON-RPC frames.
+        mcp.run(show_banner=False)
     except Exception as e:
         logger.error(f"Failed to run server: {str(e)}")
         raise

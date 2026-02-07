@@ -366,7 +366,7 @@ async def root(request: Request) -> Response:
                     if auth_mode == "token"
                     else "MCP endpoint (requires GitHub OAuth)"
                 ),
-                "/mcp-smoke": "CI smoke endpoint (token auth, when enabled)",
+                "/mcp-smoke/mcp": "CI smoke MCP endpoint (token auth, when enabled)",
                 "/.well-known/oauth-authorization-server": (
                     "OAuth discovery endpoint (oauth mode only)"
                 ),
@@ -394,7 +394,7 @@ def create_app() -> Starlette:
     smoke_app = None
     if smoke_enabled:
         smoke_server = create_mcp_smoke_server()
-        smoke_app = smoke_server.http_app(path="/")
+        smoke_app = smoke_server.http_app(path="/mcp")
 
     # Get well-known routes for OAuth discovery
     if auth_mode == "oauth" and mcp_server.auth:

@@ -72,7 +72,7 @@ jobs:
         run: |
           set -euo pipefail
           BASE_URL="${{ vars.CLOUD_RUN_URL }}"
-          MCP_URL="${BASE_URL}/mcp-smoke"
+          MCP_URL="${BASE_URL}/mcp-smoke/mcp"
 
           init_headers=$(mktemp)
           init_body=$(mktemp)

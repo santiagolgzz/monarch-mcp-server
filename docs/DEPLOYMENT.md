@@ -103,6 +103,7 @@ Go to Settings → Secrets and variables → Actions:
 *Variables* (not secret, but project-specific):
 - `GCP_PROJECT_ID` = your GCP project ID
 - `GCP_REGION` = `us-central1` (optional)
+- `GCP_VPC_CONNECTOR` = `monarch-mcp-connector` (for Redis private access)
 - `MCP_AUTH_MODE` = `token` (recommended) or `oauth`
 - `CLOUD_RUN_URL` = `https://monarch-mcp-server-xxxxx-uc.a.run.app` (set after first deploy)
 

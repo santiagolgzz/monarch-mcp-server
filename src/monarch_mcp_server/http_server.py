@@ -10,6 +10,7 @@ and other remote MCP clients. It wraps the server with:
 
 import logging
 import os
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from hmac import compare_digest
 
@@ -251,6 +252,22 @@ def create_mcp_smoke_server() -> FastMCP:
     return mcp
 
 
+def build_lifespan(mcp_app, smoke_app):
+    """Compose lifespans for mounted MCP apps so both session managers initialize."""
+
+    @asynccontextmanager
+    async def _lifespan(app):
+        if smoke_app is None:
+            async with mcp_app.lifespan(app):
+                yield
+            return
+        async with mcp_app.lifespan(app):
+            async with smoke_app.lifespan(app):
+                yield
+
+    return _lifespan
+
+
 # Health check endpoint (public, no auth required)
 async def health_check(request: Request) -> Response:
     """Health check endpoint for monitoring and load balancers."""
@@ -416,7 +433,7 @@ def create_app() -> Starlette:
             # Mount the MCP app
             Mount("/", app=mcp_app),
         ],
-        lifespan=mcp_app.lifespan,
+        lifespan=build_lifespan(mcp_app, smoke_app),
     )
 
     if auth_mode == "token" and token is not None:

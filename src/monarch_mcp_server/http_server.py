@@ -10,11 +10,13 @@ and other remote MCP clients. It wraps the server with:
 
 import logging
 import os
+from hmac import compare_digest
 
 import uvicorn
 from fastmcp import FastMCP
 from fastmcp.server.auth.providers.github import GitHubProvider
 from starlette.applications import Starlette
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Mount, Route
@@ -26,6 +28,25 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+
+def get_auth_mode() -> str:
+    """Get auth mode for remote HTTP server."""
+    mode = os.getenv("MCP_AUTH_MODE", "token").strip().lower()
+    if mode not in ("token", "oauth"):
+        raise ValueError("Invalid MCP_AUTH_MODE. Use 'token' (default) or 'oauth'.")
+    return mode
+
+
+def get_token_auth_secret() -> str:
+    """Get required shared token for token auth mode."""
+    token = os.getenv("MCP_AUTH_TOKEN", "").strip()
+    if not token:
+        raise ValueError(
+            "MCP_AUTH_TOKEN is required when MCP_AUTH_MODE=token. "
+            "Set MCP_AUTH_TOKEN to a long random secret."
+        )
+    return token
 
 
 def get_base_url() -> str:
@@ -48,35 +69,39 @@ def get_base_url() -> str:
 
 
 def create_mcp_server() -> FastMCP:
-    """Create the FastMCP server with GitHub OAuth and all Monarch tools.
+    """Create the FastMCP server with selected auth mode and all Monarch tools.
 
     Raises:
-        ValueError: If GitHub OAuth credentials are not configured.
+        ValueError: If auth configuration is invalid.
     """
-    base_url = get_base_url()
-    client_id = os.getenv("GITHUB_CLIENT_ID", "")
-    client_secret = os.getenv("GITHUB_CLIENT_SECRET", "")
+    auth_mode = get_auth_mode()
+    auth_provider = None
 
-    if not client_id or not client_secret:
-        raise ValueError(
-            "GitHub OAuth credentials required. "
-            "Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET environment variables."
+    if auth_mode == "oauth":
+        base_url = get_base_url()
+        client_id = os.getenv("GITHUB_CLIENT_ID", "")
+        client_secret = os.getenv("GITHUB_CLIENT_SECRET", "")
+
+        if not client_id or not client_secret:
+            raise ValueError(
+                "GitHub OAuth credentials required when MCP_AUTH_MODE=oauth. "
+                "Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET."
+            )
+
+        auth_provider = GitHubProvider(
+            client_id=client_id,
+            client_secret=client_secret,
+            base_url=base_url,
+            redirect_path="/auth/callback",
+            require_authorization_consent=False,
         )
+    else:
+        # Validate token mode config up front so failures are clear at startup.
+        get_token_auth_secret()
 
-    # Create GitHub OAuth provider
-    github_auth = GitHubProvider(
-        client_id=client_id,
-        client_secret=client_secret,
-        base_url=base_url,
-        redirect_path="/auth/callback",
-        # Don't require consent screen for personal use
-        require_authorization_consent=False,
-    )
-
-    # Create FastMCP server with auth
     mcp = FastMCP(
         "Monarch Money MCP Server",
-        auth=github_auth,
+        auth=auth_provider,
         instructions="MCP server for Monarch Money personal finance management",
     )
 
@@ -84,6 +109,34 @@ def create_mcp_server() -> FastMCP:
     register_tools(mcp)
 
     return mcp
+
+
+class MCPTokenAuthMiddleware(BaseHTTPMiddleware):
+    """Require Bearer token for MCP endpoint in single-user token mode."""
+
+    def __init__(self, app, token: str):
+        super().__init__(app)
+        self.token = token
+
+    async def dispatch(self, request: Request, call_next):
+        if not request.url.path.startswith("/mcp"):
+            return await call_next(request)
+
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return JSONResponse(
+                {"error": "unauthorized", "message": "Bearer token required"},
+                status_code=401,
+            )
+
+        candidate = auth_header.removeprefix("Bearer ").strip()
+        if not candidate or not compare_digest(candidate, self.token):
+            return JSONResponse(
+                {"error": "unauthorized", "message": "Invalid bearer token"},
+                status_code=401,
+            )
+
+        return await call_next(request)
 
 
 # Health check endpoint (public, no auth required)
@@ -100,30 +153,49 @@ async def health_check(request: Request) -> Response:
 async def root(request: Request) -> Response:
     """Root endpoint with basic info."""
     base_url = get_base_url()
+    auth_mode = get_auth_mode()
+    auth_description = (
+        "Bearer token (single-user mode)"
+        if auth_mode == "token"
+        else "GitHub OAuth (advanced mode)"
+    )
     return JSONResponse(
         {
             "service": "Monarch Money MCP Server",
             "description": "MCP server for Monarch Money personal finance",
+            "auth_mode": auth_mode,
             "endpoints": {
                 "/health": "Health check endpoint (public)",
-                "/mcp": "MCP endpoint (requires GitHub OAuth)",
-                "/.well-known/oauth-authorization-server": "OAuth discovery endpoint",
+                "/mcp": (
+                    "MCP endpoint (requires Authorization: Bearer token)"
+                    if auth_mode == "token"
+                    else "MCP endpoint (requires GitHub OAuth)"
+                ),
+                "/.well-known/oauth-authorization-server": (
+                    "OAuth discovery endpoint (oauth mode only)"
+                ),
             },
-            "auth": "GitHub OAuth - configure in Claude mobile app with OAuth client ID",
-            "oauth_discovery": f"{base_url}/.well-known/oauth-authorization-server",
+            "auth": auth_description,
+            "oauth_discovery": (
+                f"{base_url}/.well-known/oauth-authorization-server"
+                if auth_mode == "oauth"
+                else None
+            ),
         }
     )
 
 
 def create_app() -> Starlette:
     """Create the Starlette ASGI application."""
+    auth_mode = get_auth_mode()
     mcp_server = create_mcp_server()
+    token = get_token_auth_secret() if auth_mode == "token" else None
 
     # Get the HTTP app from FastMCP (includes OAuth routes)
     mcp_app = mcp_server.http_app(path="/mcp")
 
     # Get well-known routes for OAuth discovery
-    if mcp_server.auth:
+    if auth_mode == "oauth" and mcp_server.auth:
         well_known_routes = mcp_server.auth.get_well_known_routes(mcp_path="/mcp")
     else:
         well_known_routes = []
@@ -142,7 +214,11 @@ def create_app() -> Starlette:
         lifespan=mcp_app.lifespan,
     )
 
-    logger.info("Monarch Money MCP HTTP Server with GitHub OAuth initialized")
+    if auth_mode == "token" and token is not None:
+        app.add_middleware(MCPTokenAuthMiddleware, token=token)  # type: ignore[arg-type]
+        logger.info("Monarch Money MCP HTTP Server initialized in token auth mode")
+    else:
+        logger.info("Monarch Money MCP HTTP Server initialized in GitHub OAuth mode")
 
     return app
 
@@ -168,6 +244,7 @@ def main():
     """Run the HTTP server using uvicorn."""
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
+    auth_mode = get_auth_mode()
 
     # Validate by attempting to create the app (will raise if misconfigured)
     try:
@@ -180,8 +257,12 @@ def main():
 
     base_url = get_base_url()
     logger.info(f"Starting Monarch Money MCP Server on {base_url}")
+    logger.info(f"Auth mode: {auth_mode}")
     logger.info(f"MCP endpoint: {base_url}/mcp")
-    logger.info(f"OAuth discovery: {base_url}/.well-known/oauth-authorization-server")
+    if auth_mode == "oauth":
+        logger.info(
+            f"OAuth discovery: {base_url}/.well-known/oauth-authorization-server"
+        )
     logger.info(f"Health check: {base_url}/health")
 
     uvicorn.run(

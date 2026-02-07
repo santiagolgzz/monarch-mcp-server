@@ -10,6 +10,7 @@ async def test_http_server_registers_tools():
     """Verify that http_server.py registers tools when creating the MCP server."""
     # Mock environment for GitHub OAuth
     env = {
+        "MCP_AUTH_MODE": "oauth",
         "GITHUB_CLIENT_ID": "test_id",
         "GITHUB_CLIENT_SECRET": "test_secret",
         "BASE_URL": "http://localhost:8000",

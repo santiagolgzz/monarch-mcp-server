@@ -5,7 +5,8 @@ This guide explains how to host the Monarch Money MCP server online so you can u
 ## Overview
 
 The server uses **SSE (Server-Sent Events)** transport, which is the standard for remote MCP servers. It includes:
-- GitHub OAuth authentication for security
+- Single-user token authentication by default (`MCP_AUTH_MODE=token`)
+- Optional GitHub OAuth mode for advanced/multi-user setups (`MCP_AUTH_MODE=oauth`)
 - Health check endpoint for monitoring
 - Docker support for easy deployment
 
@@ -39,9 +40,13 @@ python -c "from monarch_mcp_server.secure_session import secure_session; print(s
 
 Save this token - you'll need it for deployment.
 
-## Step 2: Create a GitHub OAuth App
+## Step 2 (Optional): Create a GitHub OAuth App
 
-The server uses GitHub OAuth for authentication. Create an OAuth App:
+You only need this if you choose `MCP_AUTH_MODE=oauth`.
+
+If you're in the common single-user setup, skip this step and use `MCP_AUTH_MODE=token` with `MCP_AUTH_TOKEN`.
+
+For OAuth mode, create an OAuth App:
 
 1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
 2. Click "New OAuth App"
@@ -98,21 +103,23 @@ Go to Settings → Secrets and variables → Actions:
 *Variables* (not secret, but project-specific):
 - `GCP_PROJECT_ID` = your GCP project ID
 - `GCP_REGION` = `us-central1` (optional)
-- `GITHUB_CLIENT_ID` = your GitHub OAuth App client ID
+- `MCP_AUTH_MODE` = `token` (recommended) or `oauth`
 - `CLOUD_RUN_URL` = `https://monarch-mcp-server-xxxxx-uc.a.run.app` (set after first deploy)
 
 *Secrets* (encrypted):
 - `GCP_SA_KEY` = paste the entire JSON key file content
-- `GITHUB_CLIENT_SECRET` = your GitHub OAuth App secret
+- `MCP_AUTH_TOKEN` = long random secret used by your MCP client in Bearer auth
 - `MONARCH_TOKEN` = your Monarch Money token
+- `GITHUB_CLIENT_SECRET` = GitHub OAuth App secret (oauth mode only)
+- `GITHUB_CLIENT_ID` = GitHub OAuth App client ID (oauth mode only)
 
 **First Deployment:**
 1. Configure the variables/secrets above (leave `CLOUD_RUN_URL` empty initially)
 2. Push to `main` or manually trigger the workflow
 3. Get the Cloud Run URL from the deployment output
 4. Set `CLOUD_RUN_URL` variable with the actual URL
-5. Update your GitHub OAuth App callback URL to: `https://your-cloud-run-url/auth/callback`
-6. Re-run the workflow to apply the correct BASE_URL
+5. If using OAuth mode, update callback URL to: `https://your-cloud-run-url/auth/callback`
+6. Re-run the workflow if BASE_URL or OAuth settings changed
 
 After setup, every merge to `main` automatically deploys.
 
@@ -124,11 +131,12 @@ After setup, every merge to `main` automatically deploys.
 2. Connect Railway to your GitHub account
 3. Create new project → Deploy from GitHub repo
 4. Add environment variables:
-   - `GITHUB_CLIENT_ID` = your GitHub OAuth Client ID
-   - `GITHUB_CLIENT_SECRET` = your GitHub OAuth Client Secret
+   - `MCP_AUTH_MODE` = `token` (recommended)
+   - `MCP_AUTH_TOKEN` = long random secret
    - `MONARCH_TOKEN` = your Monarch Money token
+   - (`GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` only if using oauth mode)
 5. Railway will automatically deploy and give you a URL
-6. Update your GitHub OAuth App callback URL to: `https://your-app.railway.app/auth/callback`
+6. If using oauth mode, update callback URL to: `https://your-app.railway.app/auth/callback`
 
 ### Option C: Render
 
@@ -154,6 +162,8 @@ fly launch
 # Set secrets
 fly secrets set GITHUB_CLIENT_ID="your-github-client-id"
 fly secrets set GITHUB_CLIENT_SECRET="your-github-client-secret"
+fly secrets set MCP_AUTH_MODE="token"
+fly secrets set MCP_AUTH_TOKEN="your-long-random-secret"
 fly secrets set MONARCH_TOKEN="your-monarch-token"
 
 # Deploy
@@ -179,6 +189,8 @@ docker build -t monarch-mcp-server .
 docker run -d -p 8000:8000 \
   -e GITHUB_CLIENT_ID="your-github-client-id" \
   -e GITHUB_CLIENT_SECRET="your-github-client-secret" \
+  -e MCP_AUTH_MODE="token" \
+  -e MCP_AUTH_TOKEN="your-long-random-secret" \
   -e MONARCH_TOKEN="your-monarch-token" \
   -e BASE_URL="https://your-domain.com" \
   monarch-mcp-server
@@ -200,13 +212,15 @@ gcloud run deploy monarch-mcp-server \
   --allow-unauthenticated \
   --set-env-vars "GITHUB_CLIENT_ID=your-github-client-id" \
   --set-env-vars "GITHUB_CLIENT_SECRET=your-github-client-secret" \
+  --set-env-vars "MCP_AUTH_MODE=token" \
+  --set-env-vars "MCP_AUTH_TOKEN=your-long-random-secret" \
   --set-env-vars "MONARCH_TOKEN=your-monarch-token" \
   --set-env-vars "BASE_URL=https://monarch-mcp-server-HASH-uc.a.run.app"
 ```
 
 **Important**: After deployment, Cloud Run will give you a URL (e.g., `https://monarch-mcp-server-abc123-uc.a.run.app`). You must:
 1. Update `BASE_URL` with the actual URL
-2. Update your GitHub OAuth App callback URL to: `https://your-cloud-run-url/auth/callback`
+2. If using oauth mode, update callback URL to: `https://your-cloud-run-url/auth/callback`
 3. Redeploy with the correct `BASE_URL`
 
 ### Option G: VPS (DigitalOcean, AWS EC2, etc.)
@@ -226,6 +240,8 @@ pip install .
 # Set environment variables
 export GITHUB_CLIENT_ID="your-github-client-id"
 export GITHUB_CLIENT_SECRET="your-github-client-secret"
+export MCP_AUTH_MODE="token"
+export MCP_AUTH_TOKEN="your-long-random-secret"
 export MONARCH_TOKEN="your-monarch-token"
 export BASE_URL="https://your-domain.com"
 
@@ -246,6 +262,8 @@ User=your-user
 WorkingDirectory=/path/to/monarch-mcp-server
 Environment="GITHUB_CLIENT_ID=your-github-client-id"
 Environment="GITHUB_CLIENT_SECRET=your-github-client-secret"
+Environment="MCP_AUTH_MODE=token"
+Environment="MCP_AUTH_TOKEN=your-long-random-secret"
 Environment="MONARCH_TOKEN=your-monarch-token"
 Environment="BASE_URL=https://your-domain.com"
 ExecStart=/path/to/venv/bin/monarch-mcp-http
@@ -263,7 +281,8 @@ Once your server is deployed and running:
 2. Go to Settings → MCP Servers (or similar)
 3. Add a new MCP server:
    - **URL**: `https://your-server-url.com/mcp`
-   - **Auth**: GitHub OAuth (the app will prompt you to authenticate)
+   - **Auth (recommended)**: Bearer token using `MCP_AUTH_TOKEN`
+   - **Auth (optional)**: GitHub OAuth (only if `MCP_AUTH_MODE=oauth`)
 
 The server URL format depends on your deployment:
 - Railway: `https://your-app.up.railway.app/mcp`
@@ -277,8 +296,8 @@ The server URL format depends on your deployment:
 |----------|-------------|
 | `/` | Server info and available endpoints |
 | `/health` | Health check (no auth required) |
-| `/mcp` | MCP endpoint (requires GitHub OAuth) |
-| `/.well-known/oauth-authorization-server` | OAuth discovery endpoint |
+| `/mcp` | MCP endpoint (requires Bearer token or OAuth, based on mode) |
+| `/.well-known/oauth-authorization-server` | OAuth discovery endpoint (oauth mode only) |
 
 ## Security Considerations
 
@@ -290,12 +309,14 @@ The server URL format depends on your deployment:
 ## Troubleshooting
 
 ### Server won't start
-- Check that `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are set
+- For token mode: check `MCP_AUTH_MODE=token` and `MCP_AUTH_TOKEN` are set
+- For oauth mode: check `MCP_AUTH_MODE=oauth`, `GITHUB_CLIENT_ID`, and `GITHUB_CLIENT_SECRET`
 - Verify `MONARCH_TOKEN` is valid (try running locally first)
 
 ### Can't connect from Claude app
 - Ensure you're using the `/mcp` endpoint (not `/sse`)
-- Verify GitHub OAuth callback URL matches your deployment URL
+- If token mode: verify your client sends `Authorization: Bearer <MCP_AUTH_TOKEN>`
+- If oauth mode: verify GitHub OAuth callback URL matches your deployment URL
 - Verify the server is accessible (try `/health` endpoint in browser)
 
 ### Authentication errors with Monarch
@@ -310,8 +331,10 @@ The server URL format depends on your deployment:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GITHUB_CLIENT_ID` | Yes | GitHub OAuth App Client ID |
-| `GITHUB_CLIENT_SECRET` | Yes | GitHub OAuth App Client Secret |
+| `MCP_AUTH_MODE` | No | Auth mode: `token` (default) or `oauth` |
+| `MCP_AUTH_TOKEN` | Yes* | Shared bearer token for `token` mode |
+| `GITHUB_CLIENT_ID` | Yes** | GitHub OAuth App Client ID (`oauth` mode only) |
+| `GITHUB_CLIENT_SECRET` | Yes** | GitHub OAuth App Client Secret (`oauth` mode only) |
 | `MONARCH_TOKEN` | Yes* | Monarch Money authentication token |
 | `MONARCH_EMAIL` | No | Email for auto-login (alternative to token) |
 | `MONARCH_PASSWORD` | No | Password for auto-login (alternative to token) |
@@ -320,6 +343,7 @@ The server URL format depends on your deployment:
 | `PORT` | No | Server port (default: 8000) |
 | `DEBUG` | No | Enable debug logging (default: false) |
 
-*Either `MONARCH_TOKEN` or `MONARCH_EMAIL`+`MONARCH_PASSWORD` is required.
+*`MCP_AUTH_TOKEN` is required when `MCP_AUTH_MODE=token`. Also, either `MONARCH_TOKEN` or `MONARCH_EMAIL`+`MONARCH_PASSWORD` is required.
+**Required only when `MCP_AUTH_MODE=oauth`.
 
 **`BASE_URL` is auto-detected on Railway. Required for other platforms (Render, Fly.io, VPS, Cloud Run).

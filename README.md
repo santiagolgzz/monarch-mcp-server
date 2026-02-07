@@ -71,7 +71,8 @@ Start using Monarch Money tools immediately.
 
 ### 📱 Claude Mobile / Remote Access
 
-For mobile or remote deployment, see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for HTTP/SSE server setup with GitHub OAuth.
+For mobile or remote deployment, see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for HTTP/SSE setup.
+Default remote auth mode is now single-user token auth (`MCP_AUTH_MODE=token`), with GitHub OAuth available as an advanced option (`MCP_AUTH_MODE=oauth`).
 
 ## 🛠️ Available Tools
 

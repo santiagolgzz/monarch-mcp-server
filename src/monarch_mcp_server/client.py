@@ -8,7 +8,7 @@ import os
 from monarchmoney import MonarchMoney
 
 from monarch_mcp_server.exceptions import AuthenticationError
-from monarch_mcp_server.secure_session import secure_session
+from monarch_mcp_server.secure_session import DEFAULT_SESSION_FILE, secure_session
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,9 @@ async def get_monarch_client() -> MonarchMoney:
     if email and password:
         logger.info("Attempting login with environment variables")
         try:
-            client = MonarchMoney()
+            # Use an explicit absolute session path so cloud runtimes never resolve
+            # the library default relative path to a non-writable working directory.
+            client = MonarchMoney(session_file=str(DEFAULT_SESSION_FILE))
             mfa_secret = os.getenv("MONARCH_MFA_SECRET")
 
             # Login (this handles MFA if secret provided)

@@ -112,6 +112,9 @@ Go to Settings → Secrets and variables → Actions:
 - `MONARCH_TOKEN` = your Monarch Money token
 - `GITHUB_CLIENT_SECRET` = GitHub OAuth App secret (oauth mode only)
 - `GITHUB_CLIENT_ID` = GitHub OAuth App client ID (oauth mode only)
+- `OAUTH_REDIS_URL` = Redis URL used to persist OAuth state (required in oauth mode)
+- `OAUTH_JWT_SIGNING_KEY` = stable JWT signing key for OAuth tokens (required in oauth mode)
+- `MCP_CI_SMOKE_TOKEN` = dedicated bearer token for post-deploy MCP smoke endpoint
 
 **First Deployment:**
 1. Configure the variables/secrets above (leave `CLOUD_RUN_URL` empty initially)
@@ -122,6 +125,10 @@ Go to Settings → Secrets and variables → Actions:
 6. Re-run the workflow if BASE_URL or OAuth settings changed
 
 After setup, every merge to `main` automatically deploys.
+Deploy is only marked healthy if:
+1. `/health` is reachable
+2. `/ready` passes readiness checks
+3. a real authenticated MCP flow succeeds (`initialize -> tools/list -> tools/call`)
 
 ### Option B: Railway (Easiest Manual Setup)
 
@@ -337,6 +344,10 @@ The server URL format depends on your deployment:
 | `MCP_AUTH_TOKEN` | Yes* | Shared bearer token for `token` mode |
 | `GITHUB_CLIENT_ID` | Yes** | GitHub OAuth App Client ID (`oauth` mode only) |
 | `GITHUB_CLIENT_SECRET` | Yes** | GitHub OAuth App Client Secret (`oauth` mode only) |
+| `MCP_OAUTH_REDIS_URL` | Yes** | Shared Redis URL for durable OAuth state |
+| `MCP_OAUTH_JWT_SIGNING_KEY` | Yes** | Stable token signing key for OAuth |
+| `MCP_ENABLE_CI_SMOKE` | No | Enables `/mcp-smoke` endpoint for CI (default: false) |
+| `MCP_CI_SMOKE_TOKEN` | Yes*** | Bearer token required for `/mcp-smoke` |
 | `MONARCH_TOKEN` | Yes* | Monarch Money authentication token |
 | `MONARCH_EMAIL` | No | Email for auto-login (alternative to token) |
 | `MONARCH_PASSWORD` | No | Password for auto-login (alternative to token) |
@@ -347,5 +358,6 @@ The server URL format depends on your deployment:
 
 *`MCP_AUTH_TOKEN` is required when `MCP_AUTH_MODE=token`. Also, either `MONARCH_TOKEN` or `MONARCH_EMAIL`+`MONARCH_PASSWORD` is required.
 **Required only when `MCP_AUTH_MODE=oauth`.
+***Required when `MCP_ENABLE_CI_SMOKE=true`.
 
 **`BASE_URL` is auto-detected on Railway. Required for other platforms (Render, Fly.io, VPS, Cloud Run).

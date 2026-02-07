@@ -27,6 +27,8 @@ def _oauth_env(**overrides):
         "MCP_AUTH_MODE": "oauth",
         "GITHUB_CLIENT_ID": "test_client_id",
         "GITHUB_CLIENT_SECRET": "test_client_secret",
+        "MCP_OAUTH_REDIS_URL": "redis://localhost:6379/0",
+        "MCP_OAUTH_JWT_SIGNING_KEY": "test-jwt-signing-key",
         "BASE_URL": "http://localhost:8000",
     }
     env.update(overrides)
@@ -133,6 +135,26 @@ class TestCreateMCPServer:
             server = create_mcp_server()
             assert server.auth is not None
 
+    def test_oauth_mode_requires_redis_url(self):
+        from monarch_mcp_server.http_server import create_mcp_server
+
+        with patch.dict(os.environ, _oauth_env(MCP_OAUTH_REDIS_URL=""), clear=True):
+            with pytest.raises(ValueError, match="MCP_OAUTH_REDIS_URL is required"):
+                create_mcp_server()
+
+    def test_oauth_mode_requires_jwt_signing_key(self):
+        from monarch_mcp_server.http_server import create_mcp_server
+
+        with patch.dict(
+            os.environ,
+            _oauth_env(MCP_OAUTH_JWT_SIGNING_KEY=""),
+            clear=True,
+        ):
+            with pytest.raises(
+                ValueError, match="MCP_OAUTH_JWT_SIGNING_KEY is required"
+            ):
+                create_mcp_server()
+
 
 class TestHealthCheck:
     @pytest.mark.asyncio
@@ -238,7 +260,7 @@ class TestCreateApp:
         assert MCPTokenAuthMiddleware in middleware_classes
 
     def test_oauth_mode_keeps_well_known_discovery_route(self):
-        from monarch_mcp_server.http_server import create_app
+        from monarch_mcp_server.http_server import OAuthAutoRepairMiddleware, create_app
 
         with patch.dict(os.environ, _oauth_env(), clear=True):
             with patch(
@@ -248,7 +270,35 @@ class TestCreateApp:
                 app = create_app()
 
         route_paths = [getattr(route, "path", None) for route in app.routes]
+        middleware_classes = [m.cls for m in app.user_middleware]
+        assert OAuthAutoRepairMiddleware in middleware_classes
         assert "/.well-known/oauth-authorization-server" in route_paths
+
+    def test_smoke_mode_adds_smoke_endpoint_and_middleware(self):
+        from monarch_mcp_server.http_server import (
+            MCPSmokeTokenAuthMiddleware,
+            create_app,
+        )
+
+        with patch.dict(
+            os.environ,
+            _token_env(MCP_ENABLE_CI_SMOKE="true", MCP_CI_SMOKE_TOKEN="smoke-token"),
+            clear=True,
+        ):
+            with patch(
+                "monarch_mcp_server.http_server.create_mcp_server",
+                return_value=_build_fake_mcp_server(),
+            ):
+                with patch(
+                    "monarch_mcp_server.http_server.create_mcp_smoke_server",
+                    return_value=_build_fake_mcp_server(),
+                ):
+                    app = create_app()
+
+        route_paths = [getattr(route, "path", None) for route in app.routes]
+        middleware_classes = [m.cls for m in app.user_middleware]
+        assert "/mcp-smoke" in route_paths
+        assert MCPSmokeTokenAuthMiddleware in middleware_classes
 
 
 class TestTokenMiddleware:
@@ -269,6 +319,25 @@ class TestTokenMiddleware:
 
         response = await middleware.dispatch(request, call_next)
         assert response.status_code == 200
+
+
+class TestSmokeTokenMiddleware:
+    @pytest.mark.asyncio
+    async def test_missing_bearer_is_rejected(self):
+        from starlette.requests import Request
+
+        from monarch_mcp_server.http_server import MCPSmokeTokenAuthMiddleware
+
+        middleware = MCPSmokeTokenAuthMiddleware(app=MagicMock(), token="smoke-token")
+        request = MagicMock(spec=Request)
+        request.url.path = "/mcp-smoke"
+        request.headers = {}
+
+        async def call_next(_request):
+            return JSONResponse({"ok": True})
+
+        response = await middleware.dispatch(request, call_next)
+        assert response.status_code == 401
 
 
 class TestMain:

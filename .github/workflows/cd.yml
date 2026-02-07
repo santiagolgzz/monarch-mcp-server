@@ -36,6 +36,9 @@ jobs:
         id: deploy
         env:
           OAUTH_SECRET: ${{ secrets.OAUTH_CLIENT_SECRET }}
+          OAUTH_REDIS_URL: ${{ secrets.OAUTH_REDIS_URL }}
+          OAUTH_JWT_SIGNING_KEY: ${{ secrets.OAUTH_JWT_SIGNING_KEY }}
+          MCP_CI_SMOKE_TOKEN: ${{ secrets.MCP_CI_SMOKE_TOKEN }}
         run: |
           gcloud run deploy monarch-mcp \
             --image ${{ vars.GCP_REGION || 'us-central1' }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/monarch-mcp/server:${{ github.sha }} \
@@ -46,6 +49,10 @@ jobs:
             --set-env-vars "MCP_AUTH_MODE=oauth" \
             --set-env-vars "GITHUB_CLIENT_ID=${{ vars.OAUTH_CLIENT_ID }}" \
             --set-env-vars "GITHUB_CLIENT_SECRET=${OAUTH_SECRET}" \
+            --set-env-vars "MCP_OAUTH_REDIS_URL=${OAUTH_REDIS_URL}" \
+            --set-env-vars "MCP_OAUTH_JWT_SIGNING_KEY=${OAUTH_JWT_SIGNING_KEY}" \
+            --set-env-vars "MCP_ENABLE_CI_SMOKE=true" \
+            --set-env-vars "MCP_CI_SMOKE_TOKEN=${MCP_CI_SMOKE_TOKEN}" \
             --set-env-vars "BASE_URL=${{ vars.CLOUD_RUN_URL }}" \
             --set-secrets "MONARCH_EMAIL=monarch-email:latest,MONARCH_PASSWORD=monarch-password:latest,MONARCH_MFA_SECRET=monarch-mfa-secret:latest"
 
@@ -56,3 +63,86 @@ jobs:
           curl -sf "${{ vars.CLOUD_RUN_URL }}/health" || echo "Liveness check pending (service may need a moment to start)"
           echo "Checking readiness endpoint..."
           curl -sf "${{ vars.CLOUD_RUN_URL }}/ready" || (echo "Readiness check failed" && exit 1)
+
+      - name: Smoke MCP Tool Call (required)
+        env:
+          MCP_CI_SMOKE_TOKEN: ${{ secrets.MCP_CI_SMOKE_TOKEN }}
+        run: |
+          set -euo pipefail
+          BASE_URL="${{ vars.CLOUD_RUN_URL }}"
+          MCP_URL="${BASE_URL}/mcp-smoke"
+
+          init_headers=$(mktemp)
+          init_body=$(mktemp)
+          curl -sS -D "$init_headers" -o "$init_body" \
+            -H "Authorization: Bearer ${MCP_CI_SMOKE_TOKEN}" \
+            -H 'content-type: application/json' \
+            -H 'accept: application/json, text/event-stream' \
+            --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"cd-smoke","version":"1.0.0"}}}' \
+            "$MCP_URL"
+
+          python3 - "$init_headers" "$init_body" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          headers_path, body_path = sys.argv[1], sys.argv[2]
+          status = Path(headers_path).read_text().splitlines()[0]
+          if "200" not in status:
+              raise SystemExit(f"initialize failed: {status}")
+          data = json.loads(Path(body_path).read_text())
+          if "error" in data:
+              raise SystemExit(f"initialize error: {data['error']}")
+          if "result" not in data:
+              raise SystemExit("initialize missing result")
+          PY
+
+          session_id=$(awk -F': ' 'tolower($1)=="mcp-session-id" {gsub("\r", "", $2); print $2}' "$init_headers" | tail -n1)
+          session_headers=()
+          if [ -n "$session_id" ]; then
+            session_headers=(-H "mcp-session-id: $session_id")
+          fi
+
+          list_body=$(mktemp)
+          curl -sS -o "$list_body" \
+            -H "Authorization: Bearer ${MCP_CI_SMOKE_TOKEN}" \
+            -H 'content-type: application/json' \
+            -H 'accept: application/json, text/event-stream' \
+            "${session_headers[@]}" \
+            --data '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+            "$MCP_URL"
+
+          python3 - "$list_body" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          data = json.loads(Path(sys.argv[1]).read_text())
+          if "error" in data:
+              raise SystemExit(f"tools/list error: {data['error']}")
+          tools = data.get("result", {}).get("tools", [])
+          if not tools:
+              raise SystemExit("tools/list returned no tools")
+          PY
+
+          call_body=$(mktemp)
+          curl -sS -o "$call_body" \
+            -H "Authorization: Bearer ${MCP_CI_SMOKE_TOKEN}" \
+            -H 'content-type: application/json' \
+            -H 'accept: application/json, text/event-stream' \
+            "${session_headers[@]}" \
+            --data '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"setup_authentication","arguments":{}}}' \
+            "$MCP_URL"
+
+          python3 - "$call_body" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          data = json.loads(Path(sys.argv[1]).read_text())
+          if "error" in data:
+              raise SystemExit(f"tools/call error: {data['error']}")
+          result = data.get("result")
+          if result is None:
+              raise SystemExit("tools/call missing result")
+          PY

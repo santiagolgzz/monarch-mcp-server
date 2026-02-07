@@ -22,8 +22,26 @@ logger = logging.getLogger(__name__)
 KEYRING_SERVICE = "com.mcp.monarch-mcp-server"
 KEYRING_USERNAME = "monarch-token"
 
-# Standardize session file location to user's home directory
-DEFAULT_SESSION_FILE = Path.home() / ".mm" / "mm_session.pickle"
+
+def _resolve_home_dir() -> Path:
+    """Resolve home directory safely for restricted runtimes."""
+    try:
+        return Path.home()
+    except RuntimeError:
+        logger.warning(
+            "Could not resolve user home directory; falling back to /tmp "
+            "for session-related files."
+        )
+        return Path("/tmp")
+
+
+def _resolve_default_session_file() -> Path:
+    """Compute default session file path with a safe fallback."""
+    return _resolve_home_dir() / ".mm" / "mm_session.pickle"
+
+
+# Standardize session file location with fallback for restricted runtimes
+DEFAULT_SESSION_FILE = _resolve_default_session_file()
 
 
 class SecureMonarchSession:
@@ -177,7 +195,7 @@ class SecureMonarchSession:
 
         cleanup_paths = [
             # home / ".mm" / "mm_session.pickle",  <-- KEEP THIS ONE! (Handled by delete_token now)
-            Path.home() / "monarch_session.json",
+            _resolve_home_dir() / "monarch_session.json",
         ]
 
         for path in cleanup_paths:

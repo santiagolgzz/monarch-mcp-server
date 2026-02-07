@@ -7,6 +7,8 @@ from monarch_mcp_server.secure_session import (
     KEYRING_SERVICE,
     KEYRING_USERNAME,
     SecureMonarchSession,
+    _resolve_default_session_file,
+    _resolve_home_dir,
     secure_session,
 )
 
@@ -166,6 +168,24 @@ class TestGlobalSecureSession:
         """Test that global secure_session is instantiated."""
         assert secure_session is not None
         assert isinstance(secure_session, SecureMonarchSession)
+
+
+class TestSessionPathResolution:
+    """Tests for resilient session path resolution."""
+
+    def test_resolve_home_dir_falls_back_to_tmp_when_home_unavailable(self):
+        """Path.home RuntimeError should fall back to /tmp."""
+        from pathlib import Path
+
+        with patch("pathlib.Path.home", side_effect=RuntimeError("no home")):
+            assert _resolve_home_dir() == Path("/tmp")
+
+    def test_resolve_default_session_file_uses_tmp_fallback(self):
+        """Default session file should resolve under /tmp when home is unavailable."""
+        from pathlib import Path
+
+        with patch("pathlib.Path.home", side_effect=RuntimeError("no home")):
+            assert _resolve_default_session_file() == Path("/tmp/.mm/mm_session.pickle")
 
 
 class TestCleanupMethod:

@@ -7,7 +7,6 @@ Run this script to authenticate and save a session file that the MCP server can 
 
 import asyncio
 import getpass
-import os
 import shutil
 import sys
 from pathlib import Path
@@ -19,6 +18,7 @@ sys.path.insert(0, str(src_path))
 from dotenv import load_dotenv
 from monarchmoney import MonarchMoney, RequireMFAException
 
+from monarch_mcp_server.paths import resolve_home_dir
 from monarch_mcp_server.secure_session import secure_session
 
 
@@ -120,8 +120,9 @@ async def main():
                 )
 
                 # Clear old session and try fresh login
-                if os.path.exists(".mm"):
-                    shutil.rmtree(".mm")
+                session_dir = resolve_home_dir() / ".mm"
+                if session_dir.exists():
+                    shutil.rmtree(session_dir)
                     print("🗑️ Cleared expired session files")
 
                 # Try fresh login

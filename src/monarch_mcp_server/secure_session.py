@@ -8,6 +8,8 @@ from pathlib import Path
 
 from monarchmoney import MonarchMoney
 
+from monarch_mcp_server.paths import mm_file, resolve_home_dir
+
 # Try to import keyring, but make it optional for container deployments
 try:
     import keyring
@@ -24,20 +26,13 @@ KEYRING_USERNAME = "monarch-token"
 
 
 def _resolve_home_dir() -> Path:
-    """Resolve home directory safely for restricted runtimes."""
-    try:
-        return Path.home()
-    except RuntimeError:
-        logger.warning(
-            "Could not resolve user home directory; falling back to /tmp "
-            "for session-related files."
-        )
-        return Path("/tmp")
+    """Compatibility wrapper around shared path helper."""
+    return resolve_home_dir()
 
 
 def _resolve_default_session_file() -> Path:
     """Compute default session file path with a safe fallback."""
-    return _resolve_home_dir() / ".mm" / "mm_session.pickle"
+    return mm_file("mm_session.pickle")
 
 
 # Standardize session file location with fallback for restricted runtimes
@@ -195,7 +190,7 @@ class SecureMonarchSession:
 
         cleanup_paths = [
             # home / ".mm" / "mm_session.pickle",  <-- KEEP THIS ONE! (Handled by delete_token now)
-            _resolve_home_dir() / "monarch_session.json",
+            resolve_home_dir() / "monarch_session.json",
         ]
 
         for path in cleanup_paths:

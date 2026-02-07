@@ -12,16 +12,14 @@ from .exceptions import (
     NetworkError,
     ValidationError,
 )
+from .paths import mm_data_dir
 
 logger = logging.getLogger(__name__)
 
 
 def get_config_dir() -> Path:
     """Get the configuration directory path, creating it if needed."""
-    # Use user's home directory for cross-platform compatibility
-    config_dir = Path.home() / ".mm"
-    config_dir.mkdir(parents=True, exist_ok=True)
-    return config_dir
+    return mm_data_dir()
 
 
 def get_config_path(filename: str) -> Path:

@@ -7,10 +7,10 @@ Tools for monitoring and controlling write operation safety.
 import json
 import logging
 from collections import deque
-from pathlib import Path
 
 from fastmcp import FastMCP
 
+from monarch_mcp_server.paths import mm_file
 from monarch_mcp_server.safety import get_safety_guard
 
 from ._common import tool_handler
@@ -47,7 +47,7 @@ def register_safety_tools(mcp: FastMCP) -> None:
     async def get_recent_operations(limit: int = 10) -> dict:
         """View recent write operations with rollback information."""
         limit = min(limit, 50)  # Cap at 50
-        detailed_log_path = Path.home() / ".mm" / "detailed_operation_log.jsonl"
+        detailed_log_path = mm_file("detailed_operation_log.jsonl")
 
         if not detailed_log_path.exists():
             return {"message": "No operations logged yet", "operations": []}
@@ -76,7 +76,7 @@ def register_safety_tools(mcp: FastMCP) -> None:
     @tool_handler("get_rollback_suggestions")
     async def get_rollback_suggestions(operation_index: int = 0) -> str:
         """Get detailed rollback suggestions for a recent operation."""
-        detailed_log_path = Path.home() / ".mm" / "detailed_operation_log.jsonl"
+        detailed_log_path = mm_file("detailed_operation_log.jsonl")
 
         if not detailed_log_path.exists():
             return "No operations logged yet."

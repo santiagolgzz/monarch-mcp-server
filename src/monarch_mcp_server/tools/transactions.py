@@ -6,6 +6,7 @@ Tools for viewing, searching, and managing transactions.
 
 import json
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from fastmcp import FastMCP
@@ -17,6 +18,55 @@ from monarch_mcp_server.utils import validate_date_format, validate_non_empty_st
 from ._common import MAX_AGGREGATION_TRANSACTIONS, tool_handler
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _TransactionFilters:
+    start_date: str | None = None
+    end_date: str | None = None
+    account_ids: list[str] | None = None
+    category_ids: list[str] | None = None
+    search: str = ""
+
+
+def _build_transaction_filters(
+    validated_start: str | None = None,
+    validated_end: str | None = None,
+    account_id: str | None = None,
+    category_id: str | None = None,
+    search: str | None = None,
+) -> _TransactionFilters:
+    """Build Monarch transaction filters, skipping empty values."""
+    return _TransactionFilters(
+        start_date=validated_start,
+        end_date=validated_end,
+        account_ids=[account_id] if account_id else None,
+        category_ids=[category_id] if category_id else None,
+        search=search or "",
+    )
+
+
+def _map_transaction(
+    txn: dict, include_account: bool = False, include_pending: bool = False
+) -> dict:
+    """Normalize a Monarch transaction object to MCP response shape."""
+    transaction_info = {
+        "id": txn.get("id"),
+        "date": txn.get("date"),
+        "amount": txn.get("amount"),
+        "description": txn.get("description"),
+        "category": txn.get("category", {}).get("name")
+        if txn.get("category")
+        else None,
+        "merchant": txn.get("merchant", {}).get("name")
+        if txn.get("merchant")
+        else None,
+    }
+    if include_account:
+        transaction_info["account"] = txn.get("account", {}).get("displayName")
+    if include_pending:
+        transaction_info["is_pending"] = txn.get("isPending", False)
+    return transaction_info
 
 
 def register_transaction_tools(mcp: FastMCP) -> None:
@@ -40,20 +90,22 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         validated_end = validate_date_format(end_date, "end_date")
 
         client = await get_monarch_client()
-        filters = {}
-        if validated_start:
-            filters["start_date"] = validated_start
-        if validated_end:
-            filters["end_date"] = validated_end
-        if account_id:
-            filters["account_ids"] = [account_id]
-        if category_id:
-            filters["category_ids"] = [category_id]
-        if search:
-            filters["search"] = search
+        filters = _build_transaction_filters(
+            validated_start=validated_start,
+            validated_end=validated_end,
+            account_id=account_id,
+            category_id=category_id,
+            search=search,
+        )
 
         transactions = await client.get_transactions(
-            limit=limit, offset=offset, **filters
+            limit=limit,
+            offset=offset,
+            start_date=filters.start_date,
+            end_date=filters.end_date,
+            account_ids=filters.account_ids or [],
+            category_ids=filters.category_ids or [],
+            search=filters.search,
         )
         transaction_list = []
         for txn in transactions.get("allTransactions", {}).get("results", []):
@@ -65,20 +117,10 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             if max_amount is not None and amount is not None and amount > max_amount:
                 continue
 
-            transaction_info = {
-                "id": txn.get("id"),
-                "date": txn.get("date"),
-                "amount": amount,
-                "description": txn.get("description"),
-                "category": txn.get("category", {}).get("name")
-                if txn.get("category")
-                else None,
-                "account": txn.get("account", {}).get("displayName"),
-                "merchant": txn.get("merchant", {}).get("name")
-                if txn.get("merchant")
-                else None,
-                "is_pending": txn.get("isPending", False),
-            }
+            transaction_info = _map_transaction(
+                txn, include_account=True, include_pending=True
+            )
+            transaction_info["amount"] = amount
             transaction_list.append(transaction_info)
         return transaction_list
 
@@ -97,19 +139,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
 
         transaction_list = []
         for txn in transactions.get("allTransactions", {}).get("results", []):
-            transaction_info = {
-                "id": txn.get("id"),
-                "date": txn.get("date"),
-                "amount": txn.get("amount"),
-                "description": txn.get("description"),
-                "category": txn.get("category", {}).get("name")
-                if txn.get("category")
-                else None,
-                "merchant": txn.get("merchant", {}).get("name")
-                if txn.get("merchant")
-                else None,
-            }
-            transaction_list.append(transaction_info)
+            transaction_list.append(_map_transaction(txn))
         return transaction_list
 
     @mcp.tool()
@@ -133,19 +163,21 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         validated_end = validate_date_format(end_date, "end_date")
 
         client = await get_monarch_client()
-        filters = {}
-        if validated_start:
-            filters["start_date"] = validated_start
-        if validated_end:
-            filters["end_date"] = validated_end
-        if account_id:
-            filters["account_ids"] = [account_id]
-        if category_id:
-            filters["category_ids"] = [category_id]
+        filters = _build_transaction_filters(
+            validated_start=validated_start,
+            validated_end=validated_end,
+            account_id=account_id,
+            category_id=category_id,
+        )
 
         # Fetch all transactions matching filters (up to limit for aggregation)
         transactions = await client.get_transactions(
-            limit=MAX_AGGREGATION_TRANSACTIONS, **filters
+            limit=MAX_AGGREGATION_TRANSACTIONS,
+            start_date=filters.start_date,
+            end_date=filters.end_date,
+            account_ids=filters.account_ids or [],
+            category_ids=filters.category_ids or [],
+            search=filters.search,
         )
         results = transactions.get("allTransactions", {}).get("results", [])
 
@@ -192,13 +224,18 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         validated_end = validate_date_format(end_date, "end_date")
 
         client = await get_monarch_client()
-        filters = {}
-        if validated_start:
-            filters["start_date"] = validated_start
-        if validated_end:
-            filters["end_date"] = validated_end
+        filters = _build_transaction_filters(
+            validated_start=validated_start,
+            validated_end=validated_end,
+        )
 
-        return await client.get_transactions_summary(**filters)
+        summary_filters: dict[str, str] = {}
+        if filters.start_date:
+            summary_filters["start_date"] = filters.start_date
+        if filters.end_date:
+            summary_filters["end_date"] = filters.end_date
+
+        return await client.get_transactions_summary(**summary_filters)
 
     @mcp.tool()
     @tool_handler("get_recurring_transactions")

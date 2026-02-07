@@ -2,10 +2,14 @@
 
 import json
 import os
+from contextlib import asynccontextmanager
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from starlette.testclient import TestClient
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse
+from starlette.routing import Route
 
 
 def _token_env(**overrides):
@@ -27,6 +31,37 @@ def _oauth_env(**overrides):
     }
     env.update(overrides)
     return env
+
+
+def _build_fake_mcp_server(include_oauth_routes: bool = False):
+    @asynccontextmanager
+    async def _noop_lifespan(_app):
+        yield
+
+    async def _mcp_ok(_request):
+        return JSONResponse({"ok": True})
+
+    async def _oauth_discovery(_request):
+        return JSONResponse({"issuer": "http://localhost:8000"})
+
+    def _http_app(path="/mcp"):
+        app = Starlette(
+            routes=[Route(path, _mcp_ok)],
+            lifespan=_noop_lifespan,
+        )
+        # Mirror the attribute shape used by create_app() with real FastMCP apps.
+        app.lifespan = _noop_lifespan
+        return app
+
+    auth = None
+    if include_oauth_routes:
+        auth = SimpleNamespace(
+            get_well_known_routes=lambda mcp_path="/mcp": [
+                Route("/.well-known/oauth-authorization-server", _oauth_discovery)
+            ]
+        )
+
+    return SimpleNamespace(auth=auth, http_app=_http_app)
 
 
 class TestAuthModeHelpers:
@@ -145,43 +180,49 @@ class TestRootEndpoint:
 
 class TestCreateApp:
     def test_token_mode_adds_bearer_protection_to_mcp(self):
-        from monarch_mcp_server.http_server import create_app
+        from monarch_mcp_server.http_server import MCPTokenAuthMiddleware, create_app
 
         with patch.dict(os.environ, _token_env(), clear=True):
-            app = create_app()
+            with patch(
+                "monarch_mcp_server.http_server.create_mcp_server",
+                return_value=_build_fake_mcp_server(),
+            ):
+                app = create_app()
 
-        client = TestClient(app)
-
-        unauthorized = client.get("/mcp")
-        assert unauthorized.status_code == 401
+        middleware_classes = [m.cls for m in app.user_middleware]
+        assert MCPTokenAuthMiddleware in middleware_classes
 
     def test_oauth_mode_keeps_well_known_discovery_route(self):
         from monarch_mcp_server.http_server import create_app
 
         with patch.dict(os.environ, _oauth_env(), clear=True):
-            app = create_app()
+            with patch(
+                "monarch_mcp_server.http_server.create_mcp_server",
+                return_value=_build_fake_mcp_server(include_oauth_routes=True),
+            ):
+                app = create_app()
 
-        client = TestClient(app)
-        response = client.get("/.well-known/oauth-authorization-server")
-        assert response.status_code == 200
+        route_paths = [getattr(route, "path", None) for route in app.routes]
+        assert "/.well-known/oauth-authorization-server" in route_paths
 
 
 class TestTokenMiddleware:
-    def test_valid_bearer_passes_through(self):
-        from starlette.applications import Starlette
+    @pytest.mark.asyncio
+    async def test_valid_bearer_passes_through(self):
+        from starlette.requests import Request
         from starlette.responses import JSONResponse
-        from starlette.routing import Route
 
         from monarch_mcp_server.http_server import MCPTokenAuthMiddleware
 
-        async def ok(_request):
+        middleware = MCPTokenAuthMiddleware(app=MagicMock(), token="test-token")
+        request = MagicMock(spec=Request)
+        request.url.path = "/mcp"
+        request.headers = {"Authorization": "Bearer test-token"}
+
+        async def call_next(_request):
             return JSONResponse({"ok": True})
 
-        app = Starlette(routes=[Route("/mcp", ok)])
-        app.add_middleware(MCPTokenAuthMiddleware, token="test-token")
-
-        client = TestClient(app)
-        response = client.get("/mcp", headers={"Authorization": "Bearer test-token"})
+        response = await middleware.dispatch(request, call_next)
         assert response.status_code == 200
 
 

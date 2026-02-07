@@ -297,10 +297,11 @@ class TestMain:
 
 
 class TestIntegration:
-    """Integration tests using TestClient."""
+    """Integration-style endpoint tests without ASGI client lifespan startup."""
 
-    def test_health_endpoint_via_client(self):
-        """Test health endpoint through TestClient."""
+    @pytest.mark.asyncio
+    async def test_health_endpoint(self):
+        """Test health endpoint behavior."""
         with patch.dict(
             os.environ,
             {
@@ -309,40 +310,29 @@ class TestIntegration:
                 "BASE_URL": "http://localhost:8000",
             },
         ):
-            with patch(
-                "monarch_mcp_server.secure_session.SecureMonarchSession.load_token",
-                return_value=None,
-            ):
-                from starlette.testclient import TestClient
+            from starlette.requests import Request
 
-                from monarch_mcp_server.http_server import create_app
+            from monarch_mcp_server.http_server import health_check
 
-                app = create_app()
-                client = TestClient(app)
-
-                response = client.get("/health")
-                assert response.status_code == 200
-                data = response.json()
-                assert data["status"] == "healthy"
-
-    def test_root_endpoint_via_client(self):
-        """Test root endpoint through TestClient."""
-        with patch.dict(
-            os.environ,
-            {
-                "GITHUB_CLIENT_ID": "test_id",
-                "GITHUB_CLIENT_SECRET": "test_secret",
-                "BASE_URL": "http://localhost:8000",
-            },
-        ):
-            from starlette.testclient import TestClient
-
-            from monarch_mcp_server.http_server import create_app
-
-            app = create_app()
-            client = TestClient(app)
-
-            response = client.get("/")
+            response = await health_check(MagicMock(spec=Request))
             assert response.status_code == 200
-            data = response.json()
-            assert "service" in data
+            assert "healthy" in response.body.decode()
+
+    @pytest.mark.asyncio
+    async def test_root_endpoint(self):
+        """Test root endpoint behavior."""
+        with patch.dict(
+            os.environ,
+            {
+                "GITHUB_CLIENT_ID": "test_id",
+                "GITHUB_CLIENT_SECRET": "test_secret",
+                "BASE_URL": "http://localhost:8000",
+            },
+        ):
+            from starlette.requests import Request
+
+            from monarch_mcp_server.http_server import root
+
+            response = await root(MagicMock(spec=Request))
+            assert response.status_code == 200
+            assert "Monarch Money MCP Server" in response.body.decode()

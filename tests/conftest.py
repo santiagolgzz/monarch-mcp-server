@@ -91,3 +91,26 @@ def isolated_safety_guard(temp_config_dir):
     guard.operation_log_path = str(temp_config_dir / "operation_log.json")
 
     return guard
+
+
+@pytest.fixture(autouse=True)
+def writable_fastmcp_home(tmp_path, monkeypatch):
+    """Force FastMCP state directory to a writable temp path for tests."""
+    fastmcp_home = tmp_path / "fastmcp-home"
+    fastmcp_home.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("FASTMCP_HOME", str(fastmcp_home))
+
+    # FastMCP settings are instantiated at import time, so patch the singleton too.
+    try:
+        import fastmcp
+
+        fastmcp.settings.home = fastmcp_home
+    except Exception:
+        pass
+
+    try:
+        import fastmcp.server.auth.oauth_proxy as oauth_proxy
+
+        oauth_proxy.settings.home = fastmcp_home
+    except Exception:
+        pass

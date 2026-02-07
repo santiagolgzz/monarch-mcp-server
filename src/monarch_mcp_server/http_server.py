@@ -10,6 +10,7 @@ and other remote MCP clients. It wraps the server with:
 
 import logging
 import os
+from datetime import UTC, datetime
 from hmac import compare_digest
 
 import uvicorn
@@ -146,7 +147,74 @@ async def health_check(request: Request) -> Response:
         {
             "status": "healthy",
             "service": "monarch-mcp-server",
+            "mode": "liveness_only",
         }
+    )
+
+
+async def readiness_check(request: Request) -> Response:
+    """Readiness check that validates auth and MCP wiring."""
+    checks: dict[str, bool] = {}
+    errors: dict[str, str] = {}
+    auth_mode = "unknown"
+
+    try:
+        auth_mode = get_auth_mode()
+        checks["auth_mode_configured"] = True
+    except Exception as e:
+        checks["auth_mode_configured"] = False
+        errors["auth_mode_configured"] = str(e)
+
+    mcp_server = None
+    if checks["auth_mode_configured"]:
+        try:
+            mcp_server = create_mcp_server()
+            checks["mcp_server_initialized"] = True
+        except Exception as e:
+            checks["mcp_server_initialized"] = False
+            errors["mcp_server_initialized"] = str(e)
+
+    if checks.get("mcp_server_initialized") and mcp_server is not None:
+        try:
+            mcp_server.http_app(path="/mcp")
+            checks["mcp_http_app_initialized"] = True
+        except Exception as e:
+            checks["mcp_http_app_initialized"] = False
+            errors["mcp_http_app_initialized"] = str(e)
+
+    if auth_mode == "oauth":
+        provider_ready = bool(
+            mcp_server is not None
+            and checks.get("mcp_server_initialized")
+            and mcp_server.auth is not None
+        )
+        checks["oauth_provider_configured"] = provider_ready
+        if not provider_ready:
+            errors["oauth_provider_configured"] = "OAuth provider is not initialized."
+        elif mcp_server is not None and mcp_server.auth is not None:
+            try:
+                routes = mcp_server.auth.get_well_known_routes(mcp_path="/mcp")
+                checks["oauth_discovery_routes_available"] = len(routes) > 0
+                if len(routes) == 0:
+                    errors["oauth_discovery_routes_available"] = (
+                        "No OAuth discovery routes were generated."
+                    )
+            except Exception as e:
+                checks["oauth_discovery_routes_available"] = False
+                errors["oauth_discovery_routes_available"] = str(e)
+
+    ready = all(checks.values()) if checks else False
+    status_code = 200 if ready else 503
+    return JSONResponse(
+        {
+            "status": "ready" if ready else "not_ready",
+            "service": "monarch-mcp-server",
+            "auth_mode": auth_mode,
+            "checks": checks,
+            "errors": errors,
+            "timestamp": datetime.now(UTC).isoformat(),
+        },
+        status_code=status_code,
     )
 
 
@@ -166,6 +234,7 @@ async def root(request: Request) -> Response:
             "auth_mode": auth_mode,
             "endpoints": {
                 "/health": "Health check endpoint (public)",
+                "/ready": "Readiness endpoint with auth and MCP checks (public)",
                 "/mcp": (
                     "MCP endpoint (requires Authorization: Bearer token)"
                     if auth_mode == "token"
@@ -206,6 +275,7 @@ def create_app() -> Starlette:
         routes=[
             Route("/", root),
             Route("/health", health_check),
+            Route("/ready", readiness_check),
             # Well-known routes at root for OAuth discovery
             *well_known_routes,
             # Mount the MCP app
@@ -259,6 +329,7 @@ def main():
     logger.info(f"Starting Monarch Money MCP Server on {base_url}")
     logger.info(f"Auth mode: {auth_mode}")
     logger.info(f"MCP endpoint: {base_url}/mcp")
+    logger.info(f"Readiness check: {base_url}/ready")
     if auth_mode == "oauth":
         logger.info(
             f"OAuth discovery: {base_url}/.well-known/oauth-authorization-server"

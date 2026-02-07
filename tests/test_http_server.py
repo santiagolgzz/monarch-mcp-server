@@ -146,7 +146,51 @@ class TestHealthCheck:
         assert json.loads(response.body.decode()) == {
             "status": "healthy",
             "service": "monarch-mcp-server",
+            "mode": "liveness_only",
         }
+
+
+class TestReadinessCheck:
+    @pytest.mark.asyncio
+    async def test_token_mode_ready(self):
+        from starlette.requests import Request
+
+        from monarch_mcp_server.http_server import readiness_check
+
+        with patch.dict(os.environ, _token_env(), clear=True):
+            with patch(
+                "monarch_mcp_server.http_server.create_mcp_server",
+                return_value=_build_fake_mcp_server(),
+            ):
+                response = await readiness_check(MagicMock(spec=Request))
+
+        payload = json.loads(response.body.decode())
+        assert response.status_code == 200
+        assert payload["status"] == "ready"
+        assert payload["auth_mode"] == "token"
+        assert payload["checks"]["auth_mode_configured"] is True
+        assert payload["checks"]["mcp_server_initialized"] is True
+        assert payload["checks"]["mcp_http_app_initialized"] is True
+
+    @pytest.mark.asyncio
+    async def test_oauth_mode_not_ready_when_credentials_missing(self):
+        from starlette.requests import Request
+
+        from monarch_mcp_server.http_server import readiness_check
+
+        with patch.dict(
+            os.environ,
+            _oauth_env(GITHUB_CLIENT_ID="", GITHUB_CLIENT_SECRET=""),
+            clear=True,
+        ):
+            response = await readiness_check(MagicMock(spec=Request))
+
+        payload = json.loads(response.body.decode())
+        assert response.status_code == 503
+        assert payload["status"] == "not_ready"
+        assert payload["auth_mode"] == "oauth"
+        assert payload["checks"]["mcp_server_initialized"] is False
+        assert "mcp_server_initialized" in payload["errors"]
 
 
 class TestRootEndpoint:
@@ -160,6 +204,7 @@ class TestRootEndpoint:
             response = await root(MagicMock(spec=Request))
             data = json.loads(response.body.decode())
             assert data["auth_mode"] == "token"
+            assert "/ready" in data["endpoints"]
             assert "Bearer" in data["endpoints"]["/mcp"]
             assert data["oauth_discovery"] is None
 

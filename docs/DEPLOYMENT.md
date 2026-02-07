@@ -295,7 +295,8 @@ The server URL format depends on your deployment:
 | Endpoint | Description |
 |----------|-------------|
 | `/` | Server info and available endpoints |
-| `/health` | Health check (no auth required) |
+| `/health` | Liveness check (process up; no auth/path validation) |
+| `/ready` | Readiness check (auth + MCP wiring validation) |
 | `/mcp` | MCP endpoint (requires Bearer token or OAuth, based on mode) |
 | `/.well-known/oauth-authorization-server` | OAuth discovery endpoint (oauth mode only) |
 
@@ -318,6 +319,7 @@ The server URL format depends on your deployment:
 - If token mode: verify your client sends `Authorization: Bearer <MCP_AUTH_TOKEN>`
 - If oauth mode: verify GitHub OAuth callback URL matches your deployment URL
 - Verify the server is accessible (try `/health` endpoint in browser)
+- Verify auth/MCP readiness (check `/ready`; must return `status=ready`)
 
 ### Authentication errors with Monarch
 - Your token may have expired
@@ -325,7 +327,7 @@ The server URL format depends on your deployment:
 
 ### Rate limiting
 - The server inherits safety limits from the local version
-- Check `/health` endpoint for current status
+- Check `/ready` for readiness status and `/health` for liveness
 
 ## Environment Variables Reference
 

@@ -51,6 +51,8 @@ jobs:
 
       - name: Verify Deployment
         run: |
-          echo "Checking health endpoint..."
+          echo "Checking liveness endpoint..."
           sleep 10  # Give service time to start
-          curl -sf "${{ vars.CLOUD_RUN_URL }}/health" || echo "Health check pending (service may need a moment to start)"
+          curl -sf "${{ vars.CLOUD_RUN_URL }}/health" || echo "Liveness check pending (service may need a moment to start)"
+          echo "Checking readiness endpoint..."
+          curl -sf "${{ vars.CLOUD_RUN_URL }}/ready" || (echo "Readiness check failed" && exit 1)

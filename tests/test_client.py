@@ -40,11 +40,17 @@ async def test_get_monarch_client_env_vars():
                 mock_mm_instance.login = AsyncMock()
                 MockMonarchMoney.return_value = mock_mm_instance
 
-                from monarch_mcp_server.client import get_monarch_client
+                from monarch_mcp_server.client import (
+                    DEFAULT_SESSION_FILE,
+                    get_monarch_client,
+                )
 
                 client = await get_monarch_client()
 
                 assert client == mock_mm_instance
+                MockMonarchMoney.assert_called_once_with(
+                    session_file=str(DEFAULT_SESSION_FILE)
+                )
                 mock_mm_instance.login.assert_awaited_once_with(
                     "test@example.com", "password123", mfa_secret_key="secret"
                 )

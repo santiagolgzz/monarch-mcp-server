@@ -83,6 +83,26 @@ jobs:
             --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"cd-smoke","version":"1.0.0"}}}' \
             "$MCP_URL"
 
+          extract_payload() {
+            local file="$1"
+            python3 - "$file" <<'PY'
+import sys
+from pathlib import Path
+
+raw = Path(sys.argv[1]).read_text().strip()
+if raw.startswith("event:"):
+    data_lines = [line.removeprefix("data: ").strip() for line in raw.splitlines() if line.startswith("data: ")]
+    if not data_lines:
+        raise SystemExit("No SSE data payload found")
+    print(data_lines[-1])
+else:
+    print(raw)
+PY
+          }
+
+          init_payload=$(mktemp)
+          extract_payload "$init_body" > "$init_payload"
+
           python3 - "$init_headers" "$init_body" <<'PY'
           import json
           import sys
@@ -92,7 +112,11 @@ jobs:
           status = Path(headers_path).read_text().splitlines()[0]
           if "200" not in status:
               raise SystemExit(f"initialize failed: {status}")
-          data = json.loads(Path(body_path).read_text())
+          raw = Path(body_path).read_text().strip()
+          if raw.startswith("event:"):
+              data_lines = [line.removeprefix("data: ").strip() for line in raw.splitlines() if line.startswith("data: ")]
+              raw = data_lines[-1]
+          data = json.loads(raw)
           if "error" in data:
               raise SystemExit(f"initialize error: {data['error']}")
           if "result" not in data:
@@ -114,7 +138,10 @@ jobs:
             --data '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
             "$MCP_URL"
 
-          python3 - "$list_body" <<'PY'
+          list_payload=$(mktemp)
+          extract_payload "$list_body" > "$list_payload"
+
+          python3 - "$list_payload" <<'PY'
           import json
           import sys
           from pathlib import Path
@@ -133,10 +160,13 @@ jobs:
             -H 'content-type: application/json' \
             -H 'accept: application/json, text/event-stream' \
             "${session_headers[@]}" \
-            --data '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"setup_authentication","arguments":{}}}' \
+            --data '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_safety_stats","arguments":{}}}' \
             "$MCP_URL"
 
-          python3 - "$call_body" <<'PY'
+          call_payload=$(mktemp)
+          extract_payload "$call_body" > "$call_payload"
+
+          python3 - "$call_payload" <<'PY'
           import json
           import sys
           from pathlib import Path
@@ -147,4 +177,6 @@ jobs:
           result = data.get("result")
           if result is None:
               raise SystemExit("tools/call missing result")
+          if result.get("isError") is True:
+              raise SystemExit(f"tools/call isError=true: {result}")
           PY

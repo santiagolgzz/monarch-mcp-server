@@ -103,19 +103,20 @@ Go to Settings → Secrets and variables → Actions:
 *Variables* (not secret, but project-specific):
 - `GCP_PROJECT_ID` = your GCP project ID
 - `GCP_REGION` = `us-central1` (optional)
-- `GCP_VPC_CONNECTOR` = `monarch-mcp-connector` (for Redis private access)
-- `MCP_AUTH_MODE` = `token` (recommended) or `oauth`
 - `CLOUD_RUN_URL` = `https://monarch-mcp-server-xxxxx-uc.a.run.app` (set after first deploy)
 
 *Secrets* (encrypted):
 - `GCP_SA_KEY` = paste the entire JSON key file content
 - `MCP_AUTH_TOKEN` = long random secret used by your MCP client in Bearer auth
 - `MONARCH_TOKEN` = your Monarch Money token
-- `GITHUB_CLIENT_SECRET` = GitHub OAuth App secret (oauth mode only)
-- `GITHUB_CLIENT_ID` = GitHub OAuth App client ID (oauth mode only)
-- `OAUTH_REDIS_URL` = Redis URL used to persist OAuth state (required in oauth mode)
-- `OAUTH_JWT_SIGNING_KEY` = stable JWT signing key for OAuth tokens (required in oauth mode)
-- `MCP_CI_SMOKE_TOKEN` = dedicated bearer token for post-deploy MCP smoke endpoint
+
+Optional only for advanced oauth mode:
+- `GITHUB_CLIENT_SECRET` = GitHub OAuth App secret
+- `GITHUB_CLIENT_ID` = GitHub OAuth App client ID
+- `OAUTH_REDIS_URL` = Redis URL used to persist OAuth state
+- `OAUTH_JWT_SIGNING_KEY` = stable JWT signing key for OAuth tokens
+
+Note: the default CD workflow deploys in token mode (`MCP_AUTH_MODE=token`) and validates real MCP calls on `/mcp`.
 
 **First Deployment:**
 1. Configure the variables/secrets above (leave `CLOUD_RUN_URL` empty initially)
@@ -129,7 +130,7 @@ After setup, every merge to `main` automatically deploys.
 Deploy is only marked healthy if:
 1. `/health` is reachable
 2. `/ready` passes readiness checks
-3. a real authenticated MCP flow succeeds (`initialize -> tools/list -> tools/call`)
+3. a real authenticated MCP flow succeeds on `/mcp` (`initialize -> tools/list -> tools/call`)
 
 ### Option B: Railway (Easiest Manual Setup)
 

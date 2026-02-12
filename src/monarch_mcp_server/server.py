@@ -53,37 +53,6 @@ For CI/CD or containers where keyring isn't available:
 Use check_auth_status to verify your connection."""
 
 
-@mcp.tool()
-async def check_auth_status() -> str:
-    """Check if already authenticated with Monarch Money.
-
-    Verifies the connection by making a lightweight API call to Monarch's servers.
-    Works for both local (keyring) and remote (env var) authentication modes.
-    """
-    try:
-        from monarch_mcp_server.client import get_monarch_client
-
-        # Try to get an authenticated client and verify it works
-        client = await get_monarch_client()
-        subscription = await client.get_subscription_details()
-
-        # Extract useful info from subscription
-        is_paid = subscription.get("hasPremiumEntitlement", False)
-        plan_type = "Premium" if is_paid else "Free/Trial"
-
-        return f"✅ Authenticated and connected to Monarch Money\n📊 Plan: {plan_type}"
-
-    except Exception as e:
-        error_msg = str(e)
-        if "Authentication required" in error_msg:
-            return (
-                "❌ Not authenticated\n\n"
-                "For local use: Run `python login_setup.py`\n"
-                "For remote use: Set MONARCH_EMAIL and MONARCH_PASSWORD env vars"
-            )
-        return f"⚠️ Connection failed: {error_msg}"
-
-
 def main():
     """Main entry point for the server."""
     logger.info("Starting Monarch Money MCP Server...")

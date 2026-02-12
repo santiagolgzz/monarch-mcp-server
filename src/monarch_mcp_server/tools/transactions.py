@@ -72,75 +72,7 @@ def _map_transaction(
 def register_transaction_tools(mcp: FastMCP) -> None:
     """Register transaction management tools with the FastMCP instance."""
 
-    @mcp.tool()
-    @tool_handler("get_transactions")
-    async def get_transactions(
-        limit: int = 100,
-        offset: int = 0,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        account_id: str | None = None,
-        category_id: str | None = None,
-        search: str | None = None,
-        min_amount: float | None = None,
-        max_amount: float | None = None,
-    ) -> list[dict]:
-        """Get transactions from Monarch Money with granular filtering."""
-        validated_start = validate_date_format(start_date, "start_date")
-        validated_end = validate_date_format(end_date, "end_date")
-
-        client = await get_monarch_client()
-        filters = _build_transaction_filters(
-            validated_start=validated_start,
-            validated_end=validated_end,
-            account_id=account_id,
-            category_id=category_id,
-            search=search,
-        )
-
-        transactions = await client.get_transactions(
-            limit=limit,
-            offset=offset,
-            start_date=filters.start_date,
-            end_date=filters.end_date,
-            account_ids=filters.account_ids or [],
-            category_ids=filters.category_ids or [],
-            search=filters.search,
-        )
-        transaction_list = []
-        for txn in transactions.get("allTransactions", {}).get("results", []):
-            amount = txn.get("amount")
-
-            # Client-side filtering for amount range
-            if min_amount is not None and amount is not None and amount < min_amount:
-                continue
-            if max_amount is not None and amount is not None and amount > max_amount:
-                continue
-
-            transaction_info = _map_transaction(
-                txn, include_account=True, include_pending=True
-            )
-            transaction_info["amount"] = amount
-            transaction_list.append(transaction_info)
-        return transaction_list
-
-    @mcp.tool()
-    @tool_handler("search_transactions")
-    async def search_transactions(query: str, limit: int = 20) -> list[dict]:
-        """
-        Search for transactions using a keyword search.
-
-        Args:
-            query: The search term to find in merchants, categories, or notes.
-            limit: Maximum number of results to return (default: 20).
-        """
-        client = await get_monarch_client()
-        transactions = await client.get_transactions(search=query, limit=limit)
-
-        transaction_list = []
-        for txn in transactions.get("allTransactions", {}).get("results", []):
-            transaction_list.append(_map_transaction(txn))
-        return transaction_list
+    # ========== LIGHTWEIGHT READ TOOLS (aggregates, summaries) ==========
 
     @mcp.tool()
     @tool_handler("get_transaction_stats")
@@ -200,20 +132,6 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         }
 
     @mcp.tool()
-    @tool_handler("get_transaction_details")
-    async def get_transaction_details(transaction_id: str) -> dict:
-        """Get detailed information about a specific transaction."""
-        client = await get_monarch_client()
-        return await client.get_transaction_details(transaction_id)
-
-    @mcp.tool()
-    @tool_handler("get_transaction_splits")
-    async def get_transaction_splits(transaction_id: str) -> dict:
-        """Get split information for a transaction."""
-        client = await get_monarch_client()
-        return await client.get_transaction_splits(transaction_id)
-
-    @mcp.tool()
     @tool_handler("get_transactions_summary")
     async def get_transactions_summary(
         start_date: str | None = None,
@@ -243,6 +161,92 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         """Get all recurring transactions."""
         client = await get_monarch_client()
         return await client.get_recurring_transactions()
+
+    # ========== TARGETED READ TOOLS (search, filtered lists) ==========
+
+    @mcp.tool()
+    @tool_handler("search_transactions")
+    async def search_transactions(query: str, limit: int = 20) -> list[dict]:
+        """
+        Search for transactions using a keyword search.
+
+        Args:
+            query: The search term to find in merchants, categories, or notes.
+            limit: Maximum number of results to return (default: 20).
+        """
+        client = await get_monarch_client()
+        transactions = await client.get_transactions(search=query, limit=limit)
+
+        transaction_list = []
+        for txn in transactions.get("allTransactions", {}).get("results", []):
+            transaction_list.append(_map_transaction(txn))
+        return transaction_list
+
+    @mcp.tool()
+    @tool_handler("get_transactions")
+    async def get_transactions(
+        limit: int = 100,
+        offset: int = 0,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        account_id: str | None = None,
+        category_id: str | None = None,
+        search: str | None = None,
+        min_amount: float | None = None,
+        max_amount: float | None = None,
+    ) -> list[dict]:
+        """Get transactions from Monarch Money with granular filtering."""
+        validated_start = validate_date_format(start_date, "start_date")
+        validated_end = validate_date_format(end_date, "end_date")
+
+        client = await get_monarch_client()
+        filters = _build_transaction_filters(
+            validated_start=validated_start,
+            validated_end=validated_end,
+            account_id=account_id,
+            category_id=category_id,
+            search=search,
+        )
+
+        transactions = await client.get_transactions(
+            limit=limit,
+            offset=offset,
+            start_date=filters.start_date,
+            end_date=filters.end_date,
+            account_ids=filters.account_ids or [],
+            category_ids=filters.category_ids or [],
+            search=filters.search,
+        )
+        transaction_list = []
+        for txn in transactions.get("allTransactions", {}).get("results", []):
+            amount = txn.get("amount")
+
+            # Client-side filtering for amount range
+            if min_amount is not None and amount is not None and amount < min_amount:
+                continue
+            if max_amount is not None and amount is not None and amount > max_amount:
+                continue
+
+            transaction_info = _map_transaction(
+                txn, include_account=True, include_pending=True
+            )
+            transaction_info["amount"] = amount
+            transaction_list.append(transaction_info)
+        return transaction_list
+
+    @mcp.tool()
+    @tool_handler("get_transaction_details")
+    async def get_transaction_details(transaction_id: str) -> dict:
+        """Get detailed information about a specific transaction."""
+        client = await get_monarch_client()
+        return await client.get_transaction_details(transaction_id)
+
+    @mcp.tool()
+    @tool_handler("get_transaction_splits")
+    async def get_transaction_splits(transaction_id: str) -> dict:
+        """Get split information for a transaction."""
+        client = await get_monarch_client()
+        return await client.get_transaction_splits(transaction_id)
 
     # ========== WRITE TOOLS ==========
 

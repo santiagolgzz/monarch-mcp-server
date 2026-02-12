@@ -64,7 +64,7 @@ class TestCheckAuthStatus:
         )
 
         with patch(
-            "monarch_mcp_server.client.get_monarch_client",
+            "monarch_mcp_server.tools.metadata.get_monarch_client",
             return_value=mock_client,
         ):
             tool = await mcp._tool_manager.get_tool("check_auth_status")
@@ -82,7 +82,7 @@ class TestCheckAuthStatus:
         )
 
         with patch(
-            "monarch_mcp_server.client.get_monarch_client",
+            "monarch_mcp_server.tools.metadata.get_monarch_client",
             return_value=mock_client,
         ):
             tool = await mcp._tool_manager.get_tool("check_auth_status")
@@ -97,20 +97,20 @@ class TestCheckAuthStatus:
         from monarch_mcp_server.exceptions import AuthenticationError
 
         with patch(
-            "monarch_mcp_server.client.get_monarch_client",
+            "monarch_mcp_server.tools.metadata.get_monarch_client",
             side_effect=AuthenticationError("Authentication required!"),
         ):
             tool = await mcp._tool_manager.get_tool("check_auth_status")
             result = await tool.fn()
 
-            assert "Not authenticated" in result or "❌" in result
+            assert "Not authenticated" in result
             assert "login_setup" in result.lower()
 
     @pytest.mark.asyncio
     async def test_connection_error(self):
         """Verify check_auth_status handles connection errors."""
         with patch(
-            "monarch_mcp_server.client.get_monarch_client",
+            "monarch_mcp_server.tools.metadata.get_monarch_client",
             side_effect=Exception("Network timeout"),
         ):
             tool = await mcp._tool_manager.get_tool("check_auth_status")

@@ -29,20 +29,6 @@ def register_safety_tools(mcp: FastMCP) -> None:
         return guard.get_operation_stats()
 
     @mcp.tool()
-    @tool_handler("enable_emergency_stop")
-    async def enable_emergency_stop() -> str:
-        """EMERGENCY: Disable all write operations immediately."""
-        guard = get_safety_guard()
-        return guard.enable_emergency_stop()
-
-    @mcp.tool()
-    @tool_handler("disable_emergency_stop")
-    async def disable_emergency_stop() -> str:
-        """Re-enable write operations after emergency stop."""
-        guard = get_safety_guard()
-        return guard.disable_emergency_stop()
-
-    @mcp.tool()
     @tool_handler("get_recent_operations")
     async def get_recent_operations(limit: int = 10) -> dict:
         """View recent write operations with rollback information."""
@@ -128,3 +114,17 @@ Instructions: {rollback.get("notes")}
             suggestion += "This operation cannot be easily reversed.\n   You may need to manually fix any issues in Monarch Money web interface.\n"
 
         return suggestion
+
+    @mcp.tool()
+    @tool_handler("enable_emergency_stop")
+    async def enable_emergency_stop() -> str:
+        """EMERGENCY: Disable all write operations immediately."""
+        guard = get_safety_guard()
+        return guard.enable_emergency_stop()
+
+    @mcp.tool()
+    @tool_handler("disable_emergency_stop")
+    async def disable_emergency_stop() -> str:
+        """Re-enable write operations after emergency stop."""
+        guard = get_safety_guard()
+        return guard.disable_emergency_stop()

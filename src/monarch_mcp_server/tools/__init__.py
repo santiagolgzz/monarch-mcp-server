@@ -29,14 +29,19 @@ def register_tools(mcp: FastMCP) -> None:
     """
     logger.info("Registering Monarch Money tools...")
 
+    # Status & diagnostics first — agents should reach for these
+    register_metadata_tools(mcp)
+    register_safety_tools(mcp)
+
+    # Core data (lightweight → heavyweight, reads → writes)
+    register_transaction_tools(mcp)
     register_account_tools(mcp)
     register_budget_tools(mcp)
     register_category_tools(mcp)
-    register_metadata_tools(mcp)
-    register_refresh_tools(mcp)
-    register_safety_tools(mcp)
     register_tag_tools(mcp)
-    register_transaction_tools(mcp)
+
+    # Background operations last
+    register_refresh_tools(mcp)
 
     logger.info("All Monarch Money tools registered.")
 

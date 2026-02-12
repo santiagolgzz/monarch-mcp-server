@@ -103,15 +103,20 @@ Go to Settings → Secrets and variables → Actions:
 *Variables* (not secret, but project-specific):
 - `GCP_PROJECT_ID` = your GCP project ID
 - `GCP_REGION` = `us-central1` (optional)
-- `MCP_AUTH_MODE` = `token` (recommended) or `oauth`
 - `CLOUD_RUN_URL` = `https://monarch-mcp-server-xxxxx-uc.a.run.app` (set after first deploy)
 
 *Secrets* (encrypted):
 - `GCP_SA_KEY` = paste the entire JSON key file content
 - `MCP_AUTH_TOKEN` = long random secret used by your MCP client in Bearer auth
 - `MONARCH_TOKEN` = your Monarch Money token
-- `GITHUB_CLIENT_SECRET` = GitHub OAuth App secret (oauth mode only)
-- `GITHUB_CLIENT_ID` = GitHub OAuth App client ID (oauth mode only)
+
+Optional only for advanced oauth mode:
+- `GITHUB_CLIENT_SECRET` = GitHub OAuth App secret
+- `GITHUB_CLIENT_ID` = GitHub OAuth App client ID
+- `OAUTH_REDIS_URL` = Redis URL used to persist OAuth state
+- `OAUTH_JWT_SIGNING_KEY` = stable JWT signing key for OAuth tokens
+
+Note: the default CD workflow deploys in token mode (`MCP_AUTH_MODE=token`) and validates real MCP calls on `/mcp`.
 
 **First Deployment:**
 1. Configure the variables/secrets above (leave `CLOUD_RUN_URL` empty initially)
@@ -122,6 +127,10 @@ Go to Settings → Secrets and variables → Actions:
 6. Re-run the workflow if BASE_URL or OAuth settings changed
 
 After setup, every merge to `main` automatically deploys.
+Deploy is only marked healthy if:
+1. `/health` is reachable
+2. `/ready` passes readiness checks
+3. a real authenticated MCP flow succeeds on `/mcp` (`initialize -> tools/list -> tools/call`)
 
 ### Option B: Railway (Easiest Manual Setup)
 
@@ -295,7 +304,8 @@ The server URL format depends on your deployment:
 | Endpoint | Description |
 |----------|-------------|
 | `/` | Server info and available endpoints |
-| `/health` | Health check (no auth required) |
+| `/health` | Liveness check (process up; no auth/path validation) |
+| `/ready` | Readiness check (auth + MCP wiring validation) |
 | `/mcp` | MCP endpoint (requires Bearer token or OAuth, based on mode) |
 | `/.well-known/oauth-authorization-server` | OAuth discovery endpoint (oauth mode only) |
 
@@ -318,6 +328,7 @@ The server URL format depends on your deployment:
 - If token mode: verify your client sends `Authorization: Bearer <MCP_AUTH_TOKEN>`
 - If oauth mode: verify GitHub OAuth callback URL matches your deployment URL
 - Verify the server is accessible (try `/health` endpoint in browser)
+- Verify auth/MCP readiness (check `/ready`; must return `status=ready`)
 
 ### Authentication errors with Monarch
 - Your token may have expired
@@ -325,7 +336,7 @@ The server URL format depends on your deployment:
 
 ### Rate limiting
 - The server inherits safety limits from the local version
-- Check `/health` endpoint for current status
+- Check `/ready` for readiness status and `/health` for liveness
 
 ## Environment Variables Reference
 
@@ -335,6 +346,10 @@ The server URL format depends on your deployment:
 | `MCP_AUTH_TOKEN` | Yes* | Shared bearer token for `token` mode |
 | `GITHUB_CLIENT_ID` | Yes** | GitHub OAuth App Client ID (`oauth` mode only) |
 | `GITHUB_CLIENT_SECRET` | Yes** | GitHub OAuth App Client Secret (`oauth` mode only) |
+| `MCP_OAUTH_REDIS_URL` | Yes** | Shared Redis URL for durable OAuth state |
+| `MCP_OAUTH_JWT_SIGNING_KEY` | Yes** | Stable token signing key for OAuth |
+| `MCP_ENABLE_CI_SMOKE` | No | Enables `/mcp-smoke` endpoint for CI (default: false) |
+| `MCP_CI_SMOKE_TOKEN` | Yes*** | Bearer token required for `/mcp-smoke` |
 | `MONARCH_TOKEN` | Yes* | Monarch Money authentication token |
 | `MONARCH_EMAIL` | No | Email for auto-login (alternative to token) |
 | `MONARCH_PASSWORD` | No | Password for auto-login (alternative to token) |
@@ -345,5 +360,6 @@ The server URL format depends on your deployment:
 
 *`MCP_AUTH_TOKEN` is required when `MCP_AUTH_MODE=token`. Also, either `MONARCH_TOKEN` or `MONARCH_EMAIL`+`MONARCH_PASSWORD` is required.
 **Required only when `MCP_AUTH_MODE=oauth`.
+***Required when `MCP_ENABLE_CI_SMOKE=true`.
 
 **`BASE_URL` is auto-detected on Railway. Required for other platforms (Render, Fly.io, VPS, Cloud Run).

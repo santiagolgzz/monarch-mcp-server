@@ -38,6 +38,7 @@ dependencies = [
     "starlette>=0.37.0",
     "uvicorn[standard]>=0.29.0",
     "fastmcp>=2.14.4",
+    "redis>=5.0.0",
 ]
 
 [project.optional-dependencies]

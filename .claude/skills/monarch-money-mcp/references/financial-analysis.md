@@ -2,6 +2,19 @@
 
 Step-by-step patterns for common financial analysis tasks using Monarch Money MCP tools.
 
+## Tool Selection: Stats vs Full List
+
+**Always start with `get_transaction_stats`** — it returns sum, count, income, expense, and net for any filter combination. Only escalate to `get_transactions` when you need individual transaction rows.
+
+```python
+# Good: Answer "how much did I spend in January?" with one call
+stats = get_transaction_stats(start_date="2026-01-01", end_date="2026-01-31")
+# Returns: {count, sum_income, sum_expense, net, currency, period}
+
+# Only use get_transactions when you need to LIST individual items
+transactions = get_transactions(start_date="2026-01-01", end_date="2026-01-31", limit=100)
+```
+
 ## Calculating Balance Changes
 
 Use `get_account_history` to compare balances over time. Do not sum transaction amounts—this misses transfers, adjustments, and sync corrections.
@@ -11,8 +24,8 @@ Use `get_account_history` to compare balances over time. Do not sum transaction 
 history = get_account_history(account_id="123456")
 
 # Find balances at start and end dates
-start_balance = next(h["signedBalance"] for h in history if h["date"] <= "2025-01-01")
-end_balance = next(h["signedBalance"] for h in history if h["date"] <= "2025-12-31")
+start_balance = next(h["signedBalance"] for h in history if h["date"] <= "2026-01-01")
+end_balance = next(h["signedBalance"] for h in history if h["date"] <= "2026-12-31")
 
 net_change = end_balance - start_balance
 ```
@@ -20,8 +33,6 @@ net_change = end_balance - start_balance
 For multi-account analysis (e.g., total liquid cash), repeat for each account and sum the changes.
 
 ## Calculating Savings Rate
-
-Do not use `get_cashflow_summary` savings rate—it only captures post-paycheck cash accumulation and misses retirement contributions.
 
 **Correct formula:**
 ```
@@ -40,8 +51,8 @@ Get retirement contributions efficiently:
 ```python
 # Use get_transaction_stats to find total contributions without listing transactions
 stats = get_transaction_stats(
-    start_date="2025-01-01", 
-    end_date="2025-12-31",
+    start_date="2026-01-01",
+    end_date="2026-12-31",
     category_id="paychecks_category_id"  # Filter by category if known
 )
 # sum_income will capture contributions if they are categorized as such
@@ -71,9 +82,10 @@ Ask user which accounts to include. Do not assume all accounts should be summed.
 
 Auth tokens expire during long analysis sessions. If `get_*` calls return 401 errors:
 
-1. Inform user: "Session expired. Please run `python login_setup.py`"
-2. Wait for confirmation
-3. Retry the failed operation
+1. Run `check_auth_status` for diagnostics
+2. If not authenticated, inform user: "Session expired. Please run `python login_setup.py`"
+3. Wait for confirmation
+4. Retry the failed operation
 
 Batch related queries together to minimize timeout risk during complex analysis.
 

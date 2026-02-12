@@ -1,40 +1,39 @@
 # All Tools Reference
 
-## Authentication
-| Tool | Description |
-|------|-------------|
-| `setup_authentication` | Get setup instructions |
-| `check_auth_status` | Check if authenticated |
-| `debug_session_loading` | Debug keyring issues |
+Tools are registered in this order. Agents see earlier tools first, so lightweight/diagnostic tools come before heavyweight/write tools.
 
-## Accounts (10 tools)
-| Tool | Description | Safety |
-|------|-------------|--------|
-| `get_accounts` | List all accounts | Read |
-| `get_account_holdings` | Investment holdings | Read |
-| `get_account_history` | Balance over time | Read |
-| `get_account_type_options` | Available types | Read |
-| `create_manual_account` | Create cash/manual account | Write |
-| `update_account` | Modify account | Write |
-| `delete_account` | Remove account | ⚠️ Approval |
-| `refresh_accounts` | Trigger refresh | Read |
-| `request_accounts_refresh_and_wait` | Blocking refresh | Read |
-| `is_accounts_refresh_complete` | Check refresh status | Read |
+## Metadata (3 tools)
+| # | Tool | Description | Safety |
+|---|------|-------------|--------|
+| 1 | `check_auth_status` | Check if authenticated, shows plan | Read |
+| 2 | `get_subscription_details` | Monarch subscription info | Read |
+| 3 | `get_institutions` | Linked banks/institutions | Read |
 
-## Transactions (11 tools)
-| Tool | Description | Safety |
-|------|-------------|--------|
-| `get_transaction_stats` | **PRIMARY ANALYTICS**. Returns sum/count with filters. | Read |
-| `search_transactions` | **PRIMARY SEARCH**. Keyword search across all fields. | Read |
-| `get_transactions` | Query list of full transaction objects. | Read |
-| `get_transaction_details` | Single transaction | Read |
-| `get_transaction_splits` | Split info | Read |
-| `get_transactions_summary` | Aggregated data (global only) | Read |
-| `get_recurring_transactions` | Subscriptions | Read |
-| `create_transaction` | Add transaction (see params below) | Write |
-| `update_transaction` | Modify transaction | Write |
-| `update_transaction_splits` | Modify splits | Write |
-| `delete_transaction` | Remove transaction | ⚠️ Approval |
+## Safety (5 tools)
+| # | Tool | Description | Safety |
+|---|------|-------------|--------|
+| 4 | `get_safety_stats` | Operation counts, e-stop status | Read |
+| 5 | `get_recent_operations` | Audit trail of recent writes | Read |
+| 6 | `get_rollback_suggestions` | Undo guidance for operations | Read |
+| 7 | `enable_emergency_stop` | Block ALL writes immediately | ⚠️ Action |
+| 8 | `disable_emergency_stop` | Resume writes after e-stop | ⚠️ Action |
+
+## Transactions (13 tools)
+| # | Tool | Description | Safety |
+|---|------|-------------|--------|
+| 9 | `get_transaction_stats` | **Prefer this.** Aggregates: sum, count, net. | Read |
+| 10 | `get_transactions_summary` | Category/period breakdown | Read |
+| 11 | `get_recurring_transactions` | Recurring patterns/subscriptions | Read |
+| 12 | `get_cashflow` | Income vs expense breakdown with details | Read |
+| 13 | `get_cashflow_summary` | Aggregated cashflow totals | Read |
+| 14 | `search_transactions` | Keyword search (targeted) | Read |
+| 15 | `get_transactions` | Full list with filters (heavyweight) | Read |
+| 16 | `get_transaction_details` | Single transaction deep dive | Read |
+| 17 | `get_transaction_splits` | One transaction's splits | Read |
+| 18 | `create_transaction` | Add transaction | Write |
+| 19 | `update_transaction` | Modify transaction | Write |
+| 20 | `delete_transaction` | Remove transaction | ⚠️ Approval |
+| 21 | `update_transaction_splits` | Modify splits | Write |
 
 ### create_transaction Parameters
 | Parameter | Type | Required | Description |
@@ -46,44 +45,53 @@
 | `date` | string | Yes | Format: YYYY-MM-DD |
 | `notes` | string | No | Optional notes |
 
-## Categories (5 tools)
-| Tool | Description | Safety |
-|------|-------------|--------|
-| `get_transaction_categories` | List categories | Read |
-| `get_transaction_category_groups` | List groups | Read |
-| `create_transaction_category` | Add category | Write |
-| `delete_transaction_category` | Remove category | ⚠️ Approval |
-| `delete_transaction_categories` | Bulk remove | ⚠️ Approval |
-
-## Tags (3 tools)
-| Tool | Description | Safety |
-|------|-------------|--------|
-| `get_transaction_tags` | List tags | Read |
-| `create_tag` | Add tag | Write |
-| `set_transaction_tags` | Assign to transaction | Write |
+## Accounts (11 tools)
+| # | Tool | Description | Safety |
+|---|------|-------------|--------|
+| 22 | `get_accounts` | List all accounts | Read |
+| 23 | `get_account_holdings` | Investment holdings | Read |
+| 24 | `get_account_history` | One account's balance over time | Read |
+| 25 | `get_recent_account_balances` | All accounts daily balances (last 31 days) | Read |
+| 26 | `get_account_snapshots_by_type` | Net values by account type (month/year) | Read |
+| 27 | `get_aggregate_snapshots` | Daily aggregate net value | Read |
+| 28 | `get_account_type_options` | Available types for creation | Read |
+| 29 | `create_manual_account` | Create cash/manual account | Write |
+| 30 | `update_account` | Modify account | Write |
+| 31 | `delete_account` | Remove account | ⚠️ Approval |
+| 32 | `upload_account_balance_history` | Import CSV history | ⚠️ Approval |
 
 ## Budgets (2 tools)
-| Tool | Description | Safety |
-|------|-------------|--------|
-| `get_budgets` | View budgets | Read |
-| `set_budget_amount` | Update budget | Write |
+| # | Tool | Description | Safety |
+|---|------|-------------|--------|
+| 33 | `get_budgets` | View budgets | Read |
+| 34 | `set_budget_amount` | Update budget amount | Write |
 
-## Analytics (2 tools)
-| Tool | Description | Safety |
-|------|-------------|--------|
-| `get_cashflow` | Income vs expenses | Read |
-| `get_cashflow_summary` | Aggregated cashflow | Read |
+## Categories (6 tools)
+| # | Tool | Description | Safety |
+|---|------|-------------|--------|
+| 35 | `get_transaction_categories` | All categories | Read |
+| 36 | `get_transaction_category_groups` | Category groups | Read |
+| 37 | `get_transaction_tags` | All tags | Read |
+| 38 | `create_transaction_category` | Add category | Write |
+| 39 | `delete_transaction_category` | Remove category | ⚠️ Approval |
+| 40 | `delete_transaction_categories` | Bulk remove categories | ⚠️ Approval |
 
-## Other (3 tools)
-| Tool | Description | Safety |
-|------|-------------|--------|
-| `get_institutions` | Linked institutions | Read |
-| `get_subscription_details` | Monarch subscription | Read |
-| `upload_account_balance_history` | Import CSV | ⚠️ Approval |
+## Tags (2 tools)
+| # | Tool | Description | Safety |
+|---|------|-------------|--------|
+| 41 | `create_tag` | Add tag | Write |
+| 42 | `set_transaction_tags` | Assign tags to transaction | Write |
 
-## Safety Tools (3 tools)
-| Tool | Description |
-|------|-------------|
-| `get_safety_stats` | View operation counts |
-| `enable_emergency_stop` | Block ALL writes |
-| `disable_emergency_stop` | Resume writes |
+## Refresh (3 tools)
+| # | Tool | Description | Safety |
+|---|------|-------------|--------|
+| 43 | `is_accounts_refresh_complete` | Check refresh status | Read |
+| 44 | `refresh_accounts` | Trigger account refresh | Read |
+| 45 | `request_accounts_refresh_and_wait` | Blocking refresh | Read |
+
+## Server (1 tool)
+| # | Tool | Description | Safety |
+|---|------|-------------|--------|
+| — | `setup_authentication` | Get auth setup instructions | Read |
+
+**Note:** `setup_authentication` is registered on the server directly, not via `register_tools()`. It's available in stdio mode only (not HTTP/OAuth mode). Total: 45 shared tools + 1 server tool = 46 registered in stdio mode, 45 in HTTP mode.

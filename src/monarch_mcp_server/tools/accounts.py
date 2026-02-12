@@ -12,7 +12,7 @@ from fastmcp import FastMCP
 from monarch_mcp_server.client import get_monarch_client
 from monarch_mcp_server.exceptions import ValidationError
 from monarch_mcp_server.safety import require_safety_check
-from monarch_mcp_server.utils import validate_non_empty_string
+from monarch_mcp_server.utils import validate_date_format, validate_non_empty_string
 
 from ._common import tool_handler
 
@@ -94,6 +94,69 @@ def register_account_tools(mcp: FastMCP) -> None:
             return {"history": filtered_entries}
 
         return {"history": entries}
+
+    @mcp.tool()
+    @tool_handler("get_recent_account_balances")
+    async def get_recent_account_balances(start_date: str | None = None) -> dict:
+        """Get daily balances for all accounts (defaults to last 31 days).
+
+        Args:
+            start_date: Start date in YYYY-MM-DD format. Defaults to 31 days ago.
+        """
+        validated_start = validate_date_format(start_date, "start_date")
+        client = await get_monarch_client()
+        return await client.get_recent_account_balances(start_date=validated_start)
+
+    @mcp.tool()
+    @tool_handler("get_account_snapshots_by_type")
+    async def get_account_snapshots_by_type(
+        start_date: str,
+        timeframe: str = "month",
+    ) -> dict:
+        """Get net value snapshots grouped by account type.
+
+        Args:
+            start_date: Start date in YYYY-MM-DD format.
+            timeframe: Granularity — "month" or "year".
+        """
+        validated_start = validate_date_format(start_date, "start_date")
+        assert validated_start is not None
+        if timeframe not in ("month", "year"):
+            raise ValidationError(
+                f"timeframe must be 'month' or 'year', got '{timeframe}'"
+            )
+        client = await get_monarch_client()
+        return await client.get_account_snapshots_by_type(
+            start_date=validated_start, timeframe=timeframe
+        )
+
+    @mcp.tool()
+    @tool_handler("get_aggregate_snapshots")
+    async def get_aggregate_snapshots(
+        start_date: str | None = None,
+        end_date: str | None = None,
+        account_type: str | None = None,
+    ) -> dict:
+        """Get daily aggregate net value across all accounts.
+
+        Args:
+            start_date: Start date in YYYY-MM-DD format.
+            end_date: End date in YYYY-MM-DD format.
+            account_type: Optional account type filter.
+        """
+        from datetime import date as date_type
+
+        validated_start = validate_date_format(start_date, "start_date")
+        validated_end = validate_date_format(end_date, "end_date")
+
+        # SDK expects datetime.date objects, not strings
+        start_d = date_type.fromisoformat(validated_start) if validated_start else None
+        end_d = date_type.fromisoformat(validated_end) if validated_end else None
+
+        client = await get_monarch_client()
+        return await client.get_aggregate_snapshots(
+            start_date=start_d, end_date=end_d, account_type=account_type
+        )
 
     @mcp.tool()
     @tool_handler("get_account_type_options")

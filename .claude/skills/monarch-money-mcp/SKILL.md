@@ -1,64 +1,58 @@
 ---
 name: monarch-money-mcp
-description: "Use for managing Monarch Money finances: accounts, transactions, budgets, and cashflow. Triggers: finances, spending, accounts, budgets"
+description: "Queries and manages Monarch Money financial data via MCP tools. Use when checking accounts, transactions, budgets, categories, tags, or any personal finance data from Monarch. Triggers: finances, spending, accounts, budgets, transactions, net worth, savings"
 ---
 
 # Monarch Money MCP
 
-Access ~40 tools for Monarch Money personal finance.
-- **[tools.md](references/tools.md)**: Full tool list
-- **[safety.md](references/safety.md)**: Safety tiers
+Access 46 tools for Monarch Money personal finance.
+- **[tools.md](references/tools.md)**: Full tool list with registration order
+- **[safety.md](references/safety.md)**: Safety tiers and emergency controls
 - **[financial-analysis.md](references/financial-analysis.md)**: Analysis guides
 
 ## Quick Start
 
+Tools are registered lightweight-first. Prefer aggregates over full lists.
+
 ```
+check_auth_status             # Always start here — verify connectivity
+get_transaction_stats         # Aggregates (sum, count) — usually sufficient
+get_transactions_summary      # Category/period breakdown
+search_transactions           # Keyword search (targeted, small results)
+get_transactions              # Full list with filters (heavyweight — use last)
 get_accounts                  # List all accounts
-get_transactions              # Recent transactions
-get_transaction_categories    # Get category IDs (needed for create)
 get_budgets                   # Budget vs actual
-get_cashflow                  # Income vs expenses
 ```
 
 ## Safety (CRITICAL)
 
-- **Read-only tools are safe** - All `get_*` tools
-- **Destructive ops require approval** - `delete_*` tools prompt user first
-- **Emergency stop** - `enable_emergency_stop` blocks all writes
-- **Dates** - Always YYYY-MM-DD format
+- **Read-only tools are safe** — All `get_*` and `search_*` tools
+- **Destructive ops require approval** — `delete_*` tools prompt user first
+- **Emergency stop** — `enable_emergency_stop` blocks all writes
+- **Dates** — Always YYYY-MM-DD format
 
-## Common Tools
+## Tool Selection Guide
 
-| Tool | Use |
-|------|-----|
-| `get_accounts` | Account balances (includes account IDs) |
-| `get_transactions` | Query with `limit`, `start_date`, `end_date` |
-| `get_transaction_categories` | Get category IDs for creating transactions |
-| `create_transaction` | Add manual entry (see params below) |
-| `delete_transaction` | ⚠️ Requires approval |
+| Need | Tool | Why |
+|------|------|-----|
+| "How much did I spend?" | `get_transaction_stats` | Aggregates without listing rows |
+| "Show my transactions" | `get_transactions` | Full list with filters |
+| "Find a specific charge" | `search_transactions` | Keyword search across fields |
+| Account balances | `get_accounts` | Includes account IDs |
+| Category IDs for writes | `get_transaction_categories` | Required before `create_transaction` |
+| Recurring bills | `get_recurring_transactions` | Subscriptions and patterns |
+| Budget progress | `get_budgets` | Budget vs actual |
 
 ## Creating Transactions
 
 `create_transaction` requires these parameters:
-- `account_id` (string) - Get from `get_accounts`
-- `amount` (number) - Positive for income, negative for expenses
-- `merchant_name` (string) - Name of the merchant
-- `category_id` (string) - Get from `get_transaction_categories`
-- `date` (string) - Format: YYYY-MM-DD
-- `notes` (string, optional) - Additional notes
-
-Example:
-```json
-{
-  "account_id": "<from get_accounts>",
-  "amount": -25.50,
-  "merchant_name": "Coffee Shop",
-  "category_id": "<from get_transaction_categories>",
-  "date": "2025-12-15",
-  "notes": "Team coffee"
-}
-```
+- `account_id` (string) — Get from `get_accounts`
+- `amount` (number) — Positive for income, negative for expenses
+- `merchant_name` (string) — Name of the merchant
+- `category_id` (string) — Get from `get_transaction_categories`
+- `date` (string) — Format: YYYY-MM-DD
+- `notes` (string, optional) — Additional notes
 
 ## Auth Error
 
-If auth fails → User must run `python login_setup.py`
+If auth fails → run `check_auth_status` first for diagnostics. If not authenticated, user must run `python login_setup.py`.

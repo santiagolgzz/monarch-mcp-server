@@ -25,14 +25,18 @@ Claude: ⚠️ About to execute: delete_transaction(transaction_id="ABC123")
 Operations:
 - `create_transaction`
 - `update_transaction`
+- `update_transaction_splits`
 - `create_manual_account`
 - `update_account`
 - `set_budget_amount`
+- `create_transaction_category`
+- `create_tag`
+- `set_transaction_tags`
 
 ### Tier 3: Read Operations
 **No protection needed.**
 
-All `get_*` and `search_*` tools are completely safe.
+All `get_*`, `search_*`, and `is_*` tools are completely safe.
 
 ## Emergency Controls
 
@@ -44,16 +48,19 @@ enable_emergency_stop()
 disable_emergency_stop()
 ```
 
+## Audit & Rollback
+
+```python
+# Check operation counts and e-stop status
+get_safety_stats()
+
+# View recent write operations with details
+get_recent_operations(limit=10)
+
+# Get undo instructions for a specific operation
+get_rollback_suggestions(operation_index=0)
+```
+
 ## Audit Log Location
 - Summary: `~/.mm/operation_log.json`
 - Detailed: `~/.mm/detailed_operation_log.jsonl`
-
-## Rollback
-
-```python
-# View recent operations
-get_recent_operations(limit=10)
-
-# Get undo instructions
-get_rollback_suggestions(operation_index=0)
-```

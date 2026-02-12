@@ -162,6 +162,48 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         client = await get_monarch_client()
         return await client.get_recurring_transactions()
 
+    @mcp.tool()
+    @tool_handler("get_cashflow")
+    async def get_cashflow(
+        limit: int = 100,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict:
+        """Get cashflow data with income and expense breakdowns.
+
+        Args:
+            limit: Maximum number of results (default: 100).
+            start_date: Start date in YYYY-MM-DD format.
+            end_date: End date in YYYY-MM-DD format.
+        """
+        validated_start = validate_date_format(start_date, "start_date")
+        validated_end = validate_date_format(end_date, "end_date")
+        client = await get_monarch_client()
+        return await client.get_cashflow(
+            limit=limit, start_date=validated_start, end_date=validated_end
+        )
+
+    @mcp.tool()
+    @tool_handler("get_cashflow_summary")
+    async def get_cashflow_summary(
+        limit: int = 100,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict:
+        """Get aggregated cashflow summary totals.
+
+        Args:
+            limit: Maximum number of results (default: 100).
+            start_date: Start date in YYYY-MM-DD format.
+            end_date: End date in YYYY-MM-DD format.
+        """
+        validated_start = validate_date_format(start_date, "start_date")
+        validated_end = validate_date_format(end_date, "end_date")
+        client = await get_monarch_client()
+        return await client.get_cashflow_summary(
+            limit=limit, start_date=validated_start, end_date=validated_end
+        )
+
     # ========== TARGETED READ TOOLS (search, filtered lists) ==========
 
     @mcp.tool()

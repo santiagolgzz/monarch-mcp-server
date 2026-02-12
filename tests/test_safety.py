@@ -190,8 +190,8 @@ class TestRequireSafetyCheckDecorator:
             result_data = result
 
             assert "error" in result_data
-            assert "blocked" in result_data["error"]
-            assert "EMERGENCY STOP" in result_data["reason"]
+            assert "blocked" in result_data["error"]  # type: ignore[index]
+            assert "EMERGENCY STOP" in result_data["reason"]  # type: ignore[index]
         finally:
             guard.config.config["emergency_stop"] = original_stop
 
@@ -217,7 +217,7 @@ class TestRequireSafetyCheckDecorator:
             async def failing_func():
                 raise ValueError("Intentional test error")
 
-            guard.record_operation = mock_record
+            guard.record_operation = mock_record  # type: ignore[assignment]
 
             with pytest.raises(ValueError, match="Intentional test error"):
                 await failing_func()
@@ -227,7 +227,7 @@ class TestRequireSafetyCheckDecorator:
 
         finally:
             guard.config.config["enabled"] = original_enabled
-            guard.record_operation = original_record
+            guard.record_operation = original_record  # type: ignore[assignment]
 
 
 class TestRequireSafetyCheckSyncPath:
@@ -247,7 +247,7 @@ class TestRequireSafetyCheckSyncPath:
                 return f"Result: {value}"
 
             # The decorator returns an async wrapper, so we need to await it
-            result = await sync_func("test")
+            result = await sync_func("test")  # type: ignore[misc]
             assert result == "Result: test"
 
         finally:
@@ -272,7 +272,7 @@ class TestRequireSafetyCheckSyncPath:
             def sync_func():
                 return "done"
 
-            await sync_func()
+            await sync_func()  # type: ignore[misc]
 
             today = datetime.now().strftime("%Y-%m-%d")
             assert guard.daily_counts[today]["sync_recorded_op"] == 1

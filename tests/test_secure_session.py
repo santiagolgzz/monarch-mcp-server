@@ -258,14 +258,14 @@ class TestKeyringUnavailable:
         original = ss_module.KEYRING_AVAILABLE
 
         # Temporarily set KEYRING_AVAILABLE to False
-        ss_module.KEYRING_AVAILABLE = False
+        ss_module.KEYRING_AVAILABLE = False  # type: ignore[attr-defined]
 
         try:
             session = SecureMonarchSession()
             # Should not raise, just skip saving to keyring
             session.save_token("test_token")
         finally:
-            ss_module.KEYRING_AVAILABLE = original
+            ss_module.KEYRING_AVAILABLE = original  # type: ignore[attr-defined]
 
     def test_load_token_env_var_priority(self):
         """Test that MONARCH_TOKEN env var takes priority."""

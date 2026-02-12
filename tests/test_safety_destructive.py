@@ -31,7 +31,7 @@ class TestDestructiveToolsInServer:
                 )
 
                 tool = await mcp._tool_manager.get_tool("delete_transaction")
-                result = await tool.fn(transaction_id="txn_123")
+                result = await tool.fn(transaction_id="txn_123")  # type: ignore[attr-defined]
 
                 # Should not be blocked
                 assert result["deleted"] in (True, False)
@@ -55,7 +55,7 @@ class TestDestructiveToolsInServer:
 
         try:
             tool = await mcp._tool_manager.get_tool("delete_transaction")
-            result = await tool.fn(transaction_id="txn_123")
+            result = await tool.fn(transaction_id="txn_123")  # type: ignore[attr-defined]
 
             result_data = result
             assert "error" in result_data
@@ -81,7 +81,7 @@ class TestDestructiveToolsInServer:
 
         try:
             tool = await mcp._tool_manager.get_tool("delete_account")
-            result = await tool.fn(account_id="acc_123")
+            result = await tool.fn(account_id="acc_123")  # type: ignore[attr-defined]
 
             result_data = result
             assert "error" in result_data

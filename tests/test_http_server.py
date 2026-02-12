@@ -52,7 +52,7 @@ def _build_fake_mcp_server(include_oauth_routes: bool = False):
             lifespan=_noop_lifespan,
         )
         # Mirror the attribute shape used by create_app() with real FastMCP apps.
-        app.lifespan = _noop_lifespan
+        app.lifespan = _noop_lifespan  # type: ignore[attr-defined]
         return app
 
     auth = None
@@ -165,7 +165,8 @@ class TestHealthCheck:
 
         response = await health_check(MagicMock(spec=Request))
         assert response.status_code == 200
-        assert json.loads(response.body.decode()) == {
+        body = response.body.decode()  # type: ignore[union-attr]
+        assert json.loads(body) == {
             "status": "healthy",
             "service": "monarch-mcp-server",
             "mode": "liveness_only",
@@ -186,7 +187,8 @@ class TestReadinessCheck:
             ):
                 response = await readiness_check(MagicMock(spec=Request))
 
-        payload = json.loads(response.body.decode())
+        body = response.body.decode()  # type: ignore[union-attr]
+        payload = json.loads(body)
         assert response.status_code == 200
         assert payload["status"] == "ready"
         assert payload["auth_mode"] == "token"
@@ -207,7 +209,8 @@ class TestReadinessCheck:
         ):
             response = await readiness_check(MagicMock(spec=Request))
 
-        payload = json.loads(response.body.decode())
+        body = response.body.decode()  # type: ignore[union-attr]
+        payload = json.loads(body)
         assert response.status_code == 503
         assert payload["status"] == "not_ready"
         assert payload["auth_mode"] == "oauth"
@@ -224,7 +227,8 @@ class TestRootEndpoint:
 
         with patch.dict(os.environ, _token_env(), clear=True):
             response = await root(MagicMock(spec=Request))
-            data = json.loads(response.body.decode())
+            body = response.body.decode()  # type: ignore[union-attr]
+            data = json.loads(body)
             assert data["auth_mode"] == "token"
             assert "/ready" in data["endpoints"]
             assert "Bearer" in data["endpoints"]["/mcp"]
@@ -238,7 +242,8 @@ class TestRootEndpoint:
 
         with patch.dict(os.environ, _oauth_env(), clear=True):
             response = await root(MagicMock(spec=Request))
-            data = json.loads(response.body.decode())
+            body = response.body.decode()  # type: ignore[union-attr]
+            data = json.loads(body)
             assert data["auth_mode"] == "oauth"
             assert data["oauth_discovery"].endswith(
                 "/.well-known/oauth-authorization-server"

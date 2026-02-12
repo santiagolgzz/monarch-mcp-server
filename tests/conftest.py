@@ -111,6 +111,6 @@ def writable_fastmcp_home(tmp_path, monkeypatch):
     try:
         import fastmcp.server.auth.oauth_proxy as oauth_proxy
 
-        oauth_proxy.settings.home = fastmcp_home
+        oauth_proxy.settings.home = fastmcp_home  # type: ignore[attr-defined]
     except Exception:
         pass

@@ -21,7 +21,7 @@ class TestSetupAuthentication:
     async def test_returns_instructions(self):
         """Verify setup_authentication returns setup instructions."""
         tool = await mcp._tool_manager.get_tool("setup_authentication")
-        result = tool.fn()
+        result = tool.fn()  # type: ignore[attr-defined]
 
         # Check key instruction elements are present
         assert "Monarch Money" in result
@@ -33,7 +33,7 @@ class TestSetupAuthentication:
     async def test_mentions_interactive_as_recommended(self):
         """Verify instructions recommend interactive login."""
         tool = await mcp._tool_manager.get_tool("setup_authentication")
-        result = tool.fn()
+        result = tool.fn()  # type: ignore[attr-defined]
         assert "Recommended" in result
         assert "Interactive" in result or "keyring" in result
 
@@ -41,14 +41,14 @@ class TestSetupAuthentication:
     async def test_mentions_mfa(self):
         """Verify instructions mention MFA support."""
         tool = await mcp._tool_manager.get_tool("setup_authentication")
-        result = tool.fn()
+        result = tool.fn()  # type: ignore[attr-defined]
         assert "MFA" in result
 
     @pytest.mark.asyncio
     async def test_mentions_session_persistence(self):
         """Verify instructions mention session persistence."""
         tool = await mcp._tool_manager.get_tool("setup_authentication")
-        result = tool.fn()
+        result = tool.fn()  # type: ignore[attr-defined]
         assert "persist" in result.lower() or "weeks" in result.lower()
 
 
@@ -68,7 +68,7 @@ class TestCheckAuthStatus:
             return_value=mock_client,
         ):
             tool = await mcp._tool_manager.get_tool("check_auth_status")
-            result = await tool.fn()
+            result = await tool.fn()  # type: ignore[attr-defined]
 
             assert "Authenticated" in result
             assert "Premium" in result
@@ -86,7 +86,7 @@ class TestCheckAuthStatus:
             return_value=mock_client,
         ):
             tool = await mcp._tool_manager.get_tool("check_auth_status")
-            result = await tool.fn()
+            result = await tool.fn()  # type: ignore[attr-defined]
 
             assert "Authenticated" in result
             assert "Free" in result or "Trial" in result
@@ -101,7 +101,7 @@ class TestCheckAuthStatus:
             side_effect=AuthenticationError("Authentication required!"),
         ):
             tool = await mcp._tool_manager.get_tool("check_auth_status")
-            result = await tool.fn()
+            result = await tool.fn()  # type: ignore[attr-defined]
 
             assert "Not authenticated" in result
             assert "login_setup" in result.lower()
@@ -114,7 +114,7 @@ class TestCheckAuthStatus:
             side_effect=Exception("Network timeout"),
         ):
             tool = await mcp._tool_manager.get_tool("check_auth_status")
-            result = await tool.fn()
+            result = await tool.fn()  # type: ignore[attr-defined]
 
             assert "failed" in result.lower()
             assert "Network timeout" in result

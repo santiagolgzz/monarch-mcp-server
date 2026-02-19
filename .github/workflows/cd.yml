@@ -34,8 +34,6 @@ jobs:
 
       - name: Deploy to Cloud Run
         id: deploy
-        env:
-          MCP_CI_SMOKE_TOKEN: ${{ secrets.MCP_CI_SMOKE_TOKEN }}
         run: |
           gcloud run deploy monarch-mcp \
             --image ${{ vars.GCP_REGION || 'us-central1' }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/monarch-mcp/server:${{ github.sha }} \
@@ -44,13 +42,10 @@ jobs:
             --region ${{ vars.GCP_REGION || 'us-central1' }} \
             --allow-unauthenticated \
             --set-env-vars "MCP_AUTH_MODE=both" \
-            --set-env-vars "MCP_AUTH_TOKEN=${{ secrets.MCP_AUTH_TOKEN }}" \
             --set-env-vars "GITHUB_CLIENT_ID=${{ vars.OAUTH_CLIENT_ID }}" \
-            --set-env-vars "GITHUB_CLIENT_SECRET=${{ secrets.OAUTH_CLIENT_SECRET }}" \
             --set-env-vars "MCP_ENABLE_CI_SMOKE=true" \
-            --set-env-vars "MCP_CI_SMOKE_TOKEN=${MCP_CI_SMOKE_TOKEN}" \
             --set-env-vars "BASE_URL=${{ vars.CLOUD_RUN_URL }}" \
-            --set-secrets "MONARCH_EMAIL=monarch-email:latest,MONARCH_PASSWORD=monarch-password:latest,MONARCH_MFA_SECRET=monarch-mfa-secret:latest"
+            --set-secrets "MCP_AUTH_TOKEN=mcp-auth-token:latest,GITHUB_CLIENT_SECRET=oauth-client-secret:latest,MCP_CI_SMOKE_TOKEN=mcp-ci-smoke-token:latest,MONARCH_EMAIL=monarch-email:latest,MONARCH_PASSWORD=monarch-password:latest,MONARCH_MFA_SECRET=monarch-mfa-secret:latest"
 
       - name: Verify Deployment
         run: |

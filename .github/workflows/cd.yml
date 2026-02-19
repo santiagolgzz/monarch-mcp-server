@@ -43,7 +43,8 @@ jobs:
             --platform managed \
             --region ${{ vars.GCP_REGION || 'us-central1' }} \
             --allow-unauthenticated \
-            --set-env-vars "MCP_AUTH_MODE=oauth" \
+            --set-env-vars "MCP_AUTH_MODE=both" \
+            --set-env-vars "MCP_AUTH_TOKEN=${{ secrets.MCP_AUTH_TOKEN }}" \
             --set-env-vars "GITHUB_CLIENT_ID=${{ vars.OAUTH_CLIENT_ID }}" \
             --set-env-vars "GITHUB_CLIENT_SECRET=${{ secrets.OAUTH_CLIENT_SECRET }}" \
             --set-env-vars "MCP_ENABLE_CI_SMOKE=true" \

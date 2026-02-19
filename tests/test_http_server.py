@@ -35,6 +35,20 @@ def _oauth_env(**overrides):
     return env
 
 
+def _both_env(**overrides):
+    env = {
+        "MCP_AUTH_MODE": "both",
+        "MCP_AUTH_TOKEN": "test-token",
+        "GITHUB_CLIENT_ID": "test_client_id",
+        "GITHUB_CLIENT_SECRET": "test_client_secret",
+        "MCP_OAUTH_REDIS_URL": "redis://localhost:6379/0",
+        "MCP_OAUTH_JWT_SIGNING_KEY": "test-jwt-signing-key",
+        "BASE_URL": "http://localhost:8000",
+    }
+    env.update(overrides)
+    return env
+
+
 def _build_fake_mcp_server(include_oauth_routes: bool = False):
     @asynccontextmanager
     async def _noop_lifespan(_app):
@@ -79,6 +93,12 @@ class TestAuthModeHelpers:
         with patch.dict(os.environ, {"MCP_AUTH_MODE": "banana"}, clear=True):
             with pytest.raises(ValueError, match="Invalid MCP_AUTH_MODE"):
                 get_auth_mode()
+
+    def test_get_auth_mode_accepts_both(self):
+        from monarch_mcp_server.http_server import get_auth_mode
+
+        with patch.dict(os.environ, {"MCP_AUTH_MODE": "both"}, clear=True):
+            assert get_auth_mode() == "both"
 
     def test_get_token_auth_secret_requires_value(self):
         from monarch_mcp_server.http_server import get_token_auth_secret
@@ -155,6 +175,13 @@ class TestCreateMCPServer:
             server = create_mcp_server()
             assert server.auth is not None
 
+    def test_both_mode_with_credentials_sets_oauth_auth(self):
+        from monarch_mcp_server.http_server import create_mcp_server
+
+        with patch.dict(os.environ, _both_env(), clear=True):
+            server = create_mcp_server()
+            assert server.auth is not None
+
 
 class TestHealthCheck:
     @pytest.mark.asyncio
@@ -217,6 +244,25 @@ class TestReadinessCheck:
         assert payload["checks"]["mcp_server_initialized"] is False
         assert "mcp_server_initialized" in payload["errors"]
 
+    @pytest.mark.asyncio
+    async def test_both_mode_not_ready_when_token_missing(self):
+        from starlette.requests import Request
+
+        from monarch_mcp_server.http_server import readiness_check
+
+        with patch.dict(
+            os.environ, _both_env(MCP_AUTH_TOKEN="", MCP_OAUTH_REDIS_URL=""), clear=True
+        ):
+            response = await readiness_check(MagicMock(spec=Request))
+
+        body = response.body.decode()  # type: ignore[union-attr]
+        payload = json.loads(body)
+        assert response.status_code == 503
+        assert payload["status"] == "not_ready"
+        assert payload["auth_mode"] == "both"
+        assert payload["checks"]["token_secret_configured"] is False
+        assert "token_secret_configured" in payload["errors"]
+
 
 class TestRootEndpoint:
     @pytest.mark.asyncio
@@ -245,6 +291,22 @@ class TestRootEndpoint:
             body = response.body.decode()  # type: ignore[union-attr]
             data = json.loads(body)
             assert data["auth_mode"] == "oauth"
+            assert data["oauth_discovery"].endswith(
+                "/.well-known/oauth-authorization-server"
+            )
+
+    @pytest.mark.asyncio
+    async def test_reports_both_mode(self):
+        from starlette.requests import Request
+
+        from monarch_mcp_server.http_server import root
+
+        with patch.dict(os.environ, _both_env(), clear=True):
+            response = await root(MagicMock(spec=Request))
+            body = response.body.decode()  # type: ignore[union-attr]
+            data = json.loads(body)
+            assert data["auth_mode"] == "both"
+            assert "/mcp-token/mcp" in data["endpoints"]
             assert data["oauth_discovery"].endswith(
                 "/.well-known/oauth-authorization-server"
             )
@@ -283,6 +345,35 @@ class TestCreateApp:
         assert OAuthAutoRepairMiddleware in middleware_classes
         assert "/.well-known/oauth-authorization-server" in route_paths
 
+    def test_both_mode_adds_token_mount_and_oauth_route(self):
+        from monarch_mcp_server.http_server import (
+            MCPTokenAuthMiddleware,
+            OAuthAutoRepairMiddleware,
+            create_app,
+        )
+
+        with patch.dict(os.environ, _both_env(), clear=True):
+            with patch(
+                "monarch_mcp_server.http_server.create_mcp_server",
+                return_value=_build_fake_mcp_server(include_oauth_routes=True),
+            ):
+                with patch(
+                    "monarch_mcp_server.http_server.create_mcp_token_server",
+                    return_value=_build_fake_mcp_server(),
+                ):
+                    with patch(
+                        "monarch_mcp_server.http_server.oauth_state_manager"
+                    ) as mock_mgr:
+                        mock_mgr.storage = "fake-redis"
+                        app = create_app()
+
+        route_paths = [getattr(route, "path", None) for route in app.routes]
+        middleware_classes = [m.cls for m in app.user_middleware]
+        assert "/mcp-token" in route_paths
+        assert "/.well-known/oauth-authorization-server" in route_paths
+        assert MCPTokenAuthMiddleware in middleware_classes
+        assert OAuthAutoRepairMiddleware in middleware_classes
+
     def test_smoke_mode_adds_smoke_endpoint_and_middleware(self):
         from monarch_mcp_server.http_server import (
             MCPSmokeTokenAuthMiddleware,
@@ -318,10 +409,32 @@ class TestTokenMiddleware:
 
         from monarch_mcp_server.http_server import MCPTokenAuthMiddleware
 
-        middleware = MCPTokenAuthMiddleware(app=MagicMock(), token="test-token")
+        middleware = MCPTokenAuthMiddleware(
+            app=MagicMock(), token="test-token", protected_mounts=("/mcp",)
+        )
         request = MagicMock(spec=Request)
         request.url.path = "/mcp"
         request.headers = {"Authorization": "Bearer test-token"}
+
+        async def call_next(_request):
+            return JSONResponse({"ok": True})
+
+        response = await middleware.dispatch(request, call_next)
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_skips_non_protected_mounts(self):
+        from starlette.requests import Request
+        from starlette.responses import JSONResponse
+
+        from monarch_mcp_server.http_server import MCPTokenAuthMiddleware
+
+        middleware = MCPTokenAuthMiddleware(
+            app=MagicMock(), token="test-token", protected_mounts=("/mcp-token",)
+        )
+        request = MagicMock(spec=Request)
+        request.url.path = "/mcp"
+        request.headers = {}
 
         async def call_next(_request):
             return JSONResponse({"ok": True})

@@ -53,6 +53,13 @@ class OAuthStateManager:
         self._storage_key = cache_key
         return self.storage
 
+    def disable_storage(self) -> None:
+        """Disable managed Redis storage and clear related in-memory state."""
+        self.storage = None
+        self._storage_key = None
+        self._last_repair = None
+        self.reset_events()
+
     def reset_events(self) -> None:
         self._invalid_token_events.clear()
 

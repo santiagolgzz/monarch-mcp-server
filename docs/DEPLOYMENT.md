@@ -7,6 +7,7 @@ This guide explains how to host the Monarch Money MCP server online so you can u
 The server uses **SSE (Server-Sent Events)** transport, which is the standard for remote MCP servers. It includes:
 - Single-user token authentication by default (`MCP_AUTH_MODE=token`)
 - Optional GitHub OAuth mode for advanced/multi-user setups (`MCP_AUTH_MODE=oauth`)
+- Optional mixed mode to support both simultaneously (`MCP_AUTH_MODE=both`)
 - Health check endpoint for monitoring
 - Docker support for easy deployment
 
@@ -42,7 +43,7 @@ Save this token - you'll need it for deployment.
 
 ## Step 2 (Optional): Create a GitHub OAuth App
 
-You only need this if you choose `MCP_AUTH_MODE=oauth`.
+You only need this if you choose `MCP_AUTH_MODE=oauth` or `MCP_AUTH_MODE=both`.
 
 If you're in the common single-user setup, skip this step and use `MCP_AUTH_MODE=token` with `MCP_AUTH_TOKEN`.
 
@@ -143,7 +144,7 @@ Deploy is only marked healthy if:
    - `MCP_AUTH_MODE` = `token` (recommended)
    - `MCP_AUTH_TOKEN` = long random secret
    - `MONARCH_TOKEN` = your Monarch Money token
-   - (`GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` only if using oauth mode)
+   - (`GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` only if using oauth/both mode)
 5. Railway will automatically deploy and give you a URL
 6. If using oauth mode, update callback URL to: `https://your-app.railway.app/auth/callback`
 
@@ -291,7 +292,7 @@ Once your server is deployed and running:
 3. Add a new MCP server:
    - **URL**: `https://your-server-url.com/mcp`
    - **Auth (recommended)**: Bearer token using `MCP_AUTH_TOKEN`
-   - **Auth (optional)**: GitHub OAuth (only if `MCP_AUTH_MODE=oauth`)
+   - **Auth (optional)**: GitHub OAuth (for `MCP_AUTH_MODE=oauth` or `MCP_AUTH_MODE=both` on `/mcp`)
 
 The server URL format depends on your deployment:
 - Railway: `https://your-app.up.railway.app/mcp`
@@ -306,8 +307,9 @@ The server URL format depends on your deployment:
 | `/` | Server info and available endpoints |
 | `/health` | Liveness check (process up; no auth/path validation) |
 | `/ready` | Readiness check (auth + MCP wiring validation) |
-| `/mcp` | MCP endpoint (requires Bearer token or OAuth, based on mode) |
-| `/.well-known/oauth-authorization-server` | OAuth discovery endpoint (oauth mode only) |
+| `/mcp` | MCP endpoint (token in `token` mode, OAuth in `oauth`/`both` mode) |
+| `/mcp-token/mcp` | Token-auth MCP endpoint (only in `both` mode) |
+| `/.well-known/oauth-authorization-server` | OAuth discovery endpoint (`oauth`/`both` mode only) |
 
 ## Security Considerations
 
@@ -321,12 +323,15 @@ The server URL format depends on your deployment:
 ### Server won't start
 - For token mode: check `MCP_AUTH_MODE=token` and `MCP_AUTH_TOKEN` are set
 - For oauth mode: check `MCP_AUTH_MODE=oauth`, `GITHUB_CLIENT_ID`, and `GITHUB_CLIENT_SECRET`
+- For both mode: check `MCP_AUTH_MODE=both`, `MCP_AUTH_TOKEN`, `GITHUB_CLIENT_ID`, and `GITHUB_CLIENT_SECRET`
+- For both mode: check `MCP_AUTH_MODE=both`, `MCP_AUTH_TOKEN`, `GITHUB_CLIENT_ID`, and `GITHUB_CLIENT_SECRET`
 - Verify `MONARCH_TOKEN` is valid (try running locally first)
 
 ### Can't connect from Claude app
-- Ensure you're using the `/mcp` endpoint (not `/sse`)
-- If token mode: verify your client sends `Authorization: Bearer <MCP_AUTH_TOKEN>`
-- If oauth mode: verify GitHub OAuth callback URL matches your deployment URL
+- Ensure you're using the correct endpoint (`/mcp` or `/mcp-token/mcp`, not `/sse`)
+- If token mode: verify your client sends `Authorization: Bearer <MCP_AUTH_TOKEN>` to `/mcp`
+- If oauth mode: verify GitHub OAuth callback URL matches your deployment URL and use `/mcp`
+- If both mode: use `/mcp` for OAuth clients, `/mcp-token/mcp` for bearer-token clients
 - Verify the server is accessible (try `/health` endpoint in browser)
 - Verify auth/MCP readiness (check `/ready`; must return `status=ready`)
 
@@ -342,12 +347,12 @@ The server URL format depends on your deployment:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `MCP_AUTH_MODE` | No | Auth mode: `token` (default) or `oauth` |
-| `MCP_AUTH_TOKEN` | Yes* | Shared bearer token for `token` mode |
-| `GITHUB_CLIENT_ID` | Yes** | GitHub OAuth App Client ID (`oauth` mode only) |
-| `GITHUB_CLIENT_SECRET` | Yes** | GitHub OAuth App Client Secret (`oauth` mode only) |
-| `MCP_OAUTH_REDIS_URL` | Yes** | Shared Redis URL for durable OAuth state |
-| `MCP_OAUTH_JWT_SIGNING_KEY` | Yes** | Stable token signing key for OAuth |
+| `MCP_AUTH_MODE` | No | Auth mode: `token` (default), `oauth`, or `both` |
+| `MCP_AUTH_TOKEN` | Yes* | Shared bearer token for `token`/`both` mode |
+| `GITHUB_CLIENT_ID` | Yes** | GitHub OAuth App Client ID (`oauth`/`both` mode) |
+| `GITHUB_CLIENT_SECRET` | Yes** | GitHub OAuth App Client Secret (`oauth`/`both` mode) |
+| `MCP_OAUTH_REDIS_URL` | No | Shared Redis URL for durable OAuth state (`oauth`/`both`, optional) |
+| `MCP_OAUTH_JWT_SIGNING_KEY` | No | Stable token signing key for OAuth (`oauth`/`both`, optional) |
 | `MCP_ENABLE_CI_SMOKE` | No | Enables `/mcp-smoke` endpoint for CI (default: false) |
 | `MCP_CI_SMOKE_TOKEN` | Yes*** | Bearer token required for `/mcp-smoke` |
 | `MONARCH_TOKEN` | Yes* | Monarch Money authentication token |
@@ -358,8 +363,8 @@ The server URL format depends on your deployment:
 | `PORT` | No | Server port (default: 8000) |
 | `DEBUG` | No | Enable debug logging (default: false) |
 
-*`MCP_AUTH_TOKEN` is required when `MCP_AUTH_MODE=token`. Also, either `MONARCH_TOKEN` or `MONARCH_EMAIL`+`MONARCH_PASSWORD` is required.
-**Required only when `MCP_AUTH_MODE=oauth`.
+*`MCP_AUTH_TOKEN` is required when `MCP_AUTH_MODE=token` or `MCP_AUTH_MODE=both`. Also, either `MONARCH_TOKEN` or `MONARCH_EMAIL`+`MONARCH_PASSWORD` is required.
+**Required when `MCP_AUTH_MODE=oauth` or `MCP_AUTH_MODE=both`.
 ***Required when `MCP_ENABLE_CI_SMOKE=true`.
 
 **`BASE_URL` is auto-detected on Railway. Required for other platforms (Render, Fly.io, VPS, Cloud Run).

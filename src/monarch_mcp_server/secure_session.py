@@ -53,7 +53,7 @@ class SecureMonarchSession:
             return False
 
         try:
-            keyring.set_password(KEYRING_SERVICE, KEYRING_USERNAME, token)  # type: ignore[possibly-unbound]
+            keyring.set_password(KEYRING_SERVICE, KEYRING_USERNAME, token)
             logger.info("✅ Token saved securely to keyring")
 
             # Clean up any old insecure files
@@ -85,7 +85,7 @@ class SecureMonarchSession:
         if KEYRING_AVAILABLE:
             try:
                 # 2. Try keyring second (local use)
-                token = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)  # type: ignore[possibly-unbound]
+                token = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
                 if token:
                     logger.info("✅ Token loaded from keyring")
                     return token
@@ -113,7 +113,7 @@ class SecureMonarchSession:
         """Delete the authentication token from system keyring and session file."""
         if KEYRING_AVAILABLE:
             try:
-                keyring.delete_password(KEYRING_SERVICE, KEYRING_USERNAME)  # type: ignore[possibly-unbound]
+                keyring.delete_password(KEYRING_SERVICE, KEYRING_USERNAME)
                 logger.info("🗑️ Token deleted from keyring")
             except Exception as e:
                 error_type = type(e).__name__

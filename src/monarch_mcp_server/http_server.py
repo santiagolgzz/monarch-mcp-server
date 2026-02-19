@@ -13,6 +13,7 @@ import os
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from hmac import compare_digest
+from typing import Any, cast
 
 import uvicorn
 from fastmcp import FastMCP
@@ -511,8 +512,8 @@ def create_app() -> Starlette:
 
     if token is not None:
         protected_mounts = ("/mcp",) if auth_mode == "token" else ("/mcp-token",)
-        app.add_middleware(  # type: ignore[arg-type]
-            MCPTokenAuthMiddleware,
+        app.add_middleware(
+            cast(Any, MCPTokenAuthMiddleware),
             token=token,
             protected_mounts=protected_mounts,
         )
@@ -529,7 +530,9 @@ def create_app() -> Starlette:
         if oauth_state_manager.storage is not None:
             app.add_middleware(OAuthAutoRepairMiddleware)  # type: ignore[arg-type]
         if auth_mode == "oauth":
-            logger.info("Monarch Money MCP HTTP Server initialized in GitHub OAuth mode")
+            logger.info(
+                "Monarch Money MCP HTTP Server initialized in GitHub OAuth mode"
+            )
 
     if smoke_enabled and smoke_token is not None:
         app.add_middleware(MCPSmokeTokenAuthMiddleware, token=smoke_token)  # type: ignore[arg-type]

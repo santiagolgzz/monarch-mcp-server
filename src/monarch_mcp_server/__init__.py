@@ -10,7 +10,7 @@ from monarchmoney import MonarchMoneyEndpoints
 # PATCH: Monarch Money rebranded from monarchmoney.com to monarch.com
 # The library hasn't been updated yet (as of v0.1.15), so we monkey-patch the BASE_URL
 # See: https://github.com/hammem/monarchmoney/issues/184
-MonarchMoneyEndpoints.BASE_URL = "https://api.monarch.com"  # type: ignore[assignment]
+MonarchMoneyEndpoints.BASE_URL = "https://api.monarch.com"
 
 from monarch_mcp_server.exceptions import (  # noqa: E402
     APIError,

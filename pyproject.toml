@@ -34,6 +34,7 @@ dependencies = [
     "keyring>=24.0.0",
     "python-dotenv>=1.0.0",
     "pydantic>=2.10.0",  # 2.10+ required for Python 3.14 support
+    "authlib>=1.6.9",
     # HTTP server dependencies for remote hosting
     "starlette>=0.37.0",
     "uvicorn[standard]>=0.29.0",

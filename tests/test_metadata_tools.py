@@ -23,7 +23,7 @@ async def test_get_transaction_categories_async(mcp):
         "monarch_mcp_server.tools.categories.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_transaction_categories")
+        tool = await mcp.get_tool("get_transaction_categories")
         data = await tool.fn()
         assert data == []
 
@@ -40,7 +40,7 @@ async def test_get_transaction_tags_async(mcp):
         "monarch_mcp_server.tools.categories.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_transaction_tags")
+        tool = await mcp.get_tool("get_transaction_tags")
         data = await tool.fn()
         assert data == []
 
@@ -63,7 +63,7 @@ async def test_get_subscription_details_success(mcp):
         "monarch_mcp_server.tools.metadata.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_subscription_details")
+        tool = await mcp.get_tool("get_subscription_details")
         data = await tool.fn()
         assert "subscription" in data
         mock_client.get_subscription_details.assert_called_once()
@@ -81,7 +81,7 @@ async def test_get_subscription_details_error(mcp):
         "monarch_mcp_server.tools.metadata.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_subscription_details")
+        tool = await mcp.get_tool("get_subscription_details")
         with pytest.raises(RuntimeError, match="API error"):
             await tool.fn()
 
@@ -103,7 +103,7 @@ async def test_get_institutions_success(mcp):
         "monarch_mcp_server.tools.metadata.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_institutions")
+        tool = await mcp.get_tool("get_institutions")
         data = await tool.fn()
         assert "institutions" in data
         assert len(data["institutions"]) == 2
@@ -122,7 +122,7 @@ async def test_get_institutions_error(mcp):
         "monarch_mcp_server.tools.metadata.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_institutions")
+        tool = await mcp.get_tool("get_institutions")
         with pytest.raises(RuntimeError, match="Network error"):
             await tool.fn()
 
@@ -144,7 +144,7 @@ async def test_get_subscription_with_trial_data(mcp):
         "monarch_mcp_server.tools.metadata.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_subscription_details")
+        tool = await mcp.get_tool("get_subscription_details")
         data = await tool.fn()
         assert data["subscription"]["status"] == "trial"
 
@@ -161,6 +161,6 @@ async def test_get_institutions_empty(mcp):
         "monarch_mcp_server.tools.metadata.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_institutions")
+        tool = await mcp.get_tool("get_institutions")
         data = await tool.fn()
         assert data["institutions"] == []

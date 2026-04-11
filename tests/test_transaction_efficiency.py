@@ -32,7 +32,7 @@ async def test_get_transactions_filters_by_amount_range(mcp):
         "monarch_mcp_server.tools.transactions.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_transactions")
+        tool = await mcp.get_tool("get_transactions")
 
         # Test filtering for Medium transactions
         data = await tool.fn(min_amount=40.0, max_amount=60.0)
@@ -50,7 +50,7 @@ async def test_get_transactions_filters_by_category_id(mcp):
         "monarch_mcp_server.tools.transactions.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_transactions")
+        tool = await mcp.get_tool("get_transactions")
 
         await tool.fn(category_id="cat_123")
 
@@ -70,7 +70,7 @@ async def test_search_transactions_is_registered(mcp):
         "monarch_mcp_server.tools.transactions.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("search_transactions")
+        tool = await mcp.get_tool("search_transactions")
         await tool.fn(query="test keyword")
 
         args, kwargs = mock_client.get_transactions.call_args
@@ -96,7 +96,7 @@ async def test_get_transaction_stats_logic(mcp):
         return_value=mock_client,
     ):
         # This will fail until implemented
-        tool = await mcp._tool_manager.get_tool("get_transaction_stats")
+        tool = await mcp.get_tool("get_transaction_stats")
         data = await tool.fn()
         assert data["count"] == 3
         assert data["sum_income"] == 100.0
@@ -130,7 +130,7 @@ async def test_get_transactions_payload_is_optimized(mcp):
         "monarch_mcp_server.tools.transactions.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_transactions")
+        tool = await mcp.get_tool("get_transactions")
         data = await tool.fn()
         txn = data[0]
         # Check essential fields are there

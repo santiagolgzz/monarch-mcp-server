@@ -20,7 +20,7 @@ class TestSetupAuthentication:
     @pytest.mark.asyncio
     async def test_returns_instructions(self):
         """Verify setup_authentication returns setup instructions."""
-        tool = await mcp._tool_manager.get_tool("setup_authentication")
+        tool = await mcp.get_tool("setup_authentication")
         result = tool.fn()  # type: ignore[attr-defined]
 
         # Check key instruction elements are present
@@ -32,7 +32,7 @@ class TestSetupAuthentication:
     @pytest.mark.asyncio
     async def test_mentions_interactive_as_recommended(self):
         """Verify instructions recommend interactive login."""
-        tool = await mcp._tool_manager.get_tool("setup_authentication")
+        tool = await mcp.get_tool("setup_authentication")
         result = tool.fn()  # type: ignore[attr-defined]
         assert "Recommended" in result
         assert "Interactive" in result or "keyring" in result
@@ -40,14 +40,14 @@ class TestSetupAuthentication:
     @pytest.mark.asyncio
     async def test_mentions_mfa(self):
         """Verify instructions mention MFA support."""
-        tool = await mcp._tool_manager.get_tool("setup_authentication")
+        tool = await mcp.get_tool("setup_authentication")
         result = tool.fn()  # type: ignore[attr-defined]
         assert "MFA" in result
 
     @pytest.mark.asyncio
     async def test_mentions_session_persistence(self):
         """Verify instructions mention session persistence."""
-        tool = await mcp._tool_manager.get_tool("setup_authentication")
+        tool = await mcp.get_tool("setup_authentication")
         result = tool.fn()  # type: ignore[attr-defined]
         assert "persist" in result.lower() or "weeks" in result.lower()
 
@@ -67,7 +67,7 @@ class TestCheckAuthStatus:
             "monarch_mcp_server.tools.metadata.get_monarch_client",
             return_value=mock_client,
         ):
-            tool = await mcp._tool_manager.get_tool("check_auth_status")
+            tool = await mcp.get_tool("check_auth_status")
             result = await tool.fn()  # type: ignore[attr-defined]
 
             assert "Authenticated" in result
@@ -85,7 +85,7 @@ class TestCheckAuthStatus:
             "monarch_mcp_server.tools.metadata.get_monarch_client",
             return_value=mock_client,
         ):
-            tool = await mcp._tool_manager.get_tool("check_auth_status")
+            tool = await mcp.get_tool("check_auth_status")
             result = await tool.fn()  # type: ignore[attr-defined]
 
             assert "Authenticated" in result
@@ -100,7 +100,7 @@ class TestCheckAuthStatus:
             "monarch_mcp_server.tools.metadata.get_monarch_client",
             side_effect=AuthenticationError("Authentication required!"),
         ):
-            tool = await mcp._tool_manager.get_tool("check_auth_status")
+            tool = await mcp.get_tool("check_auth_status")
             result = await tool.fn()  # type: ignore[attr-defined]
 
             assert "Not authenticated" in result
@@ -113,7 +113,7 @@ class TestCheckAuthStatus:
             "monarch_mcp_server.tools.metadata.get_monarch_client",
             side_effect=Exception("Network timeout"),
         ):
-            tool = await mcp._tool_manager.get_tool("check_auth_status")
+            tool = await mcp.get_tool("check_auth_status")
             result = await tool.fn()  # type: ignore[attr-defined]
 
             assert "failed" in result.lower()
@@ -159,17 +159,18 @@ class TestMCPInstance:
         # FastMCP stores name - check it exists (implementation detail may vary)
         assert mcp is not None
         # The server initializes with "Monarch Money MCP Server"
-        # Just verify we can access the tool manager (indicates proper initialization)
-        assert mcp._tool_manager is not None
+        # Verify the mcp is properly initialized by checking it has tools
+        tools = mcp.local_provider._components
+        assert len(tools) > 0
 
     @pytest.mark.asyncio
     async def test_tools_registered(self):
         """Verify essential tools are registered on mcp."""
         # Check that some core tools are registered
-        tool = await mcp._tool_manager.get_tool("setup_authentication")
+        tool = await mcp.get_tool("setup_authentication")
         assert tool is not None
 
-        tool2 = await mcp._tool_manager.get_tool("check_auth_status")
+        tool2 = await mcp.get_tool("check_auth_status")
         assert tool2 is not None
 
 

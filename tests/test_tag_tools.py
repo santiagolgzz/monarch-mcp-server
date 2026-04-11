@@ -31,7 +31,7 @@ async def test_create_tag_with_default_color(mcp):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
             mock_guard.return_value.check_operation.return_value = (True, None)
 
-            tool = await mcp._tool_manager.get_tool("create_tag")
+            tool = await mcp.get_tool("create_tag")
             data = await tool.fn(name="New Tag")
             assert data["id"] == "tag_123"
             # Verify default color was passed
@@ -58,7 +58,7 @@ async def test_create_tag_with_custom_color(mcp):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
             mock_guard.return_value.check_operation.return_value = (True, None)
 
-            tool = await mcp._tool_manager.get_tool("create_tag")
+            tool = await mcp.get_tool("create_tag")
             data = await tool.fn(name="Important", color="#FF0000")
             assert data["color"] == "#FF0000"
             mock_client.create_transaction_tag.assert_called_once_with(
@@ -79,7 +79,7 @@ async def test_create_tag_empty_name_error(mcp):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
             mock_guard.return_value.check_operation.return_value = (True, None)
 
-            tool = await mcp._tool_manager.get_tool("create_tag")
+            tool = await mcp.get_tool("create_tag")
             with pytest.raises(RuntimeError, match="name cannot be empty"):
                 await tool.fn(name="")
 
@@ -98,7 +98,7 @@ async def test_set_transaction_tags_single(mcp):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
             mock_guard.return_value.check_operation.return_value = (True, None)
 
-            tool = await mcp._tool_manager.get_tool("set_transaction_tags")
+            tool = await mcp.get_tool("set_transaction_tags")
             data = await tool.fn(transaction_id="txn_123", tag_ids="tag_1")
             assert data["success"] is True
             mock_client.set_transaction_tags.assert_called_once_with(
@@ -120,7 +120,7 @@ async def test_set_transaction_tags_multiple_with_whitespace(mcp):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
             mock_guard.return_value.check_operation.return_value = (True, None)
 
-            tool = await mcp._tool_manager.get_tool("set_transaction_tags")
+            tool = await mcp.get_tool("set_transaction_tags")
             # Tags with whitespace around them
             data = await tool.fn(
                 transaction_id="txn_456", tag_ids="tag_1 , tag_2, tag_3 "

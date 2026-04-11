@@ -30,7 +30,7 @@ class TestDestructiveToolsInServer:
                     return_value=True
                 )
 
-                tool = await mcp._tool_manager.get_tool("delete_transaction")
+                tool = await mcp.get_tool("delete_transaction")
                 result = await tool.fn(transaction_id="txn_123")  # type: ignore[attr-defined]
 
                 # Should not be blocked
@@ -54,7 +54,7 @@ class TestDestructiveToolsInServer:
         guard.config.config["emergency_stop"] = True
 
         try:
-            tool = await mcp._tool_manager.get_tool("delete_transaction")
+            tool = await mcp.get_tool("delete_transaction")
             result = await tool.fn(transaction_id="txn_123")  # type: ignore[attr-defined]
 
             result_data = result
@@ -80,7 +80,7 @@ class TestDestructiveToolsInServer:
         guard.config.config["emergency_stop"] = True
 
         try:
-            tool = await mcp._tool_manager.get_tool("delete_account")
+            tool = await mcp.get_tool("delete_account")
             result = await tool.fn(account_id="acc_123")  # type: ignore[attr-defined]
 
             result_data = result

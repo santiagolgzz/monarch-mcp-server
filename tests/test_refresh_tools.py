@@ -24,7 +24,7 @@ async def test_is_accounts_refresh_complete_true(mcp):
     with patch(
         "monarch_mcp_server.tools.refresh.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("is_accounts_refresh_complete")
+        tool = await mcp.get_tool("is_accounts_refresh_complete")
         data = await tool.fn()
         assert data["refresh_complete"] is True
         mock_client.is_accounts_refresh_complete.assert_called_once()
@@ -41,7 +41,7 @@ async def test_is_accounts_refresh_complete_false(mcp):
     with patch(
         "monarch_mcp_server.tools.refresh.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("is_accounts_refresh_complete")
+        tool = await mcp.get_tool("is_accounts_refresh_complete")
         data = await tool.fn()
         assert data["refresh_complete"] is False
 
@@ -63,7 +63,7 @@ async def test_refresh_accounts_success(mcp):
     with patch(
         "monarch_mcp_server.tools.refresh.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("refresh_accounts")
+        tool = await mcp.get_tool("refresh_accounts")
         data = await tool.fn()
         assert data["refreshed"] is True
         mock_client.request_accounts_refresh.assert_called_once_with(["acc_1", "acc_2"])
@@ -80,7 +80,7 @@ async def test_refresh_accounts_no_accounts(mcp):
     with patch(
         "monarch_mcp_server.tools.refresh.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("refresh_accounts")
+        tool = await mcp.get_tool("refresh_accounts")
         data = await tool.fn()
         assert data["refreshed"] is False
         assert "No accounts found" in data["message"]
@@ -99,7 +99,7 @@ async def test_request_accounts_refresh_and_wait_success(mcp):
     with patch(
         "monarch_mcp_server.tools.refresh.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("request_accounts_refresh_and_wait")
+        tool = await mcp.get_tool("request_accounts_refresh_and_wait")
         data = await tool.fn()
         assert data["success"] is True
         mock_client.request_accounts_refresh_and_wait.assert_called_once()
@@ -116,7 +116,7 @@ async def test_request_accounts_refresh_and_wait_failure(mcp):
     with patch(
         "monarch_mcp_server.tools.refresh.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("request_accounts_refresh_and_wait")
+        tool = await mcp.get_tool("request_accounts_refresh_and_wait")
         data = await tool.fn()
         assert data["success"] is False
 
@@ -133,7 +133,7 @@ async def test_refresh_accounts_missing_accounts_key(mcp):
     with patch(
         "monarch_mcp_server.tools.refresh.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("refresh_accounts")
+        tool = await mcp.get_tool("refresh_accounts")
         data = await tool.fn()
         assert data["refreshed"] is False
         assert "No accounts found" in data["message"]

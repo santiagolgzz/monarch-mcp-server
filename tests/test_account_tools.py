@@ -32,7 +32,7 @@ async def test_get_accounts_async(mcp):
     with patch(
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("get_accounts")
+        tool = await mcp.get_tool("get_accounts")
         data = await tool.fn()
         assert len(data) == 1
         assert data[0]["name"] == "Test"
@@ -52,7 +52,7 @@ async def test_get_account_history_consistency(mcp):
     with patch(
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("get_account_history")
+        tool = await mcp.get_tool("get_account_history")
         # Test without filtering
         data = await tool.fn(account_id="1")
         assert "history" in data
@@ -68,7 +68,7 @@ async def test_account_id_casting_safety(mcp):
     with patch(
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("get_account_holdings")
+        tool = await mcp.get_tool("get_account_holdings")
         # Test with invalid ID
         with pytest.raises(RuntimeError, match="Invalid account_id"):
             await tool.fn(account_id="invalid")
@@ -90,7 +90,7 @@ async def test_get_account_holdings_valid_id(mcp):
     with patch(
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("get_account_holdings")
+        tool = await mcp.get_tool("get_account_holdings")
         data = await tool.fn(account_id="12345")
         assert "holdings" in data
         assert len(data["holdings"]) == 2
@@ -114,7 +114,7 @@ async def test_get_account_history_date_filtering(mcp):
     with patch(
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("get_account_history")
+        tool = await mcp.get_tool("get_account_history")
         data = await tool.fn(
             account_id="1", start_date="2024-01-10", end_date="2024-01-20"
         )
@@ -137,7 +137,7 @@ async def test_get_account_history_list_format(mcp):
     with patch(
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("get_account_history")
+        tool = await mcp.get_tool("get_account_history")
         data = await tool.fn(account_id="1")
         assert "history" in data
         assert len(data["history"]) == 2
@@ -159,7 +159,7 @@ async def test_get_account_type_options(mcp):
     with patch(
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("get_account_type_options")
+        tool = await mcp.get_tool("get_account_type_options")
         data = await tool.fn()
         assert "types" in data
         mock_client.get_account_type_options.assert_called_once()
@@ -182,7 +182,7 @@ async def test_create_manual_account_success(mcp):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
             mock_guard.return_value.check_operation.return_value = (True, None)
 
-            tool = await mcp._tool_manager.get_tool("create_manual_account")
+            tool = await mcp.get_tool("create_manual_account")
             data = await tool.fn(
                 account_name="My New Account",
                 account_type="checking",
@@ -206,7 +206,7 @@ async def test_create_manual_account_with_subtype(mcp):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
             mock_guard.return_value.check_operation.return_value = (True, None)
 
-            tool = await mcp._tool_manager.get_tool("create_manual_account")
+            tool = await mcp.get_tool("create_manual_account")
             await tool.fn(
                 account_name="Investment",
                 account_type="investment",
@@ -235,7 +235,7 @@ async def test_update_account_success(mcp):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
             mock_guard.return_value.check_operation.return_value = (True, None)
 
-            tool = await mcp._tool_manager.get_tool("update_account")
+            tool = await mcp.get_tool("update_account")
             data = await tool.fn(account_id="acc_123", name="Updated Name")
             assert data["name"] == "Updated Name"
 
@@ -254,7 +254,7 @@ async def test_delete_account_bool_result(mcp):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
             mock_guard.return_value.check_operation.return_value = (True, None)
 
-            tool = await mcp._tool_manager.get_tool("delete_account")
+            tool = await mcp.get_tool("delete_account")
             data = await tool.fn(account_id="acc_to_delete")
             assert data["deleted"] is True
             assert data["account_id"] == "acc_to_delete"
@@ -274,7 +274,7 @@ async def test_upload_account_balance_history(mcp):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
             mock_guard.return_value.check_operation.return_value = (True, None)
 
-            tool = await mcp._tool_manager.get_tool("upload_account_balance_history")
+            tool = await mcp.get_tool("upload_account_balance_history")
             csv_data = "date,balance\n2024-01-01,1000\n2024-01-02,1050"
             data = await tool.fn(account_id="acc_123", csv_data=csv_data)
             assert data["uploaded"] is True
@@ -303,7 +303,7 @@ async def test_get_accounts_name_fallback(mcp):
     with patch(
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("get_accounts")
+        tool = await mcp.get_tool("get_accounts")
         data = await tool.fn()
         assert data[0]["name"] == "Fallback Name"
 
@@ -329,7 +329,7 @@ async def test_get_accounts_missing_type(mcp):
     with patch(
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("get_accounts")
+        tool = await mcp.get_tool("get_accounts")
         data = await tool.fn()
         assert data[0]["type"] is None
         assert data[0]["institution"] is None
@@ -365,7 +365,7 @@ async def test_get_accounts_is_active_field(mcp):
     with patch(
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
-        tool = await mcp._tool_manager.get_tool("get_accounts")
+        tool = await mcp.get_tool("get_accounts")
         data = await tool.fn()
         assert data[0]["is_active"] is True
         assert data[1]["is_active"] is False

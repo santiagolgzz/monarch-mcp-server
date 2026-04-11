@@ -40,7 +40,7 @@ async def test_get_categories_with_group(mcp):
         "monarch_mcp_server.tools.categories.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_transaction_categories")
+        tool = await mcp.get_tool("get_transaction_categories")
         data = await tool.fn()
         assert len(data) == 2
         assert data[0]["name"] == "Groceries"
@@ -69,7 +69,7 @@ async def test_get_categories_null_group(mcp):
         "monarch_mcp_server.tools.categories.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_transaction_categories")
+        tool = await mcp.get_tool("get_transaction_categories")
         data = await tool.fn()
         assert len(data) == 1
         assert data[0]["group"] is None
@@ -95,7 +95,7 @@ async def test_get_tags_missing_color(mcp):
         "monarch_mcp_server.tools.categories.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_transaction_tags")
+        tool = await mcp.get_tool("get_transaction_tags")
         data = await tool.fn()
         assert len(data) == 1
         assert data[0]["name"] == "Important"
@@ -119,7 +119,7 @@ async def test_get_category_groups(mcp):
         "monarch_mcp_server.tools.categories.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_transaction_category_groups")
+        tool = await mcp.get_tool("get_transaction_category_groups")
         data = await tool.fn()
         assert "groups" in data
         mock_client.get_transaction_category_groups.assert_called_once()
@@ -139,7 +139,7 @@ async def test_create_category_validation(mcp):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
             mock_guard.return_value.check_operation.return_value = (True, None)
 
-            tool = await mcp._tool_manager.get_tool("create_transaction_category")
+            tool = await mcp.get_tool("create_transaction_category")
             with pytest.raises(RuntimeError, match="group_id cannot be empty"):
                 await tool.fn(name="New Category", group_id="")
 
@@ -162,7 +162,7 @@ async def test_create_category_success(mcp):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
             mock_guard.return_value.check_operation.return_value = (True, None)
 
-            tool = await mcp._tool_manager.get_tool("create_transaction_category")
+            tool = await mcp.get_tool("create_transaction_category")
             data = await tool.fn(name="Coffee", group_id="grp_food")
             assert data["id"] == "new_cat_123"
             mock_client.create_transaction_category.assert_called_once_with(
@@ -185,7 +185,7 @@ async def test_delete_category_false_result(mcp):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
             mock_guard.return_value.check_operation.return_value = (True, None)
 
-            tool = await mcp._tool_manager.get_tool("delete_transaction_category")
+            tool = await mcp.get_tool("delete_transaction_category")
             data = await tool.fn(category_id="cat_123")
             assert data["deleted"] is False
             assert data["category_id"] == "cat_123"
@@ -210,7 +210,7 @@ async def test_delete_categories_mixed_results(mcp):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
             mock_guard.return_value.check_operation.return_value = (True, None)
 
-            tool = await mcp._tool_manager.get_tool("delete_transaction_categories")
+            tool = await mcp.get_tool("delete_transaction_categories")
             data = await tool.fn(category_ids="cat_1,cat_2")
             assert "results" in data
             assert len(data["results"]) == 2

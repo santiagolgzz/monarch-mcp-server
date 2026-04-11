@@ -15,7 +15,7 @@ async def mcp():
 async def test_get_transactions_validates_date_format(mcp):
     """Test that get_transactions validates date format."""
     # Invalid date format should return validation error
-    tool = await mcp._tool_manager.get_tool("get_transactions")
+    tool = await mcp.get_tool("get_transactions")
     with pytest.raises(RuntimeError, match="Invalid date format"):
         await tool.fn(start_date="01-15-2024")
 
@@ -24,7 +24,7 @@ async def test_get_transactions_validates_date_format(mcp):
 async def test_create_transaction_validates_required_fields(mcp):
     """Test that create_transaction validates required fields."""
     # Empty account_id should fail validation
-    tool = await mcp._tool_manager.get_tool("create_transaction")
+    tool = await mcp.get_tool("create_transaction")
     with pytest.raises(RuntimeError, match="account_id cannot be empty"):
         await tool.fn(
             account_id="",
@@ -39,6 +39,6 @@ async def test_create_transaction_validates_required_fields(mcp):
 async def test_update_transaction_validates_date_if_provided(mcp):
     """Test that update_transaction validates date format when provided."""
     # Invalid date format should fail validation
-    tool = await mcp._tool_manager.get_tool("update_transaction")
+    tool = await mcp.get_tool("update_transaction")
     with pytest.raises(RuntimeError, match="Invalid date format"):
         await tool.fn(transaction_id="txn_123", date="bad-date-format")

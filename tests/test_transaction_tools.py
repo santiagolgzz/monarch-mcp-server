@@ -34,7 +34,7 @@ async def test_create_transaction_success(mcp):
             mock_guard.return_value.check_operation.return_value = (True, "OK")
             mock_guard.return_value.record_operation = MagicMock()
 
-            tool = await mcp._tool_manager.get_tool("create_transaction")
+            tool = await mcp.get_tool("create_transaction")
             data = await tool.fn(
                 account_id="acc_123",
                 amount=-50.0,
@@ -59,7 +59,7 @@ async def test_update_transaction_parameters(mcp):
         "monarch_mcp_server.tools.transactions.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("update_transaction")
+        tool = await mcp.get_tool("update_transaction")
 
         # Test updating only amount
         await tool.fn(transaction_id="txn_1", amount=50.0)
@@ -86,7 +86,7 @@ async def test_get_transactions_async(mcp):
         "monarch_mcp_server.tools.transactions.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_transactions")
+        tool = await mcp.get_tool("get_transactions")
         data = await tool.fn()
         assert data == []
 
@@ -118,7 +118,7 @@ async def test_get_transactions_null_category(mcp):
         "monarch_mcp_server.tools.transactions.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_transactions")
+        tool = await mcp.get_tool("get_transactions")
         data = await tool.fn()
         assert len(data) == 1
         assert data[0]["category"] is None
@@ -151,7 +151,7 @@ async def test_get_transactions_null_merchant(mcp):
         "monarch_mcp_server.tools.transactions.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_transactions")
+        tool = await mcp.get_tool("get_transactions")
         data = await tool.fn()
         assert len(data) == 1
         assert data[0]["merchant"] is None
@@ -190,7 +190,7 @@ async def test_amount_filtering_with_none(mcp):
         "monarch_mcp_server.tools.transactions.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_transactions")
+        tool = await mcp.get_tool("get_transactions")
         # Filter with min_amount - should skip txn_1 with None amount
         data = await tool.fn(min_amount=-150.0)
         # Should include both - None amount skips the filter check
@@ -209,7 +209,7 @@ async def test_transaction_stats_empty(mcp):
         "monarch_mcp_server.tools.transactions.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_transaction_stats")
+        tool = await mcp.get_tool("get_transaction_stats")
         data = await tool.fn()
         assert data["count"] == 0
         assert data["sum_income"] == 0
@@ -232,7 +232,7 @@ async def test_delete_transaction_bool_result(mcp):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
             mock_guard.return_value.check_operation.return_value = (True, None)
 
-            tool = await mcp._tool_manager.get_tool("delete_transaction")
+            tool = await mcp.get_tool("delete_transaction")
             data = await tool.fn(transaction_id="txn_to_delete")
             assert data["deleted"] is True
             assert data["transaction_id"] == "txn_to_delete"
@@ -252,7 +252,7 @@ async def test_update_splits_invalid_json(mcp):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
             mock_guard.return_value.check_operation.return_value = (True, None)
 
-            tool = await mcp._tool_manager.get_tool("update_transaction_splits")
+            tool = await mcp.get_tool("update_transaction_splits")
             with pytest.raises(RuntimeError, match="Expecting value"):
                 await tool.fn(transaction_id="txn_123", splits_data="not valid json")
 
@@ -282,7 +282,7 @@ async def test_search_transactions(mcp):
         "monarch_mcp_server.tools.transactions.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("search_transactions")
+        tool = await mcp.get_tool("search_transactions")
         data = await tool.fn(query="coffee")
         assert len(data) == 1
         assert data[0]["description"] == "Coffee Shop"
@@ -305,7 +305,7 @@ async def test_get_transaction_details(mcp):
         "monarch_mcp_server.tools.transactions.get_monarch_client",
         return_value=mock_client,
     ):
-        tool = await mcp._tool_manager.get_tool("get_transaction_details")
+        tool = await mcp.get_tool("get_transaction_details")
         data = await tool.fn(transaction_id="txn_123")
         assert data["id"] == "txn_123"
         mock_client.get_transaction_details.assert_called_once_with("txn_123")

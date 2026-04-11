@@ -22,7 +22,7 @@ async def test_get_safety_stats_async(mcp):
     with patch("monarch_mcp_server.tools.safety.get_safety_guard") as mock_guard:
         mock_guard.return_value.get_operation_stats.return_value = {"daily_count": 5}
 
-        tool = await mcp._tool_manager.get_tool("get_safety_stats")
+        tool = await mcp.get_tool("get_safety_stats")
         data = await tool.fn()
         assert data["daily_count"] == 5
 
@@ -44,7 +44,7 @@ async def test_get_recent_operations_optimized(mcp, tmp_path):
     log_file.write_text("\n".join(ops) + "\n")
 
     with patch("pathlib.Path.home", return_value=tmp_path):
-        tool = await mcp._tool_manager.get_tool("get_recent_operations")
+        tool = await mcp.get_tool("get_recent_operations")
         data = await tool.fn(limit=1)
         assert data["count"] == 1
         assert data["operations"][0]["operation"] == "update"
@@ -56,7 +56,7 @@ async def test_get_recent_operations_no_log_file(mcp, tmp_path):
     register_tools(mcp)
 
     with patch("pathlib.Path.home", return_value=tmp_path):
-        tool = await mcp._tool_manager.get_tool("get_recent_operations")
+        tool = await mcp.get_tool("get_recent_operations")
         data = await tool.fn(limit=10)
         assert data["operations"] == []
         assert "No operations" in data["message"] or data["count"] == 0
@@ -79,7 +79,7 @@ async def test_get_recent_operations_limit_capped_at_50(mcp, tmp_path):
     log_file.write_text("\n".join(ops) + "\n")
 
     with patch("pathlib.Path.home", return_value=tmp_path):
-        tool = await mcp._tool_manager.get_tool("get_recent_operations")
+        tool = await mcp.get_tool("get_recent_operations")
         # Request 100, should be capped to 50
         data = await tool.fn(limit=100)
         assert data["count"] <= 50
@@ -105,7 +105,7 @@ async def test_get_recent_operations_skips_invalid_json(mcp, tmp_path):
     log_file.write_text(content)
 
     with patch("pathlib.Path.home", return_value=tmp_path):
-        tool = await mcp._tool_manager.get_tool("get_recent_operations")
+        tool = await mcp.get_tool("get_recent_operations")
         data = await tool.fn(limit=10)
         # Should have 2 valid operations, skipping the invalid line
         assert data["count"] == 2
@@ -122,7 +122,7 @@ async def test_get_recent_operations_empty_file(mcp, tmp_path):
     log_file.write_text("")
 
     with patch("pathlib.Path.home", return_value=tmp_path):
-        tool = await mcp._tool_manager.get_tool("get_recent_operations")
+        tool = await mcp.get_tool("get_recent_operations")
         data = await tool.fn(limit=10)
         assert data["count"] == 0
         assert data["operations"] == []
@@ -134,7 +134,7 @@ async def test_get_rollback_suggestions_no_log_file(mcp, tmp_path):
     register_tools(mcp)
 
     with patch("pathlib.Path.home", return_value=tmp_path):
-        tool = await mcp._tool_manager.get_tool("get_rollback_suggestions")
+        tool = await mcp.get_tool("get_rollback_suggestions")
         result = await tool.fn(operation_index=0)
 
         assert "No operations logged" in result
@@ -155,7 +155,7 @@ async def test_get_rollback_suggestions_invalid_index(mcp, tmp_path):
     )
 
     with patch("pathlib.Path.home", return_value=tmp_path):
-        tool = await mcp._tool_manager.get_tool("get_rollback_suggestions")
+        tool = await mcp.get_tool("get_rollback_suggestions")
         result = await tool.fn(operation_index=10)
 
         assert "not found" in result.lower() or "Only" in result
@@ -172,7 +172,7 @@ async def test_get_rollback_suggestions_json_decode_error(mcp, tmp_path):
     log_file.write_text("not valid json\n")
 
     with patch("pathlib.Path.home", return_value=tmp_path):
-        tool = await mcp._tool_manager.get_tool("get_rollback_suggestions")
+        tool = await mcp.get_tool("get_rollback_suggestions")
         result = await tool.fn(operation_index=0)
 
         assert "Failed to parse" in result or "error" in result.lower()
@@ -201,7 +201,7 @@ async def test_get_rollback_suggestions_deleted_id(mcp, tmp_path):
     log_file.write_text(json.dumps(op) + "\n")
 
     with patch("pathlib.Path.home", return_value=tmp_path):
-        tool = await mcp._tool_manager.get_tool("get_rollback_suggestions")
+        tool = await mcp.get_tool("get_rollback_suggestions")
         result = await tool.fn(operation_index=0)
 
         assert "REVERSIBLE" in result
@@ -232,7 +232,7 @@ async def test_get_rollback_suggestions_created_id(mcp, tmp_path):
     log_file.write_text(json.dumps(op) + "\n")
 
     with patch("pathlib.Path.home", return_value=tmp_path):
-        tool = await mcp._tool_manager.get_tool("get_rollback_suggestions")
+        tool = await mcp.get_tool("get_rollback_suggestions")
         result = await tool.fn(operation_index=0)
 
         assert "REVERSIBLE" in result
@@ -264,7 +264,7 @@ async def test_get_rollback_suggestions_modified_id(mcp, tmp_path):
     log_file.write_text(json.dumps(op) + "\n")
 
     with patch("pathlib.Path.home", return_value=tmp_path):
-        tool = await mcp._tool_manager.get_tool("get_rollback_suggestions")
+        tool = await mcp.get_tool("get_rollback_suggestions")
         result = await tool.fn(operation_index=0)
 
         assert "REVERSIBLE" in result
@@ -294,7 +294,7 @@ async def test_get_rollback_suggestions_non_reversible(mcp, tmp_path):
     log_file.write_text(json.dumps(op) + "\n")
 
     with patch("pathlib.Path.home", return_value=tmp_path):
-        tool = await mcp._tool_manager.get_tool("get_rollback_suggestions")
+        tool = await mcp.get_tool("get_rollback_suggestions")
         result = await tool.fn(operation_index=0)
 
         assert "NOT EASILY REVERSIBLE" in result
@@ -311,7 +311,7 @@ async def test_enable_emergency_stop_tool(mcp):
             "Emergency stop enabled"
         )
 
-        tool = await mcp._tool_manager.get_tool("enable_emergency_stop")
+        tool = await mcp.get_tool("enable_emergency_stop")
         result = await tool.fn()
 
         assert "Emergency stop enabled" in result
@@ -328,7 +328,7 @@ async def test_disable_emergency_stop_tool(mcp):
             "Emergency stop disabled"
         )
 
-        tool = await mcp._tool_manager.get_tool("disable_emergency_stop")
+        tool = await mcp.get_tool("disable_emergency_stop")
         result = await tool.fn()
 
         assert "Emergency stop disabled" in result
@@ -358,7 +358,7 @@ async def test_get_rollback_suggestions_deleted_ids(mcp, tmp_path):
     log_file.write_text(json.dumps(op) + "\n")
 
     with patch("pathlib.Path.home", return_value=tmp_path):
-        tool = await mcp._tool_manager.get_tool("get_rollback_suggestions")
+        tool = await mcp.get_tool("get_rollback_suggestions")
         result = await tool.fn(operation_index=0)
 
         assert "REVERSIBLE" in result

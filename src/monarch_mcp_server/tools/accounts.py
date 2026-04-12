@@ -240,7 +240,7 @@ def register_account_tools(mcp: FastMCP) -> None:
         for row in reader:
             # Normalize keys to lowercase for case-insensitive matching
             # (SDK uses "Date", "Amount", "Account Name"; users may use lowercase)
-            norm = {k.lower().strip(): v for k, v in row.items()}
+            norm = {k.lower().strip(): v for k, v in row.items() if k is not None}
 
             date_str = norm.get("date")
             if not date_str:

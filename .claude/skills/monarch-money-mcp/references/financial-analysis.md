@@ -6,27 +6,25 @@ Step-by-step patterns for common financial analysis tasks using Monarch Money MC
 
 **Always start with `get_transaction_stats`** — it returns sum, count, income, expense, and net for any filter combination. Only escalate to `get_transactions` when you need individual transaction rows.
 
-```python
-# Good: Answer "how much did I spend in January?" with one call
-stats = get_transaction_stats(start_date="2026-01-01", end_date="2026-01-31")
-# Returns: {count, sum_income, sum_expense, net, currency, period}
+```
+# Answer "how much did I spend in January?" with one call:
+get_transaction_stats(start_date="2026-01-01", end_date="2026-01-31")
+→ {count, sum_income, sum_expense, net, currency, period}
 
-# Only use get_transactions when you need to LIST individual items
-transactions = get_transactions(start_date="2026-01-01", end_date="2026-01-31", limit=100)
+# Only use get_transactions when you need to LIST individual items:
+get_transactions(start_date="2026-01-01", end_date="2026-01-31", limit=100)
 ```
 
 ## Calculating Balance Changes
 
-Use `get_account_history` to compare balances over time. Do not sum transaction amounts—this misses transfers, adjustments, and sync corrections.
+Use `get_account_history` to compare balances over time. Do not sum transaction amounts — this misses transfers, adjustments, and sync corrections.
 
-```python
-# Get account balance change for a period
-history = get_account_history(account_id="123456")
+```
+# Get account balance change for a period:
+get_account_history(account_id="123456")
+→ entries with "date" and "signedBalance" fields
 
-# Find balances at start and end dates
-start_balance = next(h["signedBalance"] for h in history if h["date"] <= "2026-01-01")
-end_balance = next(h["signedBalance"] for h in history if h["date"] <= "2026-12-31")
-
+# Find balances at start and end dates, compute:
 net_change = end_balance - start_balance
 ```
 
@@ -48,19 +46,12 @@ Savings Rate = Total Savings / Gross Income
 ```
 
 Get retirement contributions efficiently:
-```python
-# Use get_transaction_stats to find total contributions without listing transactions
-stats = get_transaction_stats(
-    start_date="2026-01-01",
-    end_date="2026-12-31",
-    category_id="paychecks_category_id"  # Filter by category if known
-)
-# sum_income will capture contributions if they are categorized as such
 ```
+# Use stats to find total contributions without listing transactions:
+get_transaction_stats(start_date="2026-01-01", end_date="2026-12-31", category_id="<paychecks_category_id>")
 
-If you need precise filtering by account name or keywords, use `search_transactions`:
-```python
-results = search_transactions(query="401k contribution")
+# If you need precise filtering by account name or keywords:
+search_transactions(query="401k contribution")
 ```
 
 ## Calculating Net Worth
@@ -95,4 +86,4 @@ Before performing financial analysis:
 
 1. Check if user has a financial context file documenting account structure
 2. Ask about account relationships if unclear
-3. Use user-provided values over API data when they conflict—users often have better information about manual accounts, external valuations, or adjustments not reflected in Monarch
+3. Use user-provided values over API data when they conflict — users often have better information about manual accounts, external valuations, or adjustments not reflected in Monarch

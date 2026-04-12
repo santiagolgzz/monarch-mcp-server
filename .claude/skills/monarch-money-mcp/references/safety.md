@@ -15,7 +15,7 @@ Operations:
 Example flow:
 ```
 User: "Delete transaction ABC123"
-Claude: ⚠️ About to execute: delete_transaction(transaction_id="ABC123")
+Claude: About to execute: delete_transaction(transaction_id="ABC123")
         [Approve] [Deny]
 ```
 
@@ -29,9 +29,16 @@ Operations:
 - `create_manual_account`
 - `update_account`
 - `set_budget_amount`
-- `create_transaction_category`
+- `add_transaction_tag`
+- `categorize_transaction`
+
+### Tier 2b: Recorded-Only Write Operations
+**No warning, but recorded in audit log.**
+
+Operations:
 - `create_tag`
 - `set_transaction_tags`
+- `create_transaction_category`
 
 ### Tier 3: Read Operations
 **No protection needed.**

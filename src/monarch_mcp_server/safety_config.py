@@ -30,6 +30,7 @@ class SafetyConfig:
             "warn_before_execute": [
                 "create_transaction",
                 "update_transaction",
+                "update_transaction_splits",
                 "create_manual_account",
                 "update_account",
                 "set_budget_amount",

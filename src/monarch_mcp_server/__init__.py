@@ -3,16 +3,9 @@
 An extended MCP server for Monarch Money with 40+ tools covering the complete API.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
-from monarchmoney import MonarchMoneyEndpoints
-
-# PATCH: Monarch Money rebranded from monarchmoney.com to monarch.com
-# The library hasn't been updated yet (as of v0.1.15), so we monkey-patch the BASE_URL
-# See: https://github.com/hammem/monarchmoney/issues/184
-MonarchMoneyEndpoints.BASE_URL = "https://api.monarch.com"
-
-from monarch_mcp_server.exceptions import (  # noqa: E402
+from monarch_mcp_server.exceptions import (
     APIError,
     AuthenticationError,
     EmergencyStopError,
@@ -22,17 +15,17 @@ from monarch_mcp_server.exceptions import (  # noqa: E402
     SessionExpiredError,
     ValidationError,
 )
-from monarch_mcp_server.safety import (  # noqa: E402
+from monarch_mcp_server.safety import (
     SafetyConfig,
     SafetyGuard,
     get_safety_guard,
     require_safety_check,
 )
-from monarch_mcp_server.secure_session import (  # noqa: E402
+from monarch_mcp_server.secure_session import (
     SecureMonarchSession,
     secure_session,
 )
-from monarch_mcp_server.utils import (  # noqa: E402
+from monarch_mcp_server.utils import (
     format_error,
     format_result,
     get_config_dir,

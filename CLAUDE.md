@@ -81,9 +81,9 @@ Note: `MONARCH_TOKEN` is checked inside `secure_session.load_token()`, which is 
 
 Destructive operations (delete_*, upload_balance_history) require approval. Write operations (create_*, update_*, set_*) trigger warnings. Emergency stop blocks all writes.
 
-### Monkey-Patch in `__init__.py`
+### SDK: `monarchmoneycommunity`
 
-The package patches `MonarchMoneyEndpoints.BASE_URL` to `https://api.monarch.com` because the upstream `monarchmoney` library still points to the old domain. This runs at import time.
+The project uses `monarchmoneycommunity` (a community-maintained fork of the original `monarchmoney` SDK). Same Python import path (`from monarchmoney import ...`). The community fork has the correct API domain natively — no monkey-patching needed.
 
 ### OAuth State Management (`oauth_state.py`)
 

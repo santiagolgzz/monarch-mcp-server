@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.2.0] - 2026-04-12
+
+### Changed
+- **SDK**: Switched from `monarchmoney` (stale) to `monarchmoneycommunity` (actively maintained community fork). Same import path, no monkey-patch needed.
+- **Dependencies**: Pinned all dependency versions for reproducible builds.
+- **`upload_account_balance_history`**: Now parses CSV text into structured `BalanceHistoryRow` objects as required by the community SDK.
+- **`create_transaction_category`**: Added optional `icon`, `rollover_enabled`, `rollover_type` parameters.
+- **`get_transaction_tags`**: Hardened response key handling to support `transactionTags`, `householdTransactionTags`, and `tags` keys.
+
+### Added
+- **`add_transaction_tag`** tool: Appends a tag to a transaction while preserving existing tags.
+- **`categorize_transaction`** tool: Dedicated tool for assigning a category to a transaction.
+- **WSL keyring fallback**: Smart backend detection (`_keyring_available()`) with file-based token storage (`~/.mm/token`, 0o600 permissions) when system keyring is unavailable.
+- **Auth priority fix**: `MONARCH_TOKEN` env var now correctly overrides stale native sessions in `get_authenticated_client()`.
+- **`delete_token()` guard**: Skips destructive token cleanup when `MONARCH_TOKEN` env var is set (env tokens are ephemeral).
+- Safety config: `add_transaction_tag` and `categorize_transaction` added to `warn_before_execute`.
+- Rollback metadata for both new operations in `SafetyGuard`.
+
 ## [Unreleased]
 
 ### Changed

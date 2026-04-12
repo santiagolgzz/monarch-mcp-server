@@ -230,6 +230,26 @@ class SafetyGuard:
                     "creation_params": params,
                 }
             )
+        elif operation_name == "add_transaction_tag":
+            rollback.update(
+                {
+                    "reversible": True,
+                    "reverse_operation": "set_transaction_tags",
+                    "notes": "To undo: remove the tag_id from the transaction's tag list",
+                    "modified_id": params.get("transaction_id"),
+                    "added_tag_id": params.get("tag_id"),
+                }
+            )
+        elif operation_name == "categorize_transaction":
+            rollback.update(
+                {
+                    "reversible": True,
+                    "reverse_operation": "categorize_transaction",
+                    "notes": "To undo: get original category from transaction history",
+                    "modified_id": params.get("transaction_id"),
+                    "new_category_id": params.get("category_id"),
+                }
+            )
 
         return rollback
 

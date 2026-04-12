@@ -130,3 +130,106 @@ async def test_set_transaction_tags_multiple_with_whitespace(mcp):
             mock_client.set_transaction_tags.assert_called_once_with(
                 "txn_456", ["tag_1", "tag_2", "tag_3"]
             )
+
+
+@pytest.mark.asyncio
+async def test_add_transaction_tag_appends(mcp):
+    """Verify add_transaction_tag appends new tag to existing tags."""
+    register_tools(mcp)
+
+    mock_client = AsyncMock()
+    mock_client.get_transaction_details.return_value = {
+        "getTransaction": {
+            "tags": [{"id": "tag1"}],
+        }
+    }
+    mock_client.set_transaction_tags.return_value = {"success": True}
+
+    with patch(
+        "monarch_mcp_server.tools.tags.get_monarch_client", return_value=mock_client
+    ):
+        with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
+            mock_guard.return_value.check_operation.return_value = (True, None)
+
+            tool = await mcp.get_tool("add_transaction_tag")
+            data = await tool.fn(transaction_id="txn_123", tag_id="tag2")
+            assert data["success"] is True
+            # Verify set_transaction_tags called with both tags
+            mock_client.set_transaction_tags.assert_called_once_with(
+                transaction_id="txn_123", tag_ids=["tag1", "tag2"]
+            )
+
+
+@pytest.mark.asyncio
+async def test_add_transaction_tag_no_duplicate(mcp):
+    """Verify add_transaction_tag does not duplicate existing tags."""
+    register_tools(mcp)
+
+    mock_client = AsyncMock()
+    mock_client.get_transaction_details.return_value = {
+        "getTransaction": {
+            "tags": [{"id": "tag1"}, {"id": "tag2"}],
+        }
+    }
+    mock_client.set_transaction_tags.return_value = {"success": True}
+
+    with patch(
+        "monarch_mcp_server.tools.tags.get_monarch_client", return_value=mock_client
+    ):
+        with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
+            mock_guard.return_value.check_operation.return_value = (True, None)
+
+            tool = await mcp.get_tool("add_transaction_tag")
+            # Try to add tag1 again (already exists)
+            data = await tool.fn(transaction_id="txn_123", tag_id="tag1")
+            assert data["success"] is True
+            # Verify set_transaction_tags called with original tags only (no duplicate)
+            mock_client.set_transaction_tags.assert_called_once_with(
+                transaction_id="txn_123", tag_ids=["tag1", "tag2"]
+            )
+
+
+@pytest.mark.asyncio
+async def test_add_transaction_tag_empty_tags(mcp):
+    """Verify add_transaction_tag handles transaction with no existing tags."""
+    register_tools(mcp)
+
+    mock_client = AsyncMock()
+    mock_client.get_transaction_details.return_value = {
+        "getTransaction": {
+            "tags": [],
+        }
+    }
+    mock_client.set_transaction_tags.return_value = {"success": True}
+
+    with patch(
+        "monarch_mcp_server.tools.tags.get_monarch_client", return_value=mock_client
+    ):
+        with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
+            mock_guard.return_value.check_operation.return_value = (True, None)
+
+            tool = await mcp.get_tool("add_transaction_tag")
+            data = await tool.fn(transaction_id="txn_123", tag_id="tag1")
+            assert data["success"] is True
+            # Verify set_transaction_tags called with new tag
+            mock_client.set_transaction_tags.assert_called_once_with(
+                transaction_id="txn_123", tag_ids=["tag1"]
+            )
+
+
+@pytest.mark.asyncio
+async def test_add_transaction_tag_validates_empty_id(mcp):
+    """Verify add_transaction_tag raises error for empty transaction_id."""
+    register_tools(mcp)
+
+    mock_client = AsyncMock()
+
+    with patch(
+        "monarch_mcp_server.tools.tags.get_monarch_client", return_value=mock_client
+    ):
+        with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
+            mock_guard.return_value.check_operation.return_value = (True, None)
+
+            tool = await mcp.get_tool("add_transaction_tag")
+            with pytest.raises(RuntimeError, match="transaction_id cannot be empty"):
+                await tool.fn(transaction_id="", tag_id="tag1")

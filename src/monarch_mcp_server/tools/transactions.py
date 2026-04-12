@@ -354,6 +354,18 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         )
 
     @mcp.tool()
+    @require_safety_check("categorize_transaction")
+    @tool_handler("categorize_transaction")
+    async def categorize_transaction(transaction_id: str, category_id: str) -> dict:
+        """Assign a category to a transaction."""
+        validate_non_empty_string(transaction_id, "transaction_id")
+        validate_non_empty_string(category_id, "category_id")
+        client = await get_monarch_client()
+        return await client.update_transaction(
+            transaction_id=transaction_id, category_id=category_id
+        )
+
+    @mcp.tool()
     @require_safety_check("delete_transaction")
     @tool_handler("delete_transaction")
     async def delete_transaction(transaction_id: str) -> dict:

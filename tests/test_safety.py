@@ -57,6 +57,22 @@ class TestSafetyConfig:
             assert config.should_warn("update_transaction") is True
             assert config.should_warn("get_accounts") is False
 
+    def test_add_transaction_tag_in_warn_list(self):
+        """Test that add_transaction_tag is in warn_before_execute list."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = str(Path(tmpdir) / "test_config.json")
+            config = SafetyConfig(config_path=config_path)
+
+            assert config.should_warn("add_transaction_tag") is True
+
+    def test_categorize_transaction_in_warn_list(self):
+        """Test that categorize_transaction is in warn_before_execute list."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = str(Path(tmpdir) / "test_config.json")
+            config = SafetyConfig(config_path=config_path)
+
+            assert config.should_warn("categorize_transaction") is True
+
     def test_save_and_load_config(self):
         """Test saving and loading configuration."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -340,6 +356,30 @@ class TestGenerateRollbackInfo:
         rollback = temp_guard._generate_rollback_info("unknown_operation", params, None)
 
         assert rollback["reversible"] is False
+
+    def test_rollback_info_add_transaction_tag(self, temp_guard):
+        """Test rollback info for add_transaction_tag."""
+        params = {"transaction_id": "txn1", "tag_id": "tag1"}
+        rollback = temp_guard._generate_rollback_info(
+            "add_transaction_tag", params, None
+        )
+
+        assert rollback["reversible"] is True
+        assert rollback["added_tag_id"] == "tag1"
+        assert rollback["modified_id"] == "txn1"
+        assert rollback["reverse_operation"] == "set_transaction_tags"
+
+    def test_rollback_info_categorize_transaction(self, temp_guard):
+        """Test rollback info for categorize_transaction."""
+        params = {"transaction_id": "txn1", "category_id": "cat1"}
+        rollback = temp_guard._generate_rollback_info(
+            "categorize_transaction", params, None
+        )
+
+        assert rollback["reversible"] is True
+        assert rollback["new_category_id"] == "cat1"
+        assert rollback["modified_id"] == "txn1"
+        assert rollback["reverse_operation"] == "categorize_transaction"
 
 
 class TestDestructiveOperationBehavior:

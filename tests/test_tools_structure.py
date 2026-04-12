@@ -14,6 +14,8 @@ INTENTIONALLY_UNWRAPPED = {
     "interactive_login",  # Auth handled at server startup
     "multi_factor_authenticate",  # Auth handled at server startup
     "gql_call",  # Raw GraphQL — unsafe for LLM use
+    "get_credit_history",  # Added in monarchmoneycommunity — not yet exposed
+    "upload_attachment",  # Added in monarchmoneycommunity — not yet exposed
 }
 
 MINIMUM_COVERAGE = 0.95

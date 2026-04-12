@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "monarch-mcp-server-extended"
-version = "1.1.0"
+version = "1.2.0"
 description = "Extended Model Context Protocol (MCP) server for Monarch Money with 40+ tools covering the complete API"
 readme = "README.md"
 license = { text = "MIT" }
@@ -28,31 +28,32 @@ classifiers = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "mcp[cli]>=1.0.0",
-    "monarchmoney>=0.1.15",
-    "gql>=3.4,<4.0",
-    "keyring>=24.0.0",
-    "python-dotenv>=1.0.0",
-    "pydantic>=2.10.0",  # 2.10+ required for Python 3.14 support
+    "mcp[cli]==1.26.0",
+    "monarchmoneycommunity==1.3.0",
+    "gql==3.5.3",
+    "keyring==25.6.0",
+    "python-dotenv==1.1.1",
+    "pydantic==2.12.5",
     "authlib==1.6.9",
     "cryptography==46.0.7",
     "aiohttp==3.13.5",
     "jaraco-context==6.1.2",
     # HTTP server dependencies for remote hosting
-    "starlette>=0.37.0",
-    "uvicorn[standard]>=0.29.0",
+    "starlette==0.47.3",
+    "uvicorn[standard]==0.35.0",
     "fastmcp==3.2.0",
-    "redis>=5.0.0",
+    "redis==7.1.0",
+    "sse-starlette==3.0.2",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.0.0",
-    "ruff>=0.9.0",
-    "ty>=0.0.1a6",
-    "pre-commit>=3.0.0",
+    "pytest==8.4.2",
+    "pytest-asyncio==1.1.0",
+    "pytest-cov==7.0.0",
+    "ruff==0.15.0",
+    "ty==0.0.14",
+    "pre-commit==4.3.0",
 ]
 
 [project.urls]

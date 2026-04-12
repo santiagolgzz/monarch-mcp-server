@@ -218,3 +218,101 @@ async def test_delete_categories_mixed_results(mcp):
             assert data["results"][0]["category_id"] == "cat_1"
             assert data["results"][1]["deleted"] is False
             assert data["results"][1]["error"] is not None
+
+
+@pytest.mark.asyncio
+async def test_create_category_with_all_optional_params(mcp):
+    """Verify create_transaction_category passes all optional params to SDK."""
+    register_tools(mcp)
+
+    mock_client = AsyncMock()
+    mock_client.create_transaction_category.return_value = {
+        "id": "cat_pizza",
+        "name": "Pizza",
+        "icon": "🍕",
+        "rollover_enabled": True,
+        "rollover_type": "monthly",
+    }
+
+    with patch(
+        "monarch_mcp_server.tools.categories.get_monarch_client",
+        return_value=mock_client,
+    ):
+        with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
+            mock_guard.return_value.check_operation.return_value = (True, None)
+
+            tool = await mcp.get_tool("create_transaction_category")
+            data = await tool.fn(
+                name="Pizza",
+                group_id="grp_food",
+                icon="🍕",
+                rollover_enabled=True,
+                rollover_type="monthly",
+            )
+            assert data["id"] == "cat_pizza"
+            assert data["icon"] == "🍕"
+            # Verify SDK called with all kwargs
+            mock_client.create_transaction_category.assert_called_once_with(
+                group_id="grp_food",
+                transaction_category_name="Pizza",
+                icon="🍕",
+                rollover_enabled=True,
+                rollover_type="monthly",
+            )
+
+
+@pytest.mark.asyncio
+async def test_create_category_with_partial_params(mcp):
+    """Verify create_transaction_category only passes non-None optional params."""
+    register_tools(mcp)
+
+    mock_client = AsyncMock()
+    mock_client.create_transaction_category.return_value = {
+        "id": "cat_coffee",
+        "name": "Coffee",
+        "icon": "☕",
+    }
+
+    with patch(
+        "monarch_mcp_server.tools.categories.get_monarch_client",
+        return_value=mock_client,
+    ):
+        with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
+            mock_guard.return_value.check_operation.return_value = (True, None)
+
+            tool = await mcp.get_tool("create_transaction_category")
+            # Only pass icon, not rollover params
+            data = await tool.fn(name="Coffee", group_id="grp_food", icon="☕")
+            assert data["id"] == "cat_coffee"
+            # Verify SDK called with only icon (not rollover params)
+            mock_client.create_transaction_category.assert_called_once_with(
+                group_id="grp_food", transaction_category_name="Coffee", icon="☕"
+            )
+
+
+@pytest.mark.asyncio
+async def test_create_category_required_only(mcp):
+    """Verify create_transaction_category works with only required params."""
+    register_tools(mcp)
+
+    mock_client = AsyncMock()
+    mock_client.create_transaction_category.return_value = {
+        "id": "cat_misc",
+        "name": "Miscellaneous",
+    }
+
+    with patch(
+        "monarch_mcp_server.tools.categories.get_monarch_client",
+        return_value=mock_client,
+    ):
+        with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
+            mock_guard.return_value.check_operation.return_value = (True, None)
+
+            tool = await mcp.get_tool("create_transaction_category")
+            # Only pass required params
+            data = await tool.fn(name="Miscellaneous", group_id="grp_other")
+            assert data["id"] == "cat_misc"
+            # Verify SDK called with only required params (no optional ones)
+            mock_client.create_transaction_category.assert_called_once_with(
+                group_id="grp_other", transaction_category_name="Miscellaneous"
+            )

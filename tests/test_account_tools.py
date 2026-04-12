@@ -275,10 +275,32 @@ async def test_upload_account_balance_history(mcp):
             mock_guard.return_value.check_operation.return_value = (True, None)
 
             tool = await mcp.get_tool("upload_account_balance_history")
-            csv_data = "date,balance\n2024-01-01,1000\n2024-01-02,1050"
+            csv_data = "date,amount\n2024-01-01,1000\n2024-01-02,1050"
             data = await tool.fn(account_id="acc_123", csv_data=csv_data)
             assert data["uploaded"] is True
             assert data["account_id"] == "acc_123"
+            assert data["rows"] == 2
+
+
+@pytest.mark.asyncio
+async def test_upload_account_balance_history_balance_column(mcp):
+    """Verify upload_account_balance_history accepts 'balance' as column name."""
+    register_tools(mcp)
+
+    mock_client = AsyncMock()
+    mock_client.upload_account_balance_history.return_value = None
+
+    with patch(
+        "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
+    ):
+        with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
+            mock_guard.return_value.check_operation.return_value = (True, None)
+
+            tool = await mcp.get_tool("upload_account_balance_history")
+            csv_data = "date,balance\n2024-01-01,1000\n2024-01-02,1050"
+            data = await tool.fn(account_id="acc_123", csv_data=csv_data)
+            assert data["uploaded"] is True
+            assert data["rows"] == 2
 
 
 @pytest.mark.asyncio

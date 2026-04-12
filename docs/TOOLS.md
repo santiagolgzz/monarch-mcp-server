@@ -248,6 +248,19 @@ Delete a transaction.
 
 ---
 
+### categorize_transaction
+Assign a category to a transaction.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `transaction_id` | string | Yes | The transaction ID |
+| `category_id` | string | Yes | The category ID to assign |
+
+**Returns:** Updated transaction data
+
+---
+
 ## Categories & Tags
 
 ### get_transaction_categories
@@ -272,6 +285,9 @@ Create a new category.
 |------|------|----------|-------------|
 | `name` | string | Yes | Category name |
 | `group_id` | string | Yes | Parent group ID |
+| `icon` | string | No | Emoji icon for the category |
+| `rollover_enabled` | boolean | No | Whether budget rollover is enabled |
+| `rollover_type` | string | No | Rollover type (e.g. "monthly") |
 
 ---
 
@@ -325,6 +341,19 @@ Assign tags to a transaction.
 |------|------|----------|-------------|
 | `transaction_id` | string | Yes | The transaction ID |
 | `tag_ids` | string | Yes | Comma-separated tag IDs |
+
+---
+
+### add_transaction_tag
+Add a tag to a transaction, preserving any existing tags.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `transaction_id` | string | Yes | The transaction ID |
+| `tag_id` | string | Yes | The tag ID to add |
+
+**Returns:** Result from set_transaction_tags
 
 ---
 

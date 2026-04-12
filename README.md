@@ -2,7 +2,7 @@
 
 A comprehensive [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for [Monarch Money](https://www.monarchmoney.com/) personal finance. **40+ tools** covering the complete Monarch Money API — works out of the box with Claude Desktop, Claude mobile, or any MCP client.
 
-Built on the [MonarchMoney Python library](https://github.com/hammem/monarchmoney) by [@hammem](https://github.com/hammem).
+Built on the [MonarchMoney Community Python library](https://github.com/bradleyseanf/monarchmoneycommunity), a community-maintained fork of the original by [@hammem](https://github.com/hammem).
 
 ## ✨ Features
 
@@ -239,4 +239,5 @@ MIT License
 ## 🙏 Acknowledgments
 
 - **[@robcerda](https://github.com/robcerda)** — Original MCP server implementation that this project builds upon
-- **[@hammem](https://github.com/hammem)** — [MonarchMoney Python library](https://github.com/hammem/monarchmoney) providing the robust API foundation with MFA support and session management
+- **[@hammem](https://github.com/hammem)** — Original [MonarchMoney Python library](https://github.com/hammem/monarchmoney)
+- **[@bradleyseanf](https://github.com/bradleyseanf)** — [MonarchMoney Community fork](https://github.com/bradleyseanf/monarchmoneycommunity) providing the actively maintained SDK with MFA/SSO support

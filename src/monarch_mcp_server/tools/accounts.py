@@ -4,10 +4,14 @@ Account management tools for Monarch Money.
 Tools for viewing and managing financial accounts.
 """
 
+import csv
+import io
 import logging
+from datetime import datetime
 from typing import Any
 
 from fastmcp import FastMCP
+from monarchmoney.monarchmoney import BalanceHistoryRow
 
 from monarch_mcp_server.client import get_monarch_client
 from monarch_mcp_server.exceptions import ValidationError
@@ -226,8 +230,41 @@ def register_account_tools(mcp: FastMCP) -> None:
     @require_safety_check("upload_account_balance_history")
     @tool_handler("upload_account_balance_history")
     async def upload_account_balance_history(account_id: str, csv_data: str) -> dict:
-        """Upload account balance history from CSV data."""
+        """Upload account balance history from CSV data.
+
+        csv_data should be CSV text with columns: date, amount
+        (and optional account_name). Dates should be in YYYY-MM-DD format.
+        """
+        rows: list[BalanceHistoryRow] = []
+        reader = csv.DictReader(io.StringIO(csv_data))
+        for row in reader:
+            # Normalize keys to lowercase for case-insensitive matching
+            # (SDK uses "Date", "Amount", "Account Name"; users may use lowercase)
+            norm = {k.lower().strip(): v for k, v in row.items() if k is not None}
+
+            date_str = norm.get("date")
+            if not date_str:
+                raise ValidationError("CSV must have a 'date' column")
+
+            amount_str = norm.get("amount") or norm.get("balance")
+            if amount_str is None:
+                raise ValidationError("CSV must have an 'amount' or 'balance' column")
+
+            try:
+                rows.append(
+                    BalanceHistoryRow(
+                        date=datetime.strptime(date_str.strip(), "%Y-%m-%d"),
+                        amount=float(amount_str),
+                        account_name=norm.get("account_name")
+                        or norm.get("account name"),
+                    )
+                )
+            except ValueError as e:
+                raise ValidationError(f"Invalid data in CSV row: {e}")
+
+        if not rows:
+            raise ValidationError("csv_data contains no valid rows")
+
         client = await get_monarch_client()
-        await client.upload_account_balance_history(account_id, csv_data)
-        # SDK returns None on success
-        return {"uploaded": True, "account_id": account_id}
+        await client.upload_account_balance_history(account_id, rows)
+        return {"uploaded": True, "account_id": account_id, "rows": len(rows)}

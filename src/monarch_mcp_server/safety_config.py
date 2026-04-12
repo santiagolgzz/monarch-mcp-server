@@ -33,6 +33,8 @@ class SafetyConfig:
                 "create_manual_account",
                 "update_account",
                 "set_budget_amount",
+                "add_transaction_tag",
+                "categorize_transaction",
             ],
             "emergency_stop": False,
             "enabled": True,

@@ -74,9 +74,20 @@ def mock_monarch_client():
 
 @pytest.fixture
 def mock_keyring():
-    """Mock keyring module."""
-    with patch("monarch_mcp_server.secure_session.keyring") as mock:
-        mock.get_password.return_value = "test_token"
+    """Mock keyring module and enable keyring in SecureMonarchSession."""
+    with (
+        patch(
+            "monarch_mcp_server.secure_session._keyring_available", return_value=True
+        ),
+        patch("keyring.get_password", return_value="test_token") as mock_get,
+        patch("keyring.set_password") as mock_set,
+        patch("keyring.delete_password") as mock_delete,
+    ):
+        # Bundle into a mock namespace for test access
+        mock = MagicMock()
+        mock.get_password = mock_get
+        mock.set_password = mock_set
+        mock.delete_password = mock_delete
         yield mock
 
 

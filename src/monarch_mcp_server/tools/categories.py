@@ -5,6 +5,7 @@ Tools for viewing and managing transaction categories and groups.
 """
 
 import logging
+from typing import Any
 
 from fastmcp import FastMCP
 
@@ -51,7 +52,13 @@ def register_category_tools(mcp: FastMCP) -> None:
         client = await get_monarch_client()
         tags = await client.get_transaction_tags()
         tag_list = []
-        for tag in tags.get("transactionTags", []):
+        raw_tags = (
+            tags.get("transactionTags")
+            or tags.get("householdTransactionTags")
+            or tags.get("tags")
+            or []
+        )
+        for tag in raw_tags:
             tag_info = {
                 "id": tag.get("id"),
                 "name": tag.get("name"),
@@ -63,13 +70,27 @@ def register_category_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     @require_safety_check("create_transaction_category")
     @tool_handler("create_transaction_category")
-    async def create_transaction_category(name: str, group_id: str) -> dict:
+    async def create_transaction_category(
+        name: str,
+        group_id: str,
+        icon: str | None = None,
+        rollover_enabled: bool | None = None,
+        rollover_type: str | None = None,
+    ) -> dict:
         """Create a new transaction category."""
         validate_non_empty_string(group_id, "group_id")
         client = await get_monarch_client()
-        return await client.create_transaction_category(
-            group_id=group_id, transaction_category_name=name
-        )
+        kwargs: dict[str, Any] = {
+            "group_id": group_id,
+            "transaction_category_name": name,
+        }
+        if icon is not None:
+            kwargs["icon"] = icon
+        if rollover_enabled is not None:
+            kwargs["rollover_enabled"] = rollover_enabled
+        if rollover_type is not None:
+            kwargs["rollover_type"] = rollover_type
+        return await client.create_transaction_category(**kwargs)
 
     @mcp.tool()
     @require_safety_check("delete_transaction_category")

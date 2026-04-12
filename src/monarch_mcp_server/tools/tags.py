@@ -38,3 +38,20 @@ def register_tag_tools(mcp: FastMCP) -> None:
         client = await get_monarch_client()
         ids_list = [id.strip() for id in tag_ids.split(",")]
         return await client.set_transaction_tags(transaction_id, ids_list)
+
+    @mcp.tool()
+    @require_safety_check("add_transaction_tag")
+    @tool_handler("add_transaction_tag")
+    async def add_transaction_tag(transaction_id: str, tag_id: str) -> dict:
+        """Add a tag to a transaction, preserving any existing tags."""
+        validate_non_empty_string(transaction_id, "transaction_id")
+        validate_non_empty_string(tag_id, "tag_id")
+        client = await get_monarch_client()
+        details = await client.get_transaction_details(transaction_id)
+        txn = details.get("getTransaction") or {}
+        existing = [t.get("id") for t in (txn.get("tags") or []) if t.get("id")]
+        if tag_id not in existing:
+            existing.append(tag_id)
+        return await client.set_transaction_tags(
+            transaction_id=transaction_id, tag_ids=existing
+        )

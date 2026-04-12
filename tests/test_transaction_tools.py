@@ -309,3 +309,50 @@ async def test_get_transaction_details(mcp):
         data = await tool.fn(transaction_id="txn_123")
         assert data["id"] == "txn_123"
         mock_client.get_transaction_details.assert_called_once_with("txn_123")
+
+
+@pytest.mark.asyncio
+async def test_categorize_transaction_success(mcp):
+    """Verify categorize_transaction assigns category to transaction."""
+    register_tools(mcp)
+
+    mock_client = AsyncMock()
+    mock_client.update_transaction.return_value = {
+        "id": "txn_123",
+        "category": {"id": "cat_456", "name": "Groceries"},
+    }
+
+    with patch(
+        "monarch_mcp_server.tools.transactions.get_monarch_client",
+        return_value=mock_client,
+    ):
+        with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
+            mock_guard.return_value.check_operation.return_value = (True, None)
+
+            tool = await mcp.get_tool("categorize_transaction")
+            data = await tool.fn(transaction_id="txn_123", category_id="cat_456")
+            assert data["id"] == "txn_123"
+            assert data["category"]["name"] == "Groceries"
+            # Verify SDK called with correct args
+            mock_client.update_transaction.assert_called_once_with(
+                transaction_id="txn_123", category_id="cat_456"
+            )
+
+
+@pytest.mark.asyncio
+async def test_categorize_transaction_validates_empty_transaction_id(mcp):
+    """Verify categorize_transaction raises error for empty transaction_id."""
+    register_tools(mcp)
+
+    mock_client = AsyncMock()
+
+    with patch(
+        "monarch_mcp_server.tools.transactions.get_monarch_client",
+        return_value=mock_client,
+    ):
+        with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
+            mock_guard.return_value.check_operation.return_value = (True, None)
+
+            tool = await mcp.get_tool("categorize_transaction")
+            with pytest.raises(RuntimeError, match="transaction_id cannot be empty"):
+                await tool.fn(transaction_id="", category_id="cat_456")

@@ -7,7 +7,6 @@ fallback for environments without a keyring backend (e.g. WSL, headless Linux).
 
 import logging
 import os
-import stat
 from pathlib import Path
 
 from monarchmoney import MonarchMoney
@@ -36,8 +35,10 @@ def _keyring_available() -> bool:
         backend = keyring.get_keyring()
         backend_name = type(backend).__name__
 
-        # These backends indicate no real keyring is available
-        if backend_name in ("Keyring", "NullKeyring", "FailKeyring", "ChainerBackend"):
+        # These backends indicate no real keyring is available.
+        # Note: "Keyring" is NOT in this list — macOS uses
+        # keyring.backends.macOS.Keyring which is a real backend.
+        if backend_name in ("NullKeyring", "FailKeyring", "ChainerBackend"):
             # ChainerBackend may wrap a real backend — try a round-trip test
             if backend_name == "ChainerBackend":
                 try:
@@ -75,10 +76,15 @@ class SecureMonarchSession:
     # -- file-based helpers --------------------------------------------------
 
     def _save_token_file(self, token: str) -> None:
-        """Save token to file with owner-only permissions (0o600)."""
+        """Save token to file with owner-only permissions (0o600).
+
+        Uses os.open to create the file with restricted permissions atomically,
+        avoiding a window where the file is world-readable.
+        """
         _TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
-        _TOKEN_FILE.write_text(token)
-        _TOKEN_FILE.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 600
+        fd = os.open(_TOKEN_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(token)
         logger.info(f"Token saved to {_TOKEN_FILE}")
 
     def _load_token_file(self) -> str | None:

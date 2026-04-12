@@ -238,17 +238,30 @@ def register_account_tools(mcp: FastMCP) -> None:
         rows: list[BalanceHistoryRow] = []
         reader = csv.DictReader(io.StringIO(csv_data))
         for row in reader:
-            # Accept "amount" or "balance" as the value column
-            amount_str = row.get("amount") or row.get("balance")
+            # Normalize keys to lowercase for case-insensitive matching
+            # (SDK uses "Date", "Amount", "Account Name"; users may use lowercase)
+            norm = {k.lower().strip(): v for k, v in row.items()}
+
+            date_str = norm.get("date")
+            if not date_str:
+                raise ValidationError("CSV must have a 'date' column")
+
+            amount_str = norm.get("amount") or norm.get("balance")
             if amount_str is None:
                 raise ValidationError("CSV must have an 'amount' or 'balance' column")
-            rows.append(
-                BalanceHistoryRow(
-                    date=datetime.strptime(row["date"], "%Y-%m-%d"),
-                    amount=float(amount_str),
-                    account_name=row.get("account_name"),
+
+            try:
+                rows.append(
+                    BalanceHistoryRow(
+                        date=datetime.strptime(date_str.strip(), "%Y-%m-%d"),
+                        amount=float(amount_str),
+                        account_name=norm.get("account_name")
+                        or norm.get("account name"),
+                    )
                 )
-            )
+            except ValueError as e:
+                raise ValidationError(f"Invalid data in CSV row: {e}")
+
         if not rows:
             raise ValidationError("csv_data contains no valid rows")
 

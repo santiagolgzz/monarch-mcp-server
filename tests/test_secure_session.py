@@ -36,6 +36,13 @@ class TestKeyringAvailable:
         with patch("keyring.get_keyring", return_value=mock_backend):
             assert _keyring_available() is True
 
+    def test_returns_true_for_macos_keyring(self):
+        """macOS uses keyring.backends.macOS.Keyring — must not be rejected."""
+        mock_backend = MagicMock()
+        type(mock_backend).__name__ = "Keyring"
+        with patch("keyring.get_keyring", return_value=mock_backend):
+            assert _keyring_available() is True
+
     def test_probes_chainer_backend_success(self):
         mock_backend = MagicMock()
         type(mock_backend).__name__ = "ChainerBackend"

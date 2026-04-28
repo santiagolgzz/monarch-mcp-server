@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -e
+
+if command -v gitleaks >/dev/null 2>&1; then
+    GITLEAKS=gitleaks
+elif [ -x "$HOME/.local/bin/gitleaks" ]; then
+    GITLEAKS="$HOME/.local/bin/gitleaks"
+else
+    echo "gitleaks not found. Install from https://github.com/gitleaks/gitleaks/releases"
+    echo "or skip this commit with: git commit --no-verify"
+    exit 1
+fi
+
+"$GITLEAKS" git --staged --redact --no-banner

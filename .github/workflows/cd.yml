@@ -45,7 +45,7 @@ jobs:
             --set-env-vars "GITHUB_CLIENT_ID=${{ vars.OAUTH_CLIENT_ID }}" \
             --set-env-vars "MCP_ENABLE_CI_SMOKE=true" \
             --set-env-vars "BASE_URL=${{ vars.CLOUD_RUN_URL }}" \
-            --set-secrets "MCP_AUTH_TOKEN=mcp-auth-token:latest,GITHUB_CLIENT_SECRET=oauth-client-secret:latest,MCP_CI_SMOKE_TOKEN=mcp-ci-smoke-token:latest,MONARCH_EMAIL=monarch-email:latest,MONARCH_PASSWORD=monarch-password:latest,MONARCH_MFA_SECRET=monarch-mfa-secret:latest"
+            --set-secrets "MCP_OAUTH_REDIS_URL=mcp-oauth-redis-url:latest,MCP_OAUTH_JWT_SIGNING_KEY=mcp-oauth-jwt-signing-key:latest,MCP_AUTH_TOKEN=mcp-auth-token:latest,GITHUB_CLIENT_SECRET=oauth-client-secret:latest,MCP_CI_SMOKE_TOKEN=mcp-ci-smoke-token:latest,MONARCH_EMAIL=monarch-email:latest,MONARCH_PASSWORD=monarch-password:latest,MONARCH_MFA_SECRET=monarch-mfa-secret:latest"
 
       - name: Verify Deployment
         run: |

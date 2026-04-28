@@ -8,6 +8,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
+import redis.asyncio as aioredis
 from key_value.aio.stores.redis import RedisStore
 from key_value.aio.wrappers.encryption import FernetEncryptionWrapper
 
@@ -44,7 +45,12 @@ class OAuthStateManager:
         if self.storage is not None and self._storage_key == cache_key:
             return self.storage
 
-        redis_store = RedisStore(url=redis_url)
+        # Build the client ourselves: py-key-value-aio 0.4.4's RedisStore(url=...)
+        # ignores the rediss:// scheme and connects without TLS, which Upstash
+        # rejects. RedisStore expects decode_responses=True so its str check
+        # in _get_managed_entry passes.
+        redis_client = aioredis.Redis.from_url(redis_url, decode_responses=True)
+        redis_store = RedisStore(client=redis_client)
         self.storage = FernetEncryptionWrapper(
             key_value=redis_store,
             source_material=signing_key,

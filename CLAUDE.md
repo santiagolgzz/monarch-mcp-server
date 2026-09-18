@@ -20,15 +20,23 @@ uv run pytest tests/test_safety.py -v
 uv run pytest tests/test_transaction_tools.py::test_name -v
 
 # Lint + format check
-uv run ruff check src/ tests/
-uv run ruff format --check src/ tests/
+uv run ruff check src/ tests/ scripts/
+uv run ruff format --check src/ tests/ scripts/
 
 # Auto-fix lint issues
-uv run ruff check --fix src/ tests/
-uv run ruff format src/ tests/
+uv run ruff check --fix src/ tests/ scripts/
+uv run ruff format src/ tests/ scripts/
 
 # Type check (uses ty, not mypy)
 uv run ty check src/
+
+# SDK coverage report / ratchet (see "SDK Coverage Ratchet" below)
+uv run python scripts/sdk_coverage.py
+uv run python scripts/sdk_coverage.py --check
+uv run python scripts/sdk_coverage.py --update-baseline
+
+# Enable the local git hooks (secret scan + coverage ratchet)
+git config core.hooksPath .githooks
 
 # Run stdio server locally
 uv run monarch-mcp-server
@@ -97,6 +105,22 @@ All runtime data lives under `~/.mm/` (via `paths.py`): session files, safety co
 
 - **CI** (`ci.yml`): Tests on Python 3.11-3.14, lint with ruff, type-check with ty. All use `uv`.
 - **CD** (`cd.yml`): On push to main, builds Docker image, deploys to Cloud Run, runs health/readiness checks, then a full MCP smoke test (initialize -> tools/list -> tools/call).
+
+## SDK Coverage Ratchet
+
+`scripts/sdk_coverage.py` compares the `monarchmoney` SDK's public surface against what this server actually calls, and tracks three ways capability can go unexposed:
+
+1. **Uncovered methods** — SDK methods with no call site in `src/`.
+2. **Param gaps** — parameters of a called method never passed at any call site. This is the issue #15 class of bug: `create_transaction` existed and was called, but dropped the SDK's `update_balance` option, so manual transactions never moved the balance.
+3. **Unanalyzable calls** — call sites using a `**kwargs` splat, where params can't be resolved statically. Tracked rather than skipped silently, so a gap can't be hidden by switching a call to a splat.
+
+Results are ratcheted against `scripts/sdk_coverage_baseline.json`. The check fails in **both** directions: a new gap fails because capability was lost, and a baseline entry that no longer reproduces also fails, so closing a gap forces the baseline to tighten. Otherwise the baseline would rot into a list of things that used to be broken.
+
+Enforced in two places:
+- **Pre-commit** via `.githooks/pre-commit` (opt in with `git config core.hooksPath .githooks`). Skipped if `uv` is unavailable.
+- **CI** via `tests/test_sdk_coverage.py`, which runs unconditionally and cannot be bypassed with `--no-verify`.
+
+When you deliberately widen or accept a gap, re-record it with `--update-baseline` and say why in the commit message. The issue #15 gap is additionally pinned by its own test, so `--update-baseline` alone cannot re-accept it.
 
 ## Code Style
 

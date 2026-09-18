@@ -84,6 +84,8 @@ mm_session*
 token.json
 credentials.json
 refresh_token.txt
+# Checked-in config that the blanket *.json rule above would otherwise hide
+!scripts/sdk_coverage_baseline.json
 
 # Logs
 *.log

@@ -29,6 +29,7 @@ def _oauth_env(**overrides):
         "GITHUB_CLIENT_SECRET": "test_client_secret",
         "MCP_OAUTH_REDIS_URL": "redis://localhost:6379/0",
         "MCP_OAUTH_JWT_SIGNING_KEY": "test-jwt-signing-key",
+        "MCP_ALLOWED_GITHUB_USERS": "test-user",
         "BASE_URL": "http://localhost:8000",
     }
     env.update(overrides)
@@ -43,6 +44,7 @@ def _both_env(**overrides):
         "GITHUB_CLIENT_SECRET": "test_client_secret",
         "MCP_OAUTH_REDIS_URL": "redis://localhost:6379/0",
         "MCP_OAUTH_JWT_SIGNING_KEY": "test-jwt-signing-key",
+        "MCP_ALLOWED_GITHUB_USERS": "test-user",
         "BASE_URL": "http://localhost:8000",
     }
     env.update(overrides)

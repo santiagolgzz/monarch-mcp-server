@@ -15,6 +15,7 @@ async def test_http_server_registers_tools():
         "GITHUB_CLIENT_SECRET": "test_secret",
         "MCP_OAUTH_REDIS_URL": "redis://localhost:6379/0",
         "MCP_OAUTH_JWT_SIGNING_KEY": "integration-test-signing-key",
+        "MCP_ALLOWED_GITHUB_USERS": "test-user",
         "BASE_URL": "http://localhost:8000",
     }
 

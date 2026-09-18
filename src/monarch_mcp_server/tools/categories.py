@@ -5,13 +5,13 @@ Tools for viewing and managing transaction categories and groups.
 """
 
 import logging
-from typing import Any
+from datetime import datetime
 
 from fastmcp import FastMCP
 
 from monarch_mcp_server.client import get_monarch_client
 from monarch_mcp_server.safety import require_safety_check
-from monarch_mcp_server.utils import validate_non_empty_string
+from monarch_mcp_server.utils import validate_date_format, validate_non_empty_string
 
 from ._common import tool_handler
 
@@ -76,21 +76,43 @@ def register_category_tools(mcp: FastMCP) -> None:
         icon: str | None = None,
         rollover_enabled: bool | None = None,
         rollover_type: str | None = None,
+        rollover_start_month: str | None = None,
     ) -> dict:
-        """Create a new transaction category."""
+        """Create a new transaction category.
+
+        Args:
+            name: Display name for the new category.
+            group_id: The category group to create it under.
+            icon: Emoji icon. Defaults to the SDK's placeholder.
+            rollover_enabled: Whether unspent budget rolls over.
+            rollover_type: Rollover cadence. Defaults to "monthly".
+            rollover_start_month: Month the rollover starts, YYYY-MM-DD.
+                Defaults to the first of the current month. Computed per call,
+                rather than relying on the SDK's default, which is evaluated
+                once at import and goes stale across month boundaries.
+        """
         validate_non_empty_string(group_id, "group_id")
+
+        if rollover_start_month is not None:
+            validated = validate_date_format(
+                rollover_start_month, "rollover_start_month"
+            )
+            # validated is non-None because rollover_start_month was non-None
+            start_month = datetime.fromisoformat(str(validated))
+        else:
+            start_month = datetime.today().replace(day=1)
+
         client = await get_monarch_client()
-        kwargs: dict[str, Any] = {
-            "group_id": group_id,
-            "transaction_category_name": name,
-        }
-        if icon is not None:
-            kwargs["icon"] = icon
-        if rollover_enabled is not None:
-            kwargs["rollover_enabled"] = rollover_enabled
-        if rollover_type is not None:
-            kwargs["rollover_type"] = rollover_type
-        return await client.create_transaction_category(**kwargs)
+        return await client.create_transaction_category(
+            group_id=group_id,
+            transaction_category_name=name,
+            icon=icon if icon is not None else "❓",
+            rollover_enabled=(
+                rollover_enabled if rollover_enabled is not None else False
+            ),
+            rollover_type=rollover_type if rollover_type is not None else "monthly",
+            rollover_start_month=start_month,
+        )
 
     @mcp.tool()
     @require_safety_check("delete_transaction_category")

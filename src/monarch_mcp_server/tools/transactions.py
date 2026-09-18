@@ -4,18 +4,24 @@ Transaction management tools for Monarch Money.
 Tools for viewing, searching, and managing transactions.
 """
 
+import base64
+import binascii
 import json
 import logging
 from dataclasses import dataclass
-from typing import Any
 
 from fastmcp import FastMCP
 
 from monarch_mcp_server.client import get_monarch_client
+from monarch_mcp_server.exceptions import ValidationError
 from monarch_mcp_server.safety import require_safety_check
 from monarch_mcp_server.utils import validate_date_format, validate_non_empty_string
 
-from ._common import MAX_AGGREGATION_TRANSACTIONS, tool_handler
+from ._common import (
+    MAX_AGGREGATION_TRANSACTIONS,
+    MAX_ATTACHMENT_BYTES,
+    tool_handler,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -133,34 +139,36 @@ def register_transaction_tools(mcp: FastMCP) -> None:
 
     @mcp.tool()
     @tool_handler("get_transactions_summary")
-    async def get_transactions_summary(
+    async def get_transactions_summary() -> dict:
+        """Get aggregated transaction summary data across the whole account.
+
+        This summary is not date-filterable: the underlying SDK call takes no
+        arguments. For aggregates over a date range, use get_transaction_stats,
+        which accepts start_date and end_date.
+        """
+        client = await get_monarch_client()
+        return await client.get_transactions_summary()
+
+    @mcp.tool()
+    @tool_handler("get_recurring_transactions")
+    async def get_recurring_transactions(
         start_date: str | None = None,
         end_date: str | None = None,
     ) -> dict:
-        """Get aggregated transaction summary data."""
+        """Get recurring transactions, optionally limited to a date range.
+
+        Args:
+            start_date: Start date in YYYY-MM-DD format.
+            end_date: End date in YYYY-MM-DD format.
+        """
         validated_start = validate_date_format(start_date, "start_date")
         validated_end = validate_date_format(end_date, "end_date")
 
         client = await get_monarch_client()
-        filters = _build_transaction_filters(
-            validated_start=validated_start,
-            validated_end=validated_end,
+        return await client.get_recurring_transactions(
+            start_date=validated_start,
+            end_date=validated_end,
         )
-
-        summary_filters: dict[str, str] = {}
-        if filters.start_date:
-            summary_filters["start_date"] = filters.start_date
-        if filters.end_date:
-            summary_filters["end_date"] = filters.end_date
-
-        return await client.get_transactions_summary(**summary_filters)
-
-    @mcp.tool()
-    @tool_handler("get_recurring_transactions")
-    async def get_recurring_transactions() -> dict:
-        """Get all recurring transactions."""
-        client = await get_monarch_client()
-        return await client.get_recurring_transactions()
 
     @mcp.tool()
     @tool_handler("get_cashflow")
@@ -236,8 +244,42 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         search: str | None = None,
         min_amount: float | None = None,
         max_amount: float | None = None,
+        tag_ids: list[str] | None = None,
+        has_attachments: bool | None = None,
+        has_notes: bool | None = None,
+        hidden_from_reports: bool | None = None,
+        is_split: bool | None = None,
+        is_recurring: bool | None = None,
+        imported_from_mint: bool | None = None,
+        synced_from_institution: bool | None = None,
     ) -> list[dict]:
-        """Get transactions from Monarch Money with granular filtering."""
+        """Get transactions from Monarch Money with granular filtering.
+
+        Args:
+            limit: Maximum number of transactions to return.
+            offset: Number of transactions to skip (for pagination).
+            start_date: Start date in YYYY-MM-DD format.
+            end_date: End date in YYYY-MM-DD format.
+            account_id: Only transactions on this account.
+            category_id: Only transactions in this category.
+            search: Free-text search over merchant and description.
+            min_amount: Drop transactions below this amount (applied locally).
+            max_amount: Drop transactions above this amount (applied locally).
+            tag_ids: Only transactions carrying any of these tag IDs.
+            has_attachments: True for only transactions with attachments,
+                False for only those without. None does not filter.
+            has_notes: True/False to require or exclude notes. None does not filter.
+            hidden_from_reports: True/False to select transactions hidden from
+                reports. None does not filter.
+            is_split: True/False to select split transactions. None does not filter.
+            is_recurring: True/False to select recurring transactions. None does
+                not filter.
+            imported_from_mint: True/False to select transactions imported from
+                Mint. None does not filter.
+            synced_from_institution: True/False to select transactions synced
+                from a linked institution rather than entered manually. None
+                does not filter.
+        """
         validated_start = validate_date_format(start_date, "start_date")
         validated_end = validate_date_format(end_date, "end_date")
 
@@ -258,6 +300,14 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             account_ids=filters.account_ids or [],
             category_ids=filters.category_ids or [],
             search=filters.search,
+            tag_ids=tag_ids or [],
+            has_attachments=has_attachments,
+            has_notes=has_notes,
+            hidden_from_reports=hidden_from_reports,
+            is_split=is_split,
+            is_recurring=is_recurring,
+            imported_from_mint=imported_from_mint,
+            synced_from_institution=synced_from_institution,
         )
         transaction_list = []
         for txn in transactions.get("allTransactions", {}).get("results", []):
@@ -278,10 +328,22 @@ def register_transaction_tools(mcp: FastMCP) -> None:
 
     @mcp.tool()
     @tool_handler("get_transaction_details")
-    async def get_transaction_details(transaction_id: str) -> dict:
-        """Get detailed information about a specific transaction."""
+    async def get_transaction_details(
+        transaction_id: str,
+        redirect_posted: bool = True,
+    ) -> dict:
+        """Get detailed information about a specific transaction.
+
+        Args:
+            transaction_id: The transaction to look up.
+            redirect_posted: When a pending transaction has since posted,
+                follow the redirect to the posted transaction. Defaults to
+                True, matching the SDK and the Monarch app.
+        """
         client = await get_monarch_client()
-        return await client.get_transaction_details(transaction_id)
+        return await client.get_transaction_details(
+            transaction_id, redirect_posted=redirect_posted
+        )
 
     @mcp.tool()
     @tool_handler("get_transaction_splits")
@@ -291,6 +353,58 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         return await client.get_transaction_splits(transaction_id)
 
     # ========== WRITE TOOLS ==========
+
+    @mcp.tool()
+    @require_safety_check("upload_attachment")
+    @tool_handler("upload_attachment")
+    async def upload_attachment(
+        transaction_id: str,
+        file_content_base64: str,
+        filename: str,
+    ) -> dict:
+        """Attach a file to a transaction, such as a receipt.
+
+        MCP carries text, not raw bytes, so the file must be base64-encoded.
+
+        Args:
+            transaction_id: The transaction to attach the file to.
+            file_content_base64: The file's bytes, base64-encoded.
+            filename: File name including extension, e.g. "receipt.pdf". The
+                extension determines the content type Monarch stores.
+        """
+        validate_non_empty_string(transaction_id, "transaction_id")
+        validate_non_empty_string(filename, "filename")
+        validate_non_empty_string(file_content_base64, "file_content_base64")
+
+        try:
+            file_bytes = base64.b64decode(file_content_base64, validate=True)
+        except (binascii.Error, ValueError) as e:
+            raise ValidationError(
+                f"file_content_base64 is not valid base64: {e}"
+            ) from e
+
+        # No empty-file check is needed: the only base64 string that decodes to
+        # zero bytes is the empty string, which validate_non_empty_string above
+        # has already rejected.
+        if len(file_bytes) > MAX_ATTACHMENT_BYTES:
+            raise ValidationError(
+                f"Attachment is {len(file_bytes)} bytes, over the "
+                f"{MAX_ATTACHMENT_BYTES} byte limit"
+            )
+
+        client = await get_monarch_client()
+        result = await client.upload_attachment(
+            transaction_id=transaction_id,
+            file_content=file_bytes,
+            filename=filename,
+        )
+        return {
+            "uploaded": True,
+            "transaction_id": transaction_id,
+            "filename": filename,
+            "bytes": len(file_bytes),
+            "result": result,
+        }
 
     @mcp.tool()
     @require_safety_check("create_transaction")
@@ -338,26 +452,42 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         description: str | None = None,
         category_id: str | None = None,
         date: str | None = None,
+        goal_id: str | None = None,
+        hide_from_reports: bool | None = None,
+        needs_review: bool | None = None,
+        notes: str | None = None,
     ) -> dict:
-        """Update an existing transaction in Monarch Money."""
+        """Update an existing transaction in Monarch Money.
+
+        Every field is optional; omitting one leaves it unchanged. The SDK
+        treats None as "do not update" for all of these, so they are passed
+        through directly rather than being filtered out here.
+
+        Args:
+            transaction_id: The transaction to update.
+            amount: New amount.
+            description: New merchant name.
+            category_id: New category.
+            date: New date, YYYY-MM-DD.
+            goal_id: Link the transaction to this goal.
+            hide_from_reports: Hide or unhide this transaction from reports.
+            needs_review: Mark the transaction as needing review, or clear it.
+            notes: Replace the transaction's notes.
+        """
         validate_non_empty_string(transaction_id, "transaction_id")
         validated_date = validate_date_format(date, "date") if date else None
 
         client = await get_monarch_client()
-
-        # Build kwargs dict, excluding None values to avoid overwriting existing data
-        update_data: dict[str, Any] = {}
-        if amount is not None:
-            update_data["amount"] = amount
-        if description is not None:
-            update_data["merchant_name"] = description
-        if category_id is not None:
-            update_data["category_id"] = category_id
-        if validated_date is not None:
-            update_data["date"] = validated_date
-
         return await client.update_transaction(
-            transaction_id=transaction_id, **update_data
+            transaction_id=transaction_id,
+            amount=amount,
+            merchant_name=description,
+            category_id=category_id,
+            date=validated_date,
+            goal_id=goal_id,
+            hide_from_reports=hide_from_reports,
+            needs_review=needs_review,
+            notes=notes,
         )
 
     @mcp.tool()

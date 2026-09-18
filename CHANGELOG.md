@@ -2,7 +2,24 @@
 
 ## [Unreleased]
 
+### Added
+- **`refresh_accounts` / `request_accounts_refresh_and_wait` / `is_accounts_refresh_complete`**: Added `account_ids` so a refresh can target one account, a subset, or all (omit for all). The wait variant also gained `timeout` and `delay`.
+- **`set_budget_amount`**: Added `category_group_id` (budget a whole group), `timeframe`, `start_date`, and `apply_to_future`. Exactly one of `category_id` / `category_group_id` is required, validated with a clear error instead of the SDK's generic one.
+- **`upload_attachment`** *(new tool)*: Attach a file to a transaction. Content is base64-encoded since MCP carries text, with a 10 MiB decoded size limit.
+- **`get_credit_history`** *(new tool)*: Credit score history.
+- **`update_transaction`**: Exposed `goal_id`, `hide_from_reports`, `needs_review`, and `notes`.
+- **`update_account`**: Exposed `account_sub_type`, `include_in_net_worth`, `hide_from_summary_list`, and `hide_transactions_from_reports`.
+- **`create_transaction_category`**: Exposed `rollover_start_month`.
+- **`upload_account_balance_history`**: Added `timeout` and `delay`.
+- **`get_transactions`**: Exposed eight server-side SDK filters that previously had no way to be reached from a tool call — `tag_ids`, `has_attachments`, `has_notes`, `hidden_from_reports`, `is_split`, `is_recurring`, `imported_from_mint`, `synced_from_institution`. All default to no filtering.
+- **`get_recurring_transactions`**: Added `start_date` / `end_date` to limit results to a period.
+- **`get_budgets`**: Added `start_date` / `end_date` to select the budget period.
+- **`get_transaction_details`**: Added `redirect_posted` (default `true`, matching the SDK and the Monarch app) to control whether a pending transaction that has since posted redirects to the posted one.
+- **SDK coverage ratchet**: `scripts/sdk_coverage.py` reports SDK surface this server does not expose, and fails the build on regression. Enforced at commit time and in CI.
+
 ### Fixed
+- **`get_transactions_summary`**: The tool advertised `start_date` / `end_date` and splatted them into an SDK call that accepts no arguments, so supplying either raised `TypeError`. The underlying call is not date-filterable; the parameters are removed and the docstring points to `get_transaction_stats` for date-ranged aggregates. Found by converting `**kwargs` call sites to explicit arguments for the coverage ratchet.
+- **`create_transaction_category`**: `rollover_start_month` now defaults to the first of the current month computed per call. The SDK's own default is evaluated once at import, so a long-running server drifted to a stale month.
 - **`create_transaction`**: Added optional `update_balance` parameter (default `false`) so manual transactions can affect the account balance, matching Monarch's "impact balance" checkbox (#15).
 
 ## [1.2.0] - 2026-04-12

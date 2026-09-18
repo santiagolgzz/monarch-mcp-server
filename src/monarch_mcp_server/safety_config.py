@@ -36,6 +36,7 @@ class SafetyConfig:
                 "set_budget_amount",
                 "add_transaction_tag",
                 "categorize_transaction",
+                "upload_attachment",
             ],
             "emergency_stop": False,
             "enabled": True,

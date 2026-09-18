@@ -8,7 +8,6 @@ import csv
 import io
 import logging
 from datetime import datetime
-from typing import Any
 
 from fastmcp import FastMCP
 from monarchmoney.monarchmoney import BalanceHistoryRow
@@ -163,6 +162,18 @@ def register_account_tools(mcp: FastMCP) -> None:
         )
 
     @mcp.tool()
+    @tool_handler("get_credit_history")
+    async def get_credit_history() -> dict:
+        """Get credit score history from Monarch Money.
+
+        Returns the credit score data Monarch tracks over time. Requires
+        credit monitoring to be enabled on the account; otherwise the
+        response will be empty.
+        """
+        client = await get_monarch_client()
+        return await client.get_credit_history()
+
+    @mcp.tool()
     @tool_handler("get_account_type_options")
     async def get_account_type_options() -> dict:
         """Get all available account types and subtypes."""
@@ -199,20 +210,39 @@ def register_account_tools(mcp: FastMCP) -> None:
         name: str | None = None,
         balance: float | None = None,
         account_type: str | None = None,
+        account_sub_type: str | None = None,
+        include_in_net_worth: bool | None = None,
+        hide_from_summary_list: bool | None = None,
+        hide_transactions_from_reports: bool | None = None,
     ) -> dict:
-        """Update account settings or balance."""
+        """Update account settings or balance.
+
+        Every field is optional; omitting one leaves it unchanged. The SDK
+        skips None values, so they are passed through directly rather than
+        being filtered out here.
+
+        Args:
+            account_id: The account to update.
+            name: New display name.
+            balance: New displayed balance.
+            account_type: New account type.
+            account_sub_type: New account subtype.
+            include_in_net_worth: Whether this account counts toward net worth.
+            hide_from_summary_list: Hide the account from the summary list.
+            hide_transactions_from_reports: Exclude this account's transactions
+                from reports.
+        """
         client = await get_monarch_client()
-
-        # Build kwargs dict, excluding None values to avoid overwriting existing data
-        kwargs: dict[str, Any] = {}
-        if name is not None:
-            kwargs["account_name"] = name
-        if balance is not None:
-            kwargs["account_balance"] = balance
-        if account_type is not None:
-            kwargs["account_type"] = account_type
-
-        return await client.update_account(account_id=account_id, **kwargs)
+        return await client.update_account(
+            account_id=account_id,
+            account_name=name,
+            account_balance=balance,
+            account_type=account_type,
+            account_sub_type=account_sub_type,
+            include_in_net_worth=include_in_net_worth,
+            hide_from_summary_list=hide_from_summary_list,
+            hide_transactions_from_reports=hide_transactions_from_reports,
+        )
 
     @mcp.tool()
     @require_safety_check("delete_account")
@@ -229,11 +259,22 @@ def register_account_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     @require_safety_check("upload_account_balance_history")
     @tool_handler("upload_account_balance_history")
-    async def upload_account_balance_history(account_id: str, csv_data: str) -> dict:
+    async def upload_account_balance_history(
+        account_id: str,
+        csv_data: str,
+        timeout: int = 300,
+        delay: int = 10,
+    ) -> dict:
         """Upload account balance history from CSV data.
 
         csv_data should be CSV text with columns: date, amount
         (and optional account_name). Dates should be in YYYY-MM-DD format.
+
+        Args:
+            account_id: The account to upload history for.
+            csv_data: CSV text as described above.
+            timeout: Seconds to wait for the upload to be processed. Default 300.
+            delay: Seconds between status checks while waiting. Default 10.
         """
         rows: list[BalanceHistoryRow] = []
         reader = csv.DictReader(io.StringIO(csv_data))
@@ -266,5 +307,7 @@ def register_account_tools(mcp: FastMCP) -> None:
             raise ValidationError("csv_data contains no valid rows")
 
         client = await get_monarch_client()
-        await client.upload_account_balance_history(account_id, rows)
+        await client.upload_account_balance_history(
+            account_id, rows, timeout=timeout, delay=delay
+        )
         return {"uploaded": True, "account_id": account_id, "rows": len(rows)}

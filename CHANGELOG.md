@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- **`create_transaction`**: Added optional `update_balance` parameter (default `false`) so manual transactions can affect the account balance, matching Monarch's "impact balance" checkbox (#15).
+
 ## [1.2.0] - 2026-04-12
 
 ### Changed

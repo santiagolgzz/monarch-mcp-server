@@ -9,6 +9,7 @@ import logging
 from fastmcp import FastMCP
 
 from monarch_mcp_server.client import get_monarch_client
+from monarch_mcp_server.exceptions import ValidationError
 from monarch_mcp_server.safety import require_safety_check
 from monarch_mcp_server.utils import validate_date_format
 
@@ -58,7 +59,47 @@ def register_budget_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     @require_safety_check("set_budget_amount")
     @tool_handler("set_budget_amount")
-    async def set_budget_amount(category_id: str, amount: float) -> dict:
-        """Set or update budget amount for a category."""
+    async def set_budget_amount(
+        amount: float,
+        category_id: str | None = None,
+        category_group_id: str | None = None,
+        timeframe: str = "month",
+        start_date: str | None = None,
+        apply_to_future: bool = False,
+    ) -> dict:
+        """Set or update a budget amount for a category or category group.
+
+        Exactly one of category_id or category_group_id must be given.
+
+        Args:
+            amount: The budget amount. Zero clears the budget. Negative values
+                indicate over-budget.
+            category_id: Budget a single category. Mutually exclusive with
+                category_group_id.
+            category_group_id: Budget a whole category group. Mutually
+                exclusive with category_id.
+            timeframe: Budget period. "month" is currently the only value
+                Monarch accepts.
+            start_date: Start of the period, YYYY-MM-DD. Defaults to the start
+                of the current month.
+            apply_to_future: Apply this amount to all future periods as well,
+                not just the one period. Defaults to False, which changes only
+                the targeted period.
+        """
+        if (category_id is None) == (category_group_id is None):
+            raise ValidationError(
+                "Specify exactly one of category_id or category_group_id, not "
+                "both and not neither."
+            )
+
+        validated_start = validate_date_format(start_date, "start_date")
+
         client = await get_monarch_client()
-        return await client.set_budget_amount(amount=amount, category_id=category_id)
+        return await client.set_budget_amount(
+            amount=amount,
+            category_id=category_id,
+            category_group_id=category_group_id,
+            timeframe=timeframe,
+            start_date=validated_start,
+            apply_to_future=apply_to_future,
+        )

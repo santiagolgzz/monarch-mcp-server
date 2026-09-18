@@ -96,14 +96,19 @@ async def test_update_transaction_parameters(mcp):
         # Test updating only amount
         await tool.fn(transaction_id="txn_1", amount=50.0)
 
-        # Check call arguments
-        # Should NOT include merchant_name, category_id, or date if they were None
+        # Unset fields are passed through as None rather than omitted. The SDK
+        # treats None as "do not update" for every one of these fields, so the
+        # effect is the same and the call is statically checkable.
         args, kwargs = mock_client.update_transaction.call_args
         assert kwargs["transaction_id"] == "txn_1"
         assert kwargs["amount"] == 50.0
-        assert "merchant_name" not in kwargs
-        assert "category_id" not in kwargs
-        assert "date" not in kwargs
+        assert kwargs["merchant_name"] is None
+        assert kwargs["category_id"] is None
+        assert kwargs["date"] is None
+        assert kwargs["goal_id"] is None
+        assert kwargs["hide_from_reports"] is None
+        assert kwargs["needs_review"] is None
+        assert kwargs["notes"] is None
 
 
 @pytest.mark.asyncio

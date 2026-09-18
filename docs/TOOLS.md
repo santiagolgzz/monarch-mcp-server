@@ -46,6 +46,13 @@ Get daily account balance history over time.
 
 ---
 
+### get_credit_history
+Get credit score history. Requires credit monitoring enabled on the account.
+
+**Parameters:** None
+
+---
+
 ### get_account_type_options
 Get all available account types and subtypes for creating manual accounts.
 
@@ -76,6 +83,10 @@ Update account settings or balance.
 | `name` | string | No | New account name |
 | `balance` | float | No | New balance |
 | `account_type` | string | No | New account type |
+| `account_sub_type` | string | No | New account subtype |
+| `include_in_net_worth` | bool | No | Whether the account counts toward net worth |
+| `hide_from_summary_list` | bool | No | Hide the account from the summary list |
+| `hide_transactions_from_reports` | bool | No | Exclude this account's transactions from reports |
 
 ---
 
@@ -94,21 +105,32 @@ Delete an account from Monarch Money.
 ### refresh_accounts
 Request account data refresh from financial institutions (non-blocking).
 
-**Parameters:** None
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `account_ids` | list[string] | No | Target only these accounts. One ID for a single account, several for a subset. Omit to target all accounts |
 
 ---
 
 ### request_accounts_refresh_and_wait
 Request account refresh and wait for completion (blocking).
 
-**Parameters:** None
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `account_ids` | list[string] | No | Target only these accounts. One ID for a single account, several for a subset. Omit to target all accounts |
+| `timeout` | int | No | Seconds to wait before giving up (default: 300) |
+| `delay` | int | No | Seconds between completion checks (default: 10) |
 
 ---
 
 ### is_accounts_refresh_complete
 Check if account refresh is complete.
 
-**Parameters:** None
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `account_ids` | list[string] | No | Target only these accounts. One ID for a single account, several for a subset. Omit to target all accounts |
 
 ---
 
@@ -173,13 +195,12 @@ Get split information for a transaction.
 ---
 
 ### get_transactions_summary
-Get aggregated transaction summary data.
+Get aggregated transaction summary data for the whole account.
 
-**Parameters:**
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `start_date` | string | No | Start date (YYYY-MM-DD) |
-| `end_date` | string | No | End date (YYYY-MM-DD) |
+Not date-filterable — the underlying SDK call takes no arguments. Use
+`get_transaction_stats` for aggregates over a date range.
+
+**Parameters:** None
 
 ---
 
@@ -234,6 +255,10 @@ Update an existing transaction.
 | `description` | string | No | New description |
 | `category_id` | string | No | New category |
 | `date` | string | No | New date (YYYY-MM-DD) |
+| `goal_id` | string | No | Link the transaction to this goal |
+| `hide_from_reports` | bool | No | Hide or unhide this transaction from reports |
+| `needs_review` | bool | No | Mark as needing review, or clear it |
+| `notes` | string | No | Replace the transaction's notes |
 
 ---
 
@@ -247,6 +272,23 @@ Update or create transaction splits.
 | `splits_data` | string | Yes | JSON string of split data |
 
 **Safety:** Requires approval
+
+---
+
+### upload_attachment
+Attach a file to a transaction, such as a receipt.
+
+MCP carries text rather than raw bytes, so the file must be base64-encoded.
+Decoded size is capped at 10 MiB.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `transaction_id` | string | Yes | The transaction to attach to |
+| `file_content_base64` | string | Yes | The file's bytes, base64-encoded |
+| `filename` | string | Yes | File name including extension (e.g. `receipt.pdf`). The extension determines the stored content type |
+
+**Safety:** Warns before execute
 
 ---
 
@@ -302,6 +344,7 @@ Create a new category.
 | `icon` | string | No | Emoji icon for the category |
 | `rollover_enabled` | boolean | No | Whether budget rollover is enabled |
 | `rollover_type` | string | No | Rollover type (e.g. "monthly") |
+| `rollover_start_month` | string | No | Month the rollover starts (YYYY-MM-DD). Defaults to the first of the current month |
 
 ---
 
@@ -385,13 +428,19 @@ Get budget information including spent amounts and remaining balances.
 ---
 
 ### set_budget_amount
-Set or update budget amount for a category.
+Set or update a budget amount for a category or a whole category group.
+
+Exactly one of `category_id` or `category_group_id` must be given.
 
 **Parameters:**
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `category_id` | string | Yes | The category ID |
-| `amount` | float | Yes | Budget amount (0 to clear) |
+| `amount` | float | Yes | Budget amount (0 to clear, negative to indicate over-budget) |
+| `category_id` | string | No | Budget a single category. Mutually exclusive with `category_group_id` |
+| `category_group_id` | string | No | Budget a whole category group. Mutually exclusive with `category_id` |
+| `timeframe` | string | No | Budget period. `"month"` is currently the only value Monarch accepts |
+| `start_date` | string | No | Start of the period (YYYY-MM-DD). Defaults to the start of the current month |
+| `apply_to_future` | bool | No | Apply this amount to all future periods too, not just the one period. Default: `false` |
 
 ---
 
@@ -486,6 +535,8 @@ Upload historical account balance data from CSV.
 |------|------|----------|-------------|
 | `account_id` | string | Yes | The account ID |
 | `csv_data` | string | Yes | CSV content |
+| `timeout` | int | No | Seconds to wait for processing (default: 300) |
+| `delay` | int | No | Seconds between status checks (default: 10) |
 
 **Safety:** Requires approval
 

@@ -141,7 +141,12 @@ async def test_set_budget_amount_success(mcp):
             data = await tool.fn(category_id="cat_123", amount=750.0)
             assert data["success"] is True
             mock_client.set_budget_amount.assert_called_once_with(
-                amount=750.0, category_id="cat_123"
+                amount=750.0,
+                category_id="cat_123",
+                category_group_id=None,
+                timeframe="month",
+                start_date=None,
+                apply_to_future=False,
             )
 
 

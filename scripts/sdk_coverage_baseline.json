@@ -2,46 +2,21 @@
   "_comment": "Ratchet baseline for scripts/sdk_coverage.py. Known, accepted gaps between the monarchmoney SDK and the tools this server exposes. New entries may not be added without a deliberate update; entries that no longer reproduce must be removed. Regenerate with: uv run python scripts/sdk_coverage.py --update-baseline",
   "uncovered_methods": [
     "delete_session",
-    "get_credit_history",
     "gql_call",
     "interactive_login",
     "multi_factor_authenticate",
     "set_timeout",
-    "set_token",
-    "upload_attachment"
+    "set_token"
   ],
   "param_gaps": {
     "get_budgets": [
       "use_legacy_goals",
       "use_v2_goals"
     ],
-    "is_accounts_refresh_complete": [
-      "account_ids"
-    ],
     "login": [
       "save_session",
       "use_saved_session"
-    ],
-    "request_accounts_refresh_and_wait": [
-      "account_ids",
-      "delay",
-      "timeout"
-    ],
-    "set_budget_amount": [
-      "apply_to_future",
-      "category_group_id",
-      "start_date",
-      "timeframe"
-    ],
-    "upload_account_balance_history": [
-      "delay",
-      "timeout"
     ]
   },
-  "unanalyzable": [
-    "create_transaction_category",
-    "get_transactions_summary",
-    "update_account",
-    "update_transaction"
-  ]
+  "unanalyzable": []
 }

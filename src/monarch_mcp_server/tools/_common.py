@@ -19,6 +19,12 @@ logger = logging.getLogger(__name__)
 MAX_AGGREGATION_TRANSACTIONS = 2000
 """Maximum number of transactions to fetch for aggregation operations."""
 
+MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+"""Maximum decoded size of a transaction attachment upload (10 MiB).
+
+Attachments arrive base64-encoded over MCP, which inflates them by about a
+third, so the limit is checked against the decoded bytes."""
+
 
 # Type variables for the decorator
 P = ParamSpec("P")

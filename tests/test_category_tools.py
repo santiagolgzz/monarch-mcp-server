@@ -165,9 +165,14 @@ async def test_create_category_success(mcp):
             tool = await mcp.get_tool("create_transaction_category")
             data = await tool.fn(name="Coffee", group_id="grp_food")
             assert data["id"] == "new_cat_123"
-            mock_client.create_transaction_category.assert_called_once_with(
-                group_id="grp_food", transaction_category_name="Coffee"
-            )
+            kwargs = mock_client.create_transaction_category.call_args.kwargs
+            assert kwargs["group_id"] == "grp_food"
+            assert kwargs["transaction_category_name"] == "Coffee"
+            # Unspecified options fall back to the SDK's documented defaults,
+            # passed explicitly so the call is statically checkable.
+            assert kwargs["icon"] == "❓"
+            assert kwargs["rollover_enabled"] is False
+            assert kwargs["rollover_type"] == "monthly"
 
 
 @pytest.mark.asyncio
@@ -252,13 +257,12 @@ async def test_create_category_with_all_optional_params(mcp):
             assert data["id"] == "cat_pizza"
             assert data["icon"] == "🍕"
             # Verify SDK called with all kwargs
-            mock_client.create_transaction_category.assert_called_once_with(
-                group_id="grp_food",
-                transaction_category_name="Pizza",
-                icon="🍕",
-                rollover_enabled=True,
-                rollover_type="monthly",
-            )
+            kwargs = mock_client.create_transaction_category.call_args.kwargs
+            assert kwargs["group_id"] == "grp_food"
+            assert kwargs["transaction_category_name"] == "Pizza"
+            assert kwargs["icon"] == "🍕"
+            assert kwargs["rollover_enabled"] is True
+            assert kwargs["rollover_type"] == "monthly"
 
 
 @pytest.mark.asyncio
@@ -285,9 +289,12 @@ async def test_create_category_with_partial_params(mcp):
             data = await tool.fn(name="Coffee", group_id="grp_food", icon="☕")
             assert data["id"] == "cat_coffee"
             # Verify SDK called with only icon (not rollover params)
-            mock_client.create_transaction_category.assert_called_once_with(
-                group_id="grp_food", transaction_category_name="Coffee", icon="☕"
-            )
+            kwargs = mock_client.create_transaction_category.call_args.kwargs
+            assert kwargs["group_id"] == "grp_food"
+            assert kwargs["transaction_category_name"] == "Coffee"
+            assert kwargs["icon"] == "☕"
+            assert kwargs["rollover_enabled"] is False
+            assert kwargs["rollover_type"] == "monthly"
 
 
 @pytest.mark.asyncio
@@ -313,6 +320,9 @@ async def test_create_category_required_only(mcp):
             data = await tool.fn(name="Miscellaneous", group_id="grp_other")
             assert data["id"] == "cat_misc"
             # Verify SDK called with only required params (no optional ones)
-            mock_client.create_transaction_category.assert_called_once_with(
-                group_id="grp_other", transaction_category_name="Miscellaneous"
-            )
+            kwargs = mock_client.create_transaction_category.call_args.kwargs
+            assert kwargs["group_id"] == "grp_other"
+            assert kwargs["transaction_category_name"] == "Miscellaneous"
+            assert kwargs["icon"] == "❓"
+            assert kwargs["rollover_enabled"] is False
+            assert kwargs["rollover_type"] == "monthly"

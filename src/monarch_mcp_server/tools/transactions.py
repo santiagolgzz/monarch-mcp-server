@@ -302,8 +302,14 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         category_id: str,
         date: str,
         notes: str | None = None,
+        update_balance: bool = False,
     ) -> dict:
-        """Create a new transaction in Monarch Money."""
+        """Create a new transaction in Monarch Money.
+
+        Set update_balance=True to have the transaction change the account's
+        balance (same as the "impact balance" checkbox in the Monarch app).
+        Defaults to False, which leaves the balance unchanged.
+        """
         validate_non_empty_string(account_id, "account_id")
         validate_non_empty_string(merchant_name, "merchant_name")
         validate_non_empty_string(category_id, "category_id")
@@ -320,6 +326,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             merchant_name=merchant_name,
             category_id=category_id,
             notes=notes or "",
+            update_balance=update_balance,
         )
 
     @mcp.tool()

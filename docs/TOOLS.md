@@ -206,6 +206,7 @@ Create a new transaction.
 | `category_id` | string | Yes | Category ID |
 | `date` | string | Yes | Date (YYYY-MM-DD) |
 | `notes` | string | No | Optional notes |
+| `update_balance` | bool | No | If true, the transaction changes the account balance (Monarch's "impact balance" checkbox). Default: false |
 
 ---
 

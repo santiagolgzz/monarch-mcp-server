@@ -45,8 +45,40 @@ async def test_create_transaction_success(mcp):
             assert data["id"] == "txn_new_123"
             assert data["amount"] == -50.0
 
-            # Verify SDK was called
+            # Verify SDK was called, with balance untouched by default
             mock_client.create_transaction.assert_called_once()
+            kwargs = mock_client.create_transaction.call_args.kwargs
+            assert kwargs["update_balance"] is False
+
+
+@pytest.mark.asyncio
+async def test_create_transaction_passes_update_balance(mcp):
+    """Verify create_transaction forwards update_balance=True to the SDK."""
+    register_tools(mcp)
+
+    mock_client = AsyncMock()
+    mock_client.create_transaction.return_value = {"id": "txn_new_456"}
+
+    with patch(
+        "monarch_mcp_server.tools.transactions.get_monarch_client",
+        return_value=mock_client,
+    ):
+        with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
+            mock_guard.return_value.check_operation.return_value = (True, "OK")
+            mock_guard.return_value.record_operation = MagicMock()
+
+            tool = await mcp.get_tool("create_transaction")
+            await tool.fn(
+                account_id="acc_123",
+                amount=-25.0,
+                merchant_name="Test Merchant",
+                category_id="cat_123",
+                date="2024-01-15",
+                update_balance=True,
+            )
+
+            kwargs = mock_client.create_transaction.call_args.kwargs
+            assert kwargs["update_balance"] is True
 
 
 @pytest.mark.asyncio

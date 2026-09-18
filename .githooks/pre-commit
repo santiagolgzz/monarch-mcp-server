@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
+# --- Secret scanning -------------------------------------------------------
 if command -v gitleaks >/dev/null 2>&1; then
     GITLEAKS=gitleaks
 elif [ -x "$HOME/.local/bin/gitleaks" ]; then
@@ -12,3 +13,14 @@ else
 fi
 
 "$GITLEAKS" git --staged --redact --no-banner
+
+# --- SDK coverage ratchet --------------------------------------------------
+# Fails if this commit drops SDK capability, or if it closes a known gap
+# without tightening scripts/sdk_coverage_baseline.json. Skipped when uv is
+# unavailable so the hook stays usable outside a dev environment; CI runs the
+# same check unconditionally via tests/test_sdk_coverage.py.
+if command -v uv >/dev/null 2>&1; then
+    uv run --quiet python scripts/sdk_coverage.py --check
+else
+    echo "uv not found; skipping SDK coverage ratchet (CI will still enforce it)"
+fi

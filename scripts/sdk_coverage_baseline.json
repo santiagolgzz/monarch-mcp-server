@@ -12,27 +12,8 @@
   ],
   "param_gaps": {
     "get_budgets": [
-      "end_date",
-      "start_date",
       "use_legacy_goals",
       "use_v2_goals"
-    ],
-    "get_recurring_transactions": [
-      "end_date",
-      "start_date"
-    ],
-    "get_transaction_details": [
-      "redirect_posted"
-    ],
-    "get_transactions": [
-      "has_attachments",
-      "has_notes",
-      "hidden_from_reports",
-      "imported_from_mint",
-      "is_recurring",
-      "is_split",
-      "synced_from_institution",
-      "tag_ids"
     ],
     "is_accounts_refresh_complete": [
       "account_ids"

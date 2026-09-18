@@ -127,8 +127,16 @@ Get transactions with filtering options.
 | `account_id` | string | No | Filter by account |
 | `category_id` | string | No | Filter by category |
 | `search` | string | No | Search term |
-| `min_amount` | float | No | Minimum amount |
-| `max_amount` | float | No | Maximum amount |
+| `min_amount` | float | No | Minimum amount (applied locally) |
+| `max_amount` | float | No | Maximum amount (applied locally) |
+| `tag_ids` | list[string] | No | Only transactions carrying any of these tag IDs |
+| `has_attachments` | bool | No | `true` for only transactions with attachments, `false` for only those without. Omit to not filter |
+| `has_notes` | bool | No | Require or exclude notes. Omit to not filter |
+| `hidden_from_reports` | bool | No | Select transactions hidden from reports. Omit to not filter |
+| `is_split` | bool | No | Select split transactions. Omit to not filter |
+| `is_recurring` | bool | No | Select recurring transactions. Omit to not filter |
+| `imported_from_mint` | bool | No | Select transactions imported from Mint. Omit to not filter |
+| `synced_from_institution` | bool | No | Select transactions synced from a linked institution rather than entered manually. Omit to not filter |
 
 ---
 
@@ -150,6 +158,7 @@ Get detailed information about a specific transaction.
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `transaction_id` | string | Yes | The transaction ID |
+| `redirect_posted` | bool | No | When a pending transaction has since posted, follow the redirect to the posted transaction. Default: `true` |
 
 ---
 
@@ -188,9 +197,13 @@ Get high-level statistics (sum, count) without listing transactions.
 ---
 
 ### get_recurring_transactions
-Get all recurring transactions.
+Get recurring transactions, optionally limited to a date range.
 
-**Parameters:** None
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `start_date` | string | No | Start date (YYYY-MM-DD) |
+| `end_date` | string | No | End date (YYYY-MM-DD) |
 
 ---
 
@@ -363,7 +376,11 @@ Add a tag to a transaction, preserving any existing tags.
 ### get_budgets
 Get budget information including spent amounts and remaining balances.
 
-**Parameters:** None
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `start_date` | string | No | Start of the budget period (YYYY-MM-DD) |
+| `end_date` | string | No | End of the budget period (YYYY-MM-DD) |
 
 ---
 

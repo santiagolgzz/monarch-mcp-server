@@ -157,10 +157,24 @@ def register_transaction_tools(mcp: FastMCP) -> None:
 
     @mcp.tool()
     @tool_handler("get_recurring_transactions")
-    async def get_recurring_transactions() -> dict:
-        """Get all recurring transactions."""
+    async def get_recurring_transactions(
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict:
+        """Get recurring transactions, optionally limited to a date range.
+
+        Args:
+            start_date: Start date in YYYY-MM-DD format.
+            end_date: End date in YYYY-MM-DD format.
+        """
+        validated_start = validate_date_format(start_date, "start_date")
+        validated_end = validate_date_format(end_date, "end_date")
+
         client = await get_monarch_client()
-        return await client.get_recurring_transactions()
+        return await client.get_recurring_transactions(
+            start_date=validated_start,
+            end_date=validated_end,
+        )
 
     @mcp.tool()
     @tool_handler("get_cashflow")
@@ -236,8 +250,42 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         search: str | None = None,
         min_amount: float | None = None,
         max_amount: float | None = None,
+        tag_ids: list[str] | None = None,
+        has_attachments: bool | None = None,
+        has_notes: bool | None = None,
+        hidden_from_reports: bool | None = None,
+        is_split: bool | None = None,
+        is_recurring: bool | None = None,
+        imported_from_mint: bool | None = None,
+        synced_from_institution: bool | None = None,
     ) -> list[dict]:
-        """Get transactions from Monarch Money with granular filtering."""
+        """Get transactions from Monarch Money with granular filtering.
+
+        Args:
+            limit: Maximum number of transactions to return.
+            offset: Number of transactions to skip (for pagination).
+            start_date: Start date in YYYY-MM-DD format.
+            end_date: End date in YYYY-MM-DD format.
+            account_id: Only transactions on this account.
+            category_id: Only transactions in this category.
+            search: Free-text search over merchant and description.
+            min_amount: Drop transactions below this amount (applied locally).
+            max_amount: Drop transactions above this amount (applied locally).
+            tag_ids: Only transactions carrying any of these tag IDs.
+            has_attachments: True for only transactions with attachments,
+                False for only those without. None does not filter.
+            has_notes: True/False to require or exclude notes. None does not filter.
+            hidden_from_reports: True/False to select transactions hidden from
+                reports. None does not filter.
+            is_split: True/False to select split transactions. None does not filter.
+            is_recurring: True/False to select recurring transactions. None does
+                not filter.
+            imported_from_mint: True/False to select transactions imported from
+                Mint. None does not filter.
+            synced_from_institution: True/False to select transactions synced
+                from a linked institution rather than entered manually. None
+                does not filter.
+        """
         validated_start = validate_date_format(start_date, "start_date")
         validated_end = validate_date_format(end_date, "end_date")
 
@@ -258,6 +306,14 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             account_ids=filters.account_ids or [],
             category_ids=filters.category_ids or [],
             search=filters.search,
+            tag_ids=tag_ids or [],
+            has_attachments=has_attachments,
+            has_notes=has_notes,
+            hidden_from_reports=hidden_from_reports,
+            is_split=is_split,
+            is_recurring=is_recurring,
+            imported_from_mint=imported_from_mint,
+            synced_from_institution=synced_from_institution,
         )
         transaction_list = []
         for txn in transactions.get("allTransactions", {}).get("results", []):
@@ -278,10 +334,22 @@ def register_transaction_tools(mcp: FastMCP) -> None:
 
     @mcp.tool()
     @tool_handler("get_transaction_details")
-    async def get_transaction_details(transaction_id: str) -> dict:
-        """Get detailed information about a specific transaction."""
+    async def get_transaction_details(
+        transaction_id: str,
+        redirect_posted: bool = True,
+    ) -> dict:
+        """Get detailed information about a specific transaction.
+
+        Args:
+            transaction_id: The transaction to look up.
+            redirect_posted: When a pending transaction has since posted,
+                follow the redirect to the posted transaction. Defaults to
+                True, matching the SDK and the Monarch app.
+        """
         client = await get_monarch_client()
-        return await client.get_transaction_details(transaction_id)
+        return await client.get_transaction_details(
+            transaction_id, redirect_posted=redirect_posted
+        )
 
     @mcp.tool()
     @tool_handler("get_transaction_splits")

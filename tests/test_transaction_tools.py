@@ -340,7 +340,9 @@ async def test_get_transaction_details(mcp):
         tool = await mcp.get_tool("get_transaction_details")
         data = await tool.fn(transaction_id="txn_123")
         assert data["id"] == "txn_123"
-        mock_client.get_transaction_details.assert_called_once_with("txn_123")
+        mock_client.get_transaction_details.assert_called_once_with(
+            "txn_123", redirect_posted=True
+        )
 
 
 @pytest.mark.asyncio

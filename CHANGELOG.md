@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+- **`get_transactions`**: Exposed eight server-side SDK filters that previously had no way to be reached from a tool call — `tag_ids`, `has_attachments`, `has_notes`, `hidden_from_reports`, `is_split`, `is_recurring`, `imported_from_mint`, `synced_from_institution`. All default to no filtering.
+- **`get_recurring_transactions`**: Added `start_date` / `end_date` to limit results to a period.
+- **`get_budgets`**: Added `start_date` / `end_date` to select the budget period.
+- **`get_transaction_details`**: Added `redirect_posted` (default `true`, matching the SDK and the Monarch app) to control whether a pending transaction that has since posted redirects to the posted one.
+- **SDK coverage ratchet**: `scripts/sdk_coverage.py` reports SDK surface this server does not expose, and fails the build on regression. Enforced at commit time and in CI.
+
 ### Fixed
 - **`create_transaction`**: Added optional `update_balance` parameter (default `false`) so manual transactions can affect the account balance, matching Monarch's "impact balance" checkbox (#15).
 

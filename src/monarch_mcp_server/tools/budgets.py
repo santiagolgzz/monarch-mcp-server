@@ -10,6 +10,7 @@ from fastmcp import FastMCP
 
 from monarch_mcp_server.client import get_monarch_client
 from monarch_mcp_server.safety import require_safety_check
+from monarch_mcp_server.utils import validate_date_format
 
 from ._common import tool_handler
 
@@ -21,10 +22,25 @@ def register_budget_tools(mcp: FastMCP) -> None:
 
     @mcp.tool()
     @tool_handler("get_budgets")
-    async def get_budgets() -> list[dict]:
-        """Get budget information from Monarch Money."""
+    async def get_budgets(
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> list[dict]:
+        """Get budget information from Monarch Money.
+
+        Args:
+            start_date: Start of the budget period, YYYY-MM-DD. Defaults to
+                the SDK's current-period behavior when omitted.
+            end_date: End of the budget period, YYYY-MM-DD.
+        """
+        validated_start = validate_date_format(start_date, "start_date")
+        validated_end = validate_date_format(end_date, "end_date")
+
         client = await get_monarch_client()
-        budgets = await client.get_budgets()
+        budgets = await client.get_budgets(
+            start_date=validated_start,
+            end_date=validated_end,
+        )
         budget_list = []
         for budget in budgets.get("budgets", []):
             budget_info = {

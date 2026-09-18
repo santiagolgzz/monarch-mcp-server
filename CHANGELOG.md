@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **OAuth access control**: `MCP_ALLOWED_GITHUB_USERS` scopes the OAuth MCP endpoint to an explicit list of GitHub identities, given as logins or as `id:<numeric id>` entries. The check runs on every authenticated request rather than only at sign-in, so removing an entry takes effect on that identity's next call. Required in `oauth` and `both` modes: the server will not start without it.
 - **`refresh_accounts` / `request_accounts_refresh_and_wait` / `is_accounts_refresh_complete`**: Added `account_ids` so a refresh can target one account, a subset, or all (omit for all). The wait variant also gained `timeout` and `delay`.
 - **`set_budget_amount`**: Added `category_group_id` (budget a whole group), `timeframe`, `start_date`, and `apply_to_future`. Exactly one of `category_id` / `category_group_id` is required, validated with a clear error instead of the SDK's generic one.
 - **`upload_attachment`** *(new tool)*: Attach a file to a transaction. Content is base64-encoded since MCP carries text, with a 10 MiB decoded size limit.

@@ -17,13 +17,16 @@ from typing import Any, cast
 
 import uvicorn
 from fastmcp import FastMCP
-from fastmcp.server.auth.providers.github import GitHubProvider
 from starlette.applications import Starlette
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Mount, Route
 
+from monarch_mcp_server.auth_allowlist import (
+    AllowlistedGitHubProvider,
+    get_allowed_github_users,
+)
 from monarch_mcp_server.oauth_state import (
     OAUTH_JWT_SIGNING_KEY_ENV,
     OAUTH_REDIS_URL_ENV,
@@ -134,6 +137,9 @@ def create_mcp_server() -> FastMCP:
         client_secret = os.getenv("GITHUB_CLIENT_SECRET", "")
         redis_url = get_oauth_redis_url()
         signing_key = get_oauth_jwt_signing_key()
+        # Raises when unset: an OAuth endpoint with no allowlist would
+        # accept any GitHub account on the internet.
+        allowed_users = get_allowed_github_users()
 
         if not client_id or not client_secret:
             raise ValueError(
@@ -147,7 +153,8 @@ def create_mcp_server() -> FastMCP:
             oauth_storage = oauth_state_manager.configure_storage(
                 redis_url, signing_key
             )
-            auth_provider = GitHubProvider(
+            auth_provider = AllowlistedGitHubProvider(
+                allowed_users=allowed_users,
                 client_id=client_id,
                 client_secret=client_secret,
                 base_url=base_url,
@@ -159,7 +166,8 @@ def create_mcp_server() -> FastMCP:
             logger.info("OAuth storage: Redis-backed (durable)")
         else:
             oauth_state_manager.disable_storage()
-            auth_provider = GitHubProvider(
+            auth_provider = AllowlistedGitHubProvider(
+                allowed_users=allowed_users,
                 client_id=client_id,
                 client_secret=client_secret,
                 base_url=base_url,

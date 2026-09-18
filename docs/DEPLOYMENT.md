@@ -114,8 +114,39 @@ Go to Settings → Secrets and variables → Actions:
 Optional only for advanced oauth mode:
 - `GITHUB_CLIENT_SECRET` = GitHub OAuth App secret
 - `GITHUB_CLIENT_ID` = GitHub OAuth App client ID
+- `OAUTH_ALLOWED_USERS` = **required** in oauth/both mode. Comma-separated
+  GitHub identities permitted to use the server (see below).
 - `OAUTH_REDIS_URL` = Redis URL used to persist OAuth state
 - `OAUTH_JWT_SIGNING_KEY` = stable JWT signing key for OAuth tokens
+
+### Who may sign in (`MCP_ALLOWED_GITHUB_USERS`)
+
+In `oauth` or `both` mode the server requires an explicit list of the GitHub
+identities allowed to use it, supplied as `MCP_ALLOWED_GITHUB_USERS`. The CD
+workflow populates this from the `OAUTH_ALLOWED_USERS` repository variable.
+
+Completing a GitHub sign-in only proves the caller holds a GitHub account, so
+this list is what scopes the endpoint to *your* account. It is checked on every
+authenticated request, which means removing someone takes effect on their next
+call rather than whenever their token happens to expire.
+
+Two entry forms are accepted, and they can be mixed:
+
+```bash
+# Logins (case-insensitive, optional @)
+MCP_ALLOWED_GITHUB_USERS="octocat,@hubot"
+
+# Numeric user IDs, for entries that must survive a rename
+MCP_ALLOWED_GITHUB_USERS="octocat,id:583231"
+```
+
+Prefer the `id:` form for anything long-lived. GitHub logins can be changed,
+and a released login can later be registered by someone else, so a login entry
+can in principle be inherited by a different person. A numeric ID cannot. Find
+yours with `curl -s https://api.github.com/users/<login> | jq .id`.
+
+The server refuses to start in oauth/both mode when this is unset, rather than
+falling back to accepting any account. Token-only mode does not use it.
 
 Note: the default CD workflow deploys in token mode (`MCP_AUTH_MODE=token`) and validates real MCP calls on `/mcp`.
 

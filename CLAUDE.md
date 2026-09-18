@@ -54,6 +54,13 @@ uv run monarch-mcp-http
   - `token` (default): Single bearer-token auth on `/mcp`
   - `oauth`: GitHub OAuth on `/mcp`
   - `both`: OAuth on `/mcp` + token on `/mcp-token/mcp`
+
+  In `oauth`/`both` mode, `auth_allowlist.py` wraps `GitHubProvider` so that
+  `verify_token` additionally checks the authenticated identity against
+  `MCP_ALLOWED_GITHUB_USERS`. OAuth alone only proves the caller has *a* GitHub
+  account; the allowlist is what scopes the endpoint to specific people. It is
+  required — `create_mcp_server` raises when it is unset, so the endpoint can
+  never come up accepting any account.
   - Optional CI smoke endpoint at `/mcp-smoke/mcp` (when `MCP_ENABLE_CI_SMOKE=true`)
 
 ### Tool Registration Pattern

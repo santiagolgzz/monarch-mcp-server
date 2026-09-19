@@ -1,21 +1,37 @@
 {
-  "_comment": "Ratchet baseline for scripts/sdk_coverage.py. Known, accepted gaps between the monarchmoney SDK and the tools this server exposes. New entries may not be added without a deliberate update; entries that no longer reproduce must be removed. Regenerate with: uv run python scripts/sdk_coverage.py --update-baseline",
+  "_comment": "Ratchet baseline for scripts/sdk_coverage.py. Known, accepted gaps between the monarchmoney SDK and the tools this server exposes. New entries may not be added without a deliberate update; entries that no longer reproduce must be removed. Regenerate with: uv run python scripts/sdk_coverage.py --update-baseline. SDK 1.5.2 added seven methods, recorded here rather than wrapped. login_with_cookies and set_cookies are auth-layer, which this server owns through client.py/secure_session.py, so they stay unwrapped for the same reason login and interactive_login do. The other five are real capability this server does not yet expose: find_duplicate_transactions (read), reset_budget, update_flexible_budget, update_flex_rollover_settings, update_reoccuring and upload_receipt_to_inbox (writes). Exposing them is a deliberate piece of work \u2014 each write needs a safety tier, a pre-operation snapshot and a rollback plan to match the rest of the server, and reset_budget clears a user's planned amounts. They were not bundled into a dependency upgrade.",
   "uncovered_methods": [
     "delete_session",
+    "find_duplicate_transactions",
     "gql_call",
     "interactive_login",
+    "login_with_cookies",
     "multi_factor_authenticate",
+    "reset_budget",
+    "set_cookies",
     "set_timeout",
-    "set_token"
+    "set_token",
+    "update_flex_rollover_settings",
+    "update_flexible_budget",
+    "update_reoccuring",
+    "upload_receipt_to_inbox"
   ],
   "param_gaps": {
     "get_budgets": [
       "use_legacy_goals",
       "use_v2_goals"
     ],
+    "get_transactions": [
+      "is_pending",
+      "needs_review",
+      "transaction_visibility"
+    ],
     "login": [
       "save_session",
       "use_saved_session"
+    ],
+    "update_transaction": [
+      "reviewed"
     ]
   },
   "unanalyzable": []

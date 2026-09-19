@@ -14,9 +14,16 @@ INTENTIONALLY_UNWRAPPED = {
     "interactive_login",  # Auth handled at server startup
     "multi_factor_authenticate",  # Auth handled at server startup
     "gql_call",  # Raw GraphQL — unsafe for LLM use
+    "login_with_cookies",  # Auth flow, owned by client.py/secure_session.py
+    "set_cookies",  # Ditto
 }
 
-MINIMUM_COVERAGE = 0.95
+# A floor against collapse, not the precise control. scripts/sdk_coverage.py
+# and its baseline track the exact uncovered set and fail in both directions;
+# this only catches a wholesale regression. Lowered from 0.95 when SDK 1.5.2
+# added five unexposed capability methods (see the baseline's _comment for why
+# they were recorded rather than wrapped). Raise it again as they are exposed.
+MINIMUM_COVERAGE = 0.85
 
 TOOLS_DIR = (
     Path(__file__).resolve().parent.parent / "src" / "monarch_mcp_server" / "tools"

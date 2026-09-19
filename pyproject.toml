@@ -54,6 +54,13 @@ dev = [
     "ruff>=0.15.0",
     "ty>=0.0.14",
     "pre-commit>=4.3.0",
+    # test_tool_handler.py marks its retry tests @pytest.mark.anyio, which
+    # parametrizes over every installed anyio backend. trio used to arrive as a
+    # transitive dependency, so those tests silently ran twice; when the
+    # dependency upgrade dropped it, seven tests vanished from collection
+    # without a single failure. Declared here so backend coverage is a decision
+    # rather than a side effect of someone else's dependency tree.
+    "trio>=0.27.0",
 ]
 
 [project.urls]

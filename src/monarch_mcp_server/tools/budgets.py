@@ -38,22 +38,43 @@ def register_budget_tools(mcp: FastMCP) -> None:
         validated_end = validate_date_format(end_date, "end_date")
 
         client = await get_monarch_client()
-        budgets = await client.get_budgets(
+        payload = await client.get_budgets(
             start_date=validated_start,
             end_date=validated_end,
         )
-        budget_list = []
-        for budget in budgets.get("budgets", []):
-            budget_info = {
-                "id": budget.get("id"),
-                "name": budget.get("name"),
-                "amount": budget.get("amount"),
-                "spent": budget.get("spent"),
-                "remaining": budget.get("remaining"),
-                "category": budget.get("category", {}).get("name"),
-                "period": budget.get("period"),
-            }
-            budget_list.append(budget_info)
+
+        # The SDK returns GetJointPlanningData, which nests amounts under
+        # `budgetData` as one bucket per category (and per category group),
+        # each holding a list of months. An earlier version read a top-level
+        # `budgets` key that this response has never contained, so this tool
+        # always returned an empty list.
+        budget_data = (payload or {}).get("budgetData") or {}
+        budget_list: list[dict] = []
+
+        for bucket_key, id_key, kind in (
+            ("monthlyAmountsByCategory", "category", "category"),
+            ("monthlyAmountsByCategoryGroup", "categoryGroup", "category_group"),
+        ):
+            for bucket in budget_data.get(bucket_key) or []:
+                target_id = (bucket.get(id_key) or {}).get("id")
+                for entry in bucket.get("monthlyAmounts") or []:
+                    planned = entry.get("plannedCashFlowAmount")
+                    actual = entry.get("actualAmount")
+                    budget_list.append(
+                        {
+                            "kind": kind,
+                            "category_id": target_id,
+                            "month": entry.get("month"),
+                            "budgeted": planned,
+                            "actual": actual,
+                            "remaining": entry.get("remainingAmount"),
+                            "rollover_type": entry.get("rolloverType"),
+                            "previous_month_rollover": entry.get(
+                                "previousMonthRolloverAmount"
+                            ),
+                        }
+                    )
+
         return budget_list
 
     @mcp.tool()

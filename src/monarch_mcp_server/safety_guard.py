@@ -124,6 +124,7 @@ class SafetyGuard:
         operation_details: dict | None = None,
         result: Any = None,
         pre_state: dict | None = None,
+        pre_state_error: str | None = None,
         error: str | None = None,
     ) -> None:
         """Record that an operation was attempted.
@@ -144,6 +145,7 @@ class SafetyGuard:
             result,
             success=success,
             pre_state=pre_state,
+            pre_state_error=pre_state_error,
             error=error,
         )
 
@@ -155,6 +157,7 @@ class SafetyGuard:
         *,
         success: bool = True,
         pre_state: dict | None = None,
+        pre_state_error: str | None = None,
         error: str | None = None,
     ) -> None:
         """Save detailed operation log for potential rollback."""
@@ -178,6 +181,15 @@ class SafetyGuard:
                     operation_name, safe_params, result, pre_state
                 ),
             }
+            if pre_state_error:
+                # Say why the undo is unavailable, rather than leaving a bare
+                # "no snapshot was captured" that reads like it was never tried.
+                log_entry["pre_state_error"] = pre_state_error
+                log_entry["rollback_info"]["blocked_reason"] = (
+                    f"Capturing a pre-operation snapshot failed "
+                    f"({pre_state_error}), so this operation cannot be reversed "
+                    "from the log."
+                )
             if not success:
                 log_entry["error"] = error
                 # A failed call may still have applied. Say so rather than

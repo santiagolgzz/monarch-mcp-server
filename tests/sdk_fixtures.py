@@ -165,3 +165,69 @@ def categories_response(category_id: str = "cat_food") -> dict[str, Any]:
             }
         ]
     }
+
+
+def budgets_response(
+    category_id: str = "cat_food",
+    month: str = "2026-03-01",
+    budgeted: float = 300.0,
+) -> dict[str, Any]:
+    """``get_budgets`` — GetJointPlanningData, nested under ``budgetData``.
+
+    There is no top-level ``budgets`` key. The tool read one for months and so
+    always returned an empty list; the conftest mock returned the invented
+    shape, so nothing caught it.
+    """
+    return {
+        "budgetData": {
+            "monthlyAmountsByCategory": [
+                {
+                    "category": {"id": category_id, "__typename": "Category"},
+                    "monthlyAmounts": [
+                        {
+                            "month": month,
+                            "plannedCashFlowAmount": budgeted,
+                            "plannedSetAsideAmount": 0.0,
+                            "actualAmount": 120.0,
+                            "remainingAmount": budgeted - 120.0,
+                            "previousMonthRolloverAmount": 0.0,
+                            "rolloverType": None,
+                            "__typename": "BudgetMonthlyAmounts",
+                        }
+                    ],
+                    "__typename": "BudgetCategoryMonthlyAmounts",
+                }
+            ],
+            "monthlyAmountsByCategoryGroup": [],
+            "__typename": "BudgetData",
+        }
+    }
+
+
+def transaction_splits_response(transaction_id: str = "txn_1") -> dict[str, Any]:
+    """``get_transaction_splits`` — splits hang off ``getTransaction``."""
+    return {
+        "getTransaction": {
+            "id": transaction_id,
+            "amount": -100.0,
+            "category": {"id": "cat_food", "name": "Restaurants"},
+            "merchant": {"id": "mer_1", "name": "Cafe Example"},
+            "splitTransactions": [
+                {
+                    "id": "split_1",
+                    "merchant": {"id": "mer_1", "name": "Cafe Example"},
+                    "category": {"id": "cat_food", "name": "Restaurants"},
+                    "amount": -60.0,
+                    "notes": "food",
+                },
+                {
+                    "id": "split_2",
+                    "merchant": {"id": "mer_1", "name": "Cafe Example"},
+                    "category": {"id": "cat_tip", "name": "Tips"},
+                    "amount": -40.0,
+                    "notes": None,
+                },
+            ],
+            "__typename": "Transaction",
+        }
+    }

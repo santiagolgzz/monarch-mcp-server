@@ -7,6 +7,8 @@ from fastmcp import FastMCP
 
 from monarch_mcp_server.tools import register_tools
 
+from . import sdk_fixtures
+
 
 @pytest.fixture
 def mcp():
@@ -14,83 +16,122 @@ def mcp():
 
 
 @pytest.mark.asyncio
-async def test_get_budgets_success(mcp):
-    """Verify get_budgets returns formatted budget list."""
+async def test_get_budgets_reads_the_real_response_shape(mcp):
+    """get_budgets must read `budgetData`, the key the SDK actually returns.
+
+    It read a top-level `budgets` key for months. That key does not exist in
+    GetJointPlanningData, so the tool always returned an empty list — and the
+    mock invented the same key, so the suite agreed with the bug.
+    """
+    register_tools(mcp)
+
+    mock_client = AsyncMock()
+    mock_client.get_budgets.return_value = sdk_fixtures.budgets_response(
+        category_id="cat_food", month="2026-03-01", budgeted=300.0
+    )
+
+    with patch(
+        "monarch_mcp_server.tools.budgets.get_monarch_client", return_value=mock_client
+    ):
+        tool = await mcp.get_tool("get_budgets")
+        data = await tool.fn()
+
+        assert len(data) == 1, "the real response shape must produce a row"
+        row = data[0]
+        assert row["kind"] == "category"
+        assert row["category_id"] == "cat_food"
+        assert row["month"] == "2026-03-01"
+        assert row["budgeted"] == 300.0
+        assert row["actual"] == 120.0
+        assert row["remaining"] == 180.0
+
+
+@pytest.mark.asyncio
+async def test_get_budgets_includes_category_groups(mcp):
+    """Group-level budgets live in a sibling bucket and count too."""
+    register_tools(mcp)
+
+    payload = sdk_fixtures.budgets_response()
+    payload["budgetData"]["monthlyAmountsByCategoryGroup"] = [
+        {
+            "categoryGroup": {"id": "grp_1"},
+            "monthlyAmounts": [
+                {
+                    "month": "2026-03-01",
+                    "plannedCashFlowAmount": 900.0,
+                    "actualAmount": 400.0,
+                    "remainingAmount": 500.0,
+                }
+            ],
+        }
+    ]
+
+    mock_client = AsyncMock()
+    mock_client.get_budgets.return_value = payload
+
+    with patch(
+        "monarch_mcp_server.tools.budgets.get_monarch_client", return_value=mock_client
+    ):
+        tool = await mcp.get_tool("get_budgets")
+        data = await tool.fn()
+
+        kinds = {row["kind"] for row in data}
+        assert kinds == {"category", "category_group"}
+        group_row = next(r for r in data if r["kind"] == "category_group")
+        assert group_row["category_id"] == "grp_1"
+        assert group_row["budgeted"] == 900.0
+
+
+@pytest.mark.asyncio
+async def test_get_budgets_empty_list(mcp):
+    """An empty budgetData yields no rows rather than raising."""
     register_tools(mcp)
 
     mock_client = AsyncMock()
     mock_client.get_budgets.return_value = {
-        "budgets": [
-            {
-                "id": "bud_1",
-                "name": "Groceries",
-                "amount": 500.0,
-                "spent": 150.0,
-                "remaining": 350.0,
-                "category": {"name": "Food & Dining"},
-                "period": "monthly",
-            },
-            {
-                "id": "bud_2",
-                "name": "Entertainment",
-                "amount": 200.0,
-                "spent": 50.0,
-                "remaining": 150.0,
-                "category": {"name": "Entertainment"},
-                "period": "monthly",
-            },
-        ]
+        "budgetData": {
+            "monthlyAmountsByCategory": [],
+            "monthlyAmountsByCategoryGroup": [],
+        }
     }
 
     with patch(
         "monarch_mcp_server.tools.budgets.get_monarch_client", return_value=mock_client
     ):
         tool = await mcp.get_tool("get_budgets")
-        data = await tool.fn()
-        assert len(data) == 2
-        assert data[0]["id"] == "bud_1"
-        assert data[0]["name"] == "Groceries"
-        assert data[0]["amount"] == 500.0
-        assert data[0]["spent"] == 150.0
-        assert data[0]["remaining"] == 350.0
-        assert data[0]["category"] == "Food & Dining"
-        assert data[0]["period"] == "monthly"
+        assert await tool.fn() == []
 
 
 @pytest.mark.asyncio
-async def test_get_budgets_empty_list(mcp):
-    """Verify get_budgets handles empty budget list."""
+async def test_get_budgets_missing_budget_data_key(mcp):
+    """A response with no budgetData at all must not raise."""
     register_tools(mcp)
 
     mock_client = AsyncMock()
-    mock_client.get_budgets.return_value = {"budgets": []}
+    mock_client.get_budgets.return_value = {}
 
     with patch(
         "monarch_mcp_server.tools.budgets.get_monarch_client", return_value=mock_client
     ):
         tool = await mcp.get_tool("get_budgets")
-        data = await tool.fn()
-        assert data == []
+        assert await tool.fn() == []
 
 
 @pytest.mark.asyncio
-async def test_get_budgets_missing_category(mcp):
-    """Verify get_budgets handles budgets without category."""
+async def test_get_budgets_tolerates_partial_month_entries(mcp):
+    """Missing amount fields come through as None instead of raising."""
     register_tools(mcp)
 
     mock_client = AsyncMock()
     mock_client.get_budgets.return_value = {
-        "budgets": [
-            {
-                "id": "bud_1",
-                "name": "Miscellaneous",
-                "amount": 100.0,
-                "spent": 25.0,
-                "remaining": 75.0,
-                "category": {},  # Empty category dict (missing name)
-                "period": "monthly",
-            }
-        ]
+        "budgetData": {
+            "monthlyAmountsByCategory": [
+                {
+                    "category": {"id": "cat_1"},
+                    "monthlyAmounts": [{"month": "2026-03-01"}],
+                }
+            ]
+        }
     }
 
     with patch(
@@ -99,23 +140,8 @@ async def test_get_budgets_missing_category(mcp):
         tool = await mcp.get_tool("get_budgets")
         data = await tool.fn()
         assert len(data) == 1
-        assert data[0]["category"] is None  # Empty dict returns None for name
-
-
-@pytest.mark.asyncio
-async def test_get_budgets_missing_budgets_key(mcp):
-    """Verify get_budgets handles missing budgets key in response."""
-    register_tools(mcp)
-
-    mock_client = AsyncMock()
-    mock_client.get_budgets.return_value = {}  # No budgets key
-
-    with patch(
-        "monarch_mcp_server.tools.budgets.get_monarch_client", return_value=mock_client
-    ):
-        tool = await mcp.get_tool("get_budgets")
-        data = await tool.fn()
-        assert data == []
+        assert data[0]["budgeted"] is None
+        assert data[0]["category_id"] == "cat_1"
 
 
 @pytest.mark.asyncio
@@ -148,31 +174,3 @@ async def test_set_budget_amount_success(mcp):
                 start_date=None,
                 apply_to_future=False,
             )
-
-
-@pytest.mark.asyncio
-async def test_get_budgets_partial_data(mcp):
-    """Verify get_budgets handles budgets with missing optional fields."""
-    register_tools(mcp)
-
-    mock_client = AsyncMock()
-    mock_client.get_budgets.return_value = {
-        "budgets": [
-            {
-                "id": "bud_1",
-                # Missing name, amount, spent, remaining
-                "category": {"name": "Test"},
-            }
-        ]
-    }
-
-    with patch(
-        "monarch_mcp_server.tools.budgets.get_monarch_client", return_value=mock_client
-    ):
-        tool = await mcp.get_tool("get_budgets")
-        data = await tool.fn()
-        assert len(data) == 1
-        assert data[0]["id"] == "bud_1"
-        assert data[0]["name"] is None
-        assert data[0]["amount"] is None
-        assert data[0]["category"] == "Test"

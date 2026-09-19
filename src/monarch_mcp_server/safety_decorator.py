@@ -6,6 +6,8 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from monarch_mcp_server.pre_state import capture as capture_pre_state
+
 logger = logging.getLogger(__name__)
 
 
@@ -37,6 +39,13 @@ def require_safety_check(
             if message and message != "Operation allowed":
                 logger.info(f"{operation_name}: {message}")
 
+            # Snapshot before the write, since the write is what destroys the
+            # values an undo would need. Best-effort: a failed capture is
+            # recorded and the operation still runs.
+            pre_state, capture_error = await capture_pre_state(
+                operation_name, operation_details
+            )
+
             try:
                 if inspect.iscoroutinefunction(func):
                     result = await func(*args, **kwargs)
@@ -48,6 +57,8 @@ def require_safety_check(
                     success=True,
                     operation_details=operation_details,
                     result=result,
+                    pre_state=pre_state,
+                    pre_state_error=capture_error,
                 )
                 return result
             except Exception as exc:
@@ -59,6 +70,8 @@ def require_safety_check(
                     success=False,
                     operation_details=operation_details,
                     error=f"{type(exc).__name__}: {exc}",
+                    pre_state=pre_state,
+                    pre_state_error=capture_error,
                 )
                 raise
 

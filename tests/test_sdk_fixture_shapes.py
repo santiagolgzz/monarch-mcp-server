@@ -41,54 +41,59 @@ def _operation_document(method_name: str) -> str:
     return body[match.start() :]
 
 
-def _root_field_and_children(document: str) -> tuple[str, set[str]]:
-    """Extract the operation's root field name and its direct subfields.
+def _name_of(raw: str) -> str:
+    """Field name from a token, dropping arguments, aliases and directives."""
+    return raw.strip().split("(")[0].split("@")[0].strip()
 
-    Walks braces rather than parsing GraphQL properly — enough to read a
-    selection set, and it keeps the test free of a parser dependency.
+
+def _root_fields(document: str) -> dict[str, set[str]]:
+    """Map each of the operation's root fields to its direct subfields.
+
+    Queries may select several top-level fields — ``GetTransactionDrawer``
+    asks for both ``getTransaction`` and ``myHousehold`` — so this returns all
+    of them rather than assuming one. Walks braces rather than parsing GraphQL
+    properly, which is enough to read a selection set and keeps the test free
+    of a parser dependency.
     """
-    # Skip past `mutation Name(...) {` to the operation's selection set.
     open_brace = document.index("{")
     depth = 0
-    root_name: str | None = None
-    children: set[str] = set()
+    current_root: str | None = None
+    roots: dict[str, set[str]] = {}
     token = ""
-
-    def name_of(raw: str) -> str:
-        """Field name from a token, dropping any argument list or alias."""
-        return raw.strip().split("(")[0].strip()
 
     for char in document[open_brace:]:
         if char == "{":
-            name = name_of(token)
+            name = _name_of(token)
             depth += 1
             # depth is now the level of the selection set being opened, so the
             # name that preceded it sits one level up.
             if depth == 2 and name:
-                root_name = name
-            elif depth == 3 and name:
-                # A child of the root that has its own selection set — the
-                # entity wrappers (`transaction`, `account`, `errors`) live
-                # here, and they are the whole point of these fixtures.
-                children.add(name)
+                current_root = name
+                roots.setdefault(name, set())
+            elif depth == 3 and name and current_root:
+                # A child of a root that has its own selection set — the entity
+                # wrappers (`transaction`, `account`, `errors`) live here, and
+                # they are the whole point of these fixtures.
+                roots[current_root].add(name)
             token = ""
         elif char == "}":
-            if depth == 2 and name_of(token):
-                children.add(name_of(token))
+            if depth == 2 and _name_of(token) and current_root:
+                roots[current_root].add(_name_of(token))
             depth -= 1
             token = ""
             if depth == 0:
                 break
         elif char == "\n":
-            if depth == 2 and name_of(token):
-                children.add(name_of(token))
+            if depth == 2 and _name_of(token) and current_root:
+                roots[current_root].add(_name_of(token))
             token = ""
         else:
             token += char
 
-    assert root_name, f"could not find root field in document: {document[:120]}"
-    children.discard("")
-    return root_name, children
+    assert roots, f"could not find root fields in document: {document[:120]}"
+    for children in roots.values():
+        children.discard("")
+    return roots
 
 
 # (fixture callable, SDK method whose document defines the shape)
@@ -100,6 +105,15 @@ MUTATION_FIXTURES = [
     (sdk_fixtures.delete_transaction_response, "delete_transaction"),
 ]
 
+# Read queries matter just as much: `get_budgets` returns `budgetData`, but the
+# tool read a top-level `budgets` key and so always returned an empty list. The
+# mock agreed with the tool, so the suite never noticed.
+QUERY_FIXTURES = [
+    (sdk_fixtures.budgets_response, "get_budgets"),
+    (sdk_fixtures.transaction_splits_response, "get_transaction_splits"),
+    (sdk_fixtures.transaction_detail, "get_transaction_details"),
+]
+
 
 @pytest.mark.parametrize(
     ("fixture", "sdk_method"),
@@ -108,8 +122,9 @@ MUTATION_FIXTURES = [
 )
 def test_fixture_envelope_matches_sdk_document(fixture, sdk_method):
     """The fixture's envelope must match what the SDK's document selects."""
-    document = _operation_document(sdk_method)
-    root_field, selected = _root_field_and_children(document)
+    roots = _root_fields(_operation_document(sdk_method))
+    assert len(roots) == 1, f"{sdk_method} is expected to have one root field"
+    root_field, selected = next(iter(roots.items()))
 
     payload = fixture()
     assert list(payload) == [root_field], (
@@ -128,6 +143,23 @@ def test_fixture_envelope_matches_sdk_document(fixture, sdk_method):
     assert not missing, (
         f"{fixture.__name__} omits fields {sorted(missing)} that "
         f"{sdk_method} selects. The fixture no longer matches the real shape."
+    )
+
+
+@pytest.mark.parametrize(
+    ("fixture", "sdk_method"),
+    QUERY_FIXTURES,
+    ids=[method for _, method in QUERY_FIXTURES],
+)
+def test_query_fixture_root_matches_sdk_document(fixture, sdk_method):
+    """A read fixture must be keyed by the field the query actually selects."""
+    roots = _root_fields(_operation_document(sdk_method))
+
+    payload = fixture()
+    assert set(payload) <= set(roots), (
+        f"{fixture.__name__} keys its payload as {sorted(payload)}, but "
+        f"{sdk_method} selects {sorted(roots)}. Reading a key the query does "
+        "not return is what made get_budgets always give an empty list."
     )
 
 

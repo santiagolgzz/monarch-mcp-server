@@ -352,12 +352,12 @@ class TestDestructiveOperationBehavior:
         assert allowed is True
         assert "destructive" in message.lower()
 
-    def test_destructive_op_requires_confirmation(self, temp_guard):
+    async def test_destructive_op_requires_confirmation(self, temp_guard):
         """The gate that issue #20 said was missing."""
         temp_guard.config.config["require_approval"] = ["test_destructive_op"]
 
         params = {"some_id": "123"}
-        confirmed, refusal = temp_guard.confirm_operation(
+        confirmed, refusal = await temp_guard.confirm_operation(
             "test_destructive_op", params, None
         )
 
@@ -365,7 +365,7 @@ class TestDestructiveOperationBehavior:
         assert refusal["error"] == "Confirmation required"
 
         token = refusal["confirmation_token"]
-        confirmed, refusal = temp_guard.confirm_operation(
+        confirmed, refusal = await temp_guard.confirm_operation(
             "test_destructive_op", {**params, "confirmation_token": token}, None
         )
         assert confirmed is True

@@ -3,7 +3,7 @@
 ## Three-Tier Protection
 
 ### Tier 1: Destructive Operations
-**Withheld until confirmed with a token.**
+**Withheld until approved.**
 
 Operations:
 - `delete_transaction`
@@ -12,10 +12,15 @@ Operations:
 - `delete_transaction_categories`
 - `upload_account_balance_history`
 
-Each takes a `confirmation_token` parameter. The first call is refused and
-returns a challenge; repeating the identical call with that token carries the
-operation out. The token is single-use, bound to those exact arguments, and
-expires after `confirmation_ttl_seconds` (300 by default).
+Approval is asked of the **user**, not of you. Where the client supports MCP
+elicitation, the server prompts them directly and waits; a decline refuses the
+operation and issues no token, so you cannot approve what they turned down.
+
+Where the client cannot be prompted, the server falls back to a
+`confirmation_token`: the first call is refused with a description of what will
+be destroyed, and repeating the identical call with the token proceeds. The
+token is single-use, bound to those exact arguments, and expires
+(`confirmation_ttl_seconds`, 300 by default).
 
 ```
 delete_transaction(transaction_id="txn_1")
@@ -27,14 +32,12 @@ delete_transaction(transaction_id="txn_1", confirmation_token="8Kq...")
 → {"deleted": true, "transaction_id": "txn_1"}
 ```
 
-**Show `about_to_change` to the user and get their agreement before replaying
-the token.** The server cannot tell whether anyone saw it — the token is
-answered by whoever called the tool, so confirming it yourself is exactly as
-easy as asking first. You are the only thing standing between the challenge and
-the delete.
+**Show `about_to_change` to the user and get their agreement before replaying a
+token.** The token path cannot tell whether they saw it — that is exactly what
+you are standing in for when elicitation is unavailable.
 
-Setting `require_confirmation: false` in `~/.mm/safety_config.json` restores
-warn-and-proceed.
+Setting `require_confirmation: false` in `~/.mm/safety_config.json` disables
+both paths.
 
 ### Tier 2: Write Operations
 **Show warning, don't require approval.**

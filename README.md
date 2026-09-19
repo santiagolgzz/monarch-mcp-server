@@ -147,8 +147,26 @@ Write operations are tiered, logged, and — where the data allows — reversibl
 
 ### Confirming a destructive operation
 
-Destructive tools take a `confirmation_token`. Call once without it and the
-server refuses, describing what is about to be destroyed:
+Approval is asked of **you**, not of the client calling the tool.
+
+When your MCP client supports [elicitation](https://modelcontextprotocol.io/),
+the server asks you directly and waits:
+
+```
+delete_transaction is about to run and cannot be undone automatically
+unless a snapshot was captured.
+
+About to change: Transaction 'Cafe Example' for -42.5 on 2026-03-04
+
+Approve this?                                      [ Approve ]  [ Decline ]
+```
+
+Declining refuses the operation and issues no token, so the caller has no way
+to approve what you just turned down.
+
+**On clients without elicitation**, the server falls back to an in-band token.
+The first call is refused and returns a description plus a token; repeating the
+identical call with it proceeds:
 
 ```
 delete_transaction(transaction_id="txn_1")
@@ -157,29 +175,21 @@ delete_transaction(transaction_id="txn_1")
    "confirmation_token": "8Kq...", "expires_in_seconds": 300}
 ```
 
-Repeat the identical call with the token to carry it out. The token is
-single-use, bound to those exact arguments — one issued for `txn_1` cannot
-delete `txn_2` — and expires.
+The token is single-use, expires, and is bound to those exact arguments — one
+issued for `txn_1` cannot delete `txn_2`.
 
-This is what `require_approval` in the config always implied. Until now it
-implied it without doing it: the list existed, `get_safety_stats` reported it,
-and nothing was ever withheld.
+> **Be clear about what the fallback proves.** A token is answered by the
+> caller, so an agent can confirm its own delete; it takes a second round-trip
+> and the record is described in the transcript, but no human is required.
+> Elicitation is the path that requires a person, which is why it is preferred
+> and why no token is minted when the client supports it.
 
-> **What confirmation does and does not prove.** The token is answered by
-> whoever called the tool. That forces a second deliberate round-trip with the
-> arguments echoed back, and puts a description of the record into the
-> transcript where a person can see it — but an agent driving this server can
-> confirm its own delete. Read "confirmed" as "confirmed by the caller", not
-> "approved by a human".
->
-> Two things do reach a person. Every tool declares MCP annotations
-> (`readOnlyHint`, `destructiveHint`, `idempotentHint`), so a client can apply
-> its own confirmation UX before the call arrives here. And MCP's elicitation
-> flow would let the server ask you directly; that is built but not yet
-> released, pending live testing of how it feels in practice.
+Every tool also declares MCP annotations (`readOnlyHint`, `destructiveHint`,
+`idempotentHint`), so a client can apply its own confirmation UX before the
+call ever reaches this server.
 
-Set `require_confirmation: false` in `~/.mm/safety_config.json` to restore the
-old warn-and-proceed behavior.
+Set `require_confirmation: false` in `~/.mm/safety_config.json` to disable both
+paths and restore warn-and-proceed.
 
 ### Daily caps
 

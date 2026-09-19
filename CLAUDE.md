@@ -158,8 +158,13 @@ audit log), `safety_decorator.py` (the wrapper), `pre_state.py` (snapshots),
    Best-effort: a failure is recorded as `pre_state_error` and the write still
    proceeds, because refusing a delete over a failed snapshot read is the worse
    trade.
-3. **`confirm_operation`** — the two-step token gate, *after* capture so the
-   challenge can describe what is about to be destroyed.
+3. **`confirm_operation`** — the approval gate, *after* capture so the prompt
+   can describe what is about to be destroyed. It prefers MCP **elicitation**,
+   which asks the user through the client; only when the client cannot be asked
+   does it fall back to an in-band confirmation token. That ordering matters:
+   a token is answered by the caller, so an agent can confirm its own delete,
+   whereas elicitation requires a person. No token is minted when elicitation
+   is available, so the weaker path cannot be used to sidestep the stronger.
 4. **run, then `record_operation`** — successes and failures alike.
 
 ### What was wrong before

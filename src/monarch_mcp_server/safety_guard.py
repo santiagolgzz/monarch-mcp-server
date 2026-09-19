@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from monarch_mcp_server.approval import ApprovalStore, preview_of
+from monarch_mcp_server.elicitation import ask_user
 from monarch_mcp_server.paths import mm_file
 from monarch_mcp_server.rollback import build_rollback
 from monarch_mcp_server.safety_config import SafetyConfig
@@ -135,17 +136,21 @@ class SafetyGuard:
 
         return True, "Operation allowed"
 
-    def confirm_operation(
+    async def confirm_operation(
         self,
         operation_name: str,
         params: dict,
         pre_state: dict | None,
     ) -> tuple[bool, dict | None]:
-        """Apply the two-step confirmation gate.
+        """Withhold a destructive operation until it is approved.
 
-        Returns ``(allowed, refusal)``. The refusal is the challenge to hand
-        back to the caller, carrying a token and a description of the record
-        about to be destroyed.
+        Prefers MCP elicitation, which asks the *user* through the client, and
+        falls back to an in-band confirmation token when the client cannot be
+        asked. Only the fallback can be satisfied by the caller alone, so on a
+        client that supports elicitation no token is ever issued and there is
+        nothing weaker to fall back to.
+
+        Returns ``(allowed, refusal)``.
         """
         if not self.config.requires_approval(operation_name):
             return True, None
@@ -166,11 +171,27 @@ class SafetyGuard:
                 "reason": reason,
             }
 
-        challenge = self.approvals.issue(
-            operation_name,
-            params,
-            preview_of(operation_name, params, pre_state),
-        )
+        preview = preview_of(operation_name, params, pre_state)
+
+        outcome = await ask_user(operation_name, preview)
+        if outcome.available:
+            if outcome.accepted:
+                logger.info("User approved %s via elicitation", operation_name)
+                return True, None
+            logger.info("User did not approve %s: %s", operation_name, outcome.reason)
+            return False, {
+                "error": "Not approved",
+                "operation": operation_name,
+                "about_to_change": preview,
+                "reason": outcome.reason,
+                "how_to_proceed": (
+                    f"The user was asked and did not approve. Do not retry "
+                    f"{operation_name} unless they ask for it."
+                ),
+            }
+
+        # No client to ask — fall back to a token the caller replays.
+        challenge = self.approvals.issue(operation_name, params, preview)
         return False, challenge.as_response()
 
     def record_operation(

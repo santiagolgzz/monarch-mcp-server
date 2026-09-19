@@ -186,5 +186,7 @@ def permit_all(guard_mock):
     Returns the guard mock so callers can still assert against it.
     """
     guard_mock.check_operation.return_value = (True, "OK")
-    guard_mock.confirm_operation.return_value = (True, None)
+    # confirm_operation is async — it may ask the user through the client — so
+    # a plain MagicMock return value would not be awaitable.
+    guard_mock.confirm_operation = AsyncMock(return_value=(True, None))
     return guard_mock

@@ -168,15 +168,15 @@ class TestSummarize:
 
 
 class TestGuardConfirmation:
-    def test_non_approval_operations_pass_straight_through(self, guard):
-        confirmed, refusal = guard.confirm_operation(
+    async def test_non_approval_operations_pass_straight_through(self, guard):
+        confirmed, refusal = await guard.confirm_operation(
             "create_transaction", {"amount": 1}, None
         )
         assert confirmed is True
         assert refusal is None
 
-    def test_challenge_carries_the_preview(self, guard):
-        confirmed, refusal = guard.confirm_operation(
+    async def test_challenge_carries_the_preview(self, guard):
+        confirmed, refusal = await guard.confirm_operation(
             "delete_transaction",
             {"transaction_id": "t1"},
             {
@@ -190,8 +190,8 @@ class TestGuardConfirmation:
         assert "Cafe Example" in refusal["about_to_change"]
         assert refusal["expires_in_seconds"] > 0
 
-    def test_a_rejected_token_explains_itself(self, guard):
-        confirmed, refusal = guard.confirm_operation(
+    async def test_a_rejected_token_explains_itself(self, guard):
+        confirmed, refusal = await guard.confirm_operation(
             "delete_transaction",
             {"transaction_id": "t1", "confirmation_token": "bogus"},
             None,
@@ -200,9 +200,9 @@ class TestGuardConfirmation:
         assert refusal["error"] == "Confirmation rejected"
         assert refusal["reason"]
 
-    def test_the_gate_can_be_turned_off(self, guard):
+    async def test_the_gate_can_be_turned_off(self, guard):
         guard.config.config["require_confirmation"] = False
-        confirmed, refusal = guard.confirm_operation(
+        confirmed, refusal = await guard.confirm_operation(
             "delete_transaction", {"transaction_id": "t1"}, None
         )
         assert confirmed is True

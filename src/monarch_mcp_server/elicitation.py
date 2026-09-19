@@ -38,14 +38,32 @@ class ElicitationOutcome:
 
     ``available`` is False when the client cannot be asked at all, which is the
     signal to fall back to a token rather than to treat it as a refusal.
+
+    ``grant_seconds`` is set when the user chose to stop being asked for a
+    while. It is only ever non-zero on an approval that came from a person.
     """
 
     available: bool
     accepted: bool = False
     reason: str = ""
+    grant_seconds: int = 0
 
 
 UNAVAILABLE = ElicitationOutcome(available=False)
+
+APPROVE_ONCE = "Approve once"
+DECLINE = "Decline"
+
+
+def grant_choice(operation_name: str, seconds: int) -> str:
+    """The wording of the "stop asking" option.
+
+    It names the operation, because that is the whole scope of the grant, and
+    the duration, because an open-ended one would be a different decision.
+    """
+    minutes = max(1, round(seconds / 60))
+    unit = "minute" if minutes == 1 else "minutes"
+    return f"Approve all {operation_name} for {minutes} {unit}"
 
 
 def _client_can_elicit(context) -> bool:
@@ -73,8 +91,26 @@ def _prompt(operation_name: str, preview: str) -> str:
     )
 
 
-async def ask_user(operation_name: str, preview: str) -> ElicitationOutcome:
+def _choices(operation_name: str, grant_seconds: int) -> list[str]:
+    """Options offered in the prompt, most conservative first."""
+    options = [APPROVE_ONCE]
+    if grant_seconds > 0:
+        options.append(grant_choice(operation_name, grant_seconds))
+    options.append(DECLINE)
+    return options
+
+
+async def ask_user(
+    operation_name: str, preview: str, grant_seconds: int = 0
+) -> ElicitationOutcome:
     """Ask the person to approve a destructive operation.
+
+    Args:
+        operation_name: The operation awaiting approval.
+        preview: What it is about to change, from the pre-operation snapshot.
+        grant_seconds: When positive, the prompt also offers to stop asking for
+            this operation for that long. Zero omits the option entirely, so
+            every call is asked about individually.
 
     Returns ``UNAVAILABLE`` when there is no client to ask — no active request
     context, no declared capability, or the attempt failed. Callers treat that
@@ -98,10 +134,11 @@ async def ask_user(operation_name: str, preview: str) -> ElicitationOutcome:
             DeclinedElicitation,
         )
 
-        # `bool` rather than an empty schema: some clients render an empty form
-        # as an unanswerable prompt.
+        # A list of strings becomes an enum schema, which clients render as
+        # discrete choices rather than a free-text box or an empty form.
+        choices = _choices(operation_name, grant_seconds)
         result = await context.elicit(
-            _prompt(operation_name, preview), response_type=bool
+            _prompt(operation_name, preview), response_type=choices
         )
     except Exception as exc:  # noqa: BLE001 - never let this block the gate
         logger.warning(
@@ -112,14 +149,7 @@ async def ask_user(operation_name: str, preview: str) -> ElicitationOutcome:
         return UNAVAILABLE
 
     if isinstance(result, AcceptedElicitation):
-        # An accept whose payload is an explicit False is a "no". Treating the
-        # act of answering as consent would defeat the point of asking.
-        approved = result.data is not False
-        return ElicitationOutcome(
-            available=True,
-            accepted=approved,
-            reason="Approved by the user" if approved else "The user answered no.",
-        )
+        return _interpret(result.data, operation_name, grant_seconds)
 
     if isinstance(result, DeclinedElicitation):
         return ElicitationOutcome(
@@ -143,4 +173,52 @@ async def ask_user(operation_name: str, preview: str) -> ElicitationOutcome:
         available=True,
         accepted=False,
         reason="The client returned an unrecognized response.",
+    )
+
+
+def _interpret(
+    answer: object, operation_name: str, grant_seconds: int
+) -> ElicitationOutcome:
+    """Turn the user's choice into an outcome.
+
+    Anything that is not recognisably an approval is treated as a refusal. The
+    act of answering is not consent, so an unexpected payload must never open
+    the gate.
+    """
+    # Older prompts used a bool; keep honouring it so a client that answers
+    # that way is not misread as approving.
+    if isinstance(answer, bool):
+        return ElicitationOutcome(
+            available=True,
+            accepted=answer,
+            reason="Approved by the user" if answer else "The user answered no.",
+        )
+
+    if answer == APPROVE_ONCE:
+        return ElicitationOutcome(
+            available=True, accepted=True, reason="Approved by the user, once."
+        )
+
+    if grant_seconds > 0 and answer == grant_choice(operation_name, grant_seconds):
+        return ElicitationOutcome(
+            available=True,
+            accepted=True,
+            reason=f"Approved by the user for {grant_seconds}s.",
+            grant_seconds=grant_seconds,
+        )
+
+    if answer == DECLINE:
+        return ElicitationOutcome(
+            available=True, accepted=False, reason="The user declined."
+        )
+
+    logger.warning(
+        "Unrecognized elicitation answer %r for %s; treating as not approved.",
+        answer,
+        operation_name,
+    )
+    return ElicitationOutcome(
+        available=True,
+        accepted=False,
+        reason="The client returned an unrecognized answer.",
     )

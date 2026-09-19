@@ -227,3 +227,200 @@ class TestGatePrefersElicitation:
             )
         assert allowed is True
         context.elicit.assert_not_awaited()
+
+
+class TestPromptChoices:
+    """The prompt offers a way to stop being asked, and names its scope."""
+
+    async def test_offers_once_grant_and_decline(self):
+        context = fake_context(result=AcceptedElicitation(data="Approve once"))
+        with with_context(context):
+            await elicitation.ask_user("delete_transaction", "a coffee", 900)
+
+        choices = context.elicit.await_args.kwargs["response_type"]
+        assert choices == [
+            "Approve once",
+            "Approve all delete_transaction for 15 minutes",
+            "Decline",
+        ]
+
+    async def test_the_grant_option_names_the_operation(self):
+        """Its scope is the operation, so the wording has to say which."""
+        context = fake_context(result=AcceptedElicitation(data="Approve once"))
+        with with_context(context):
+            await elicitation.ask_user("delete_account", "an account", 900)
+
+        grant_option = context.elicit.await_args.kwargs["response_type"][1]
+        assert "delete_account" in grant_option
+
+    async def test_zero_seconds_removes_the_option(self):
+        """Operators who want every call confirmed individually can have it."""
+        context = fake_context(result=AcceptedElicitation(data="Approve once"))
+        with with_context(context):
+            await elicitation.ask_user("delete_transaction", "a coffee", 0)
+
+        assert context.elicit.await_args.kwargs["response_type"] == [
+            "Approve once",
+            "Decline",
+        ]
+
+
+class TestInterpretingTheAnswer:
+    async def test_approve_once_grants_nothing(self):
+        context = fake_context(result=AcceptedElicitation(data="Approve once"))
+        with with_context(context):
+            outcome = await elicitation.ask_user("delete_transaction", "x", 900)
+        assert outcome.accepted is True
+        assert outcome.grant_seconds == 0
+
+    async def test_choosing_the_grant_returns_its_duration(self):
+        answer = "Approve all delete_transaction for 15 minutes"
+        context = fake_context(result=AcceptedElicitation(data=answer))
+        with with_context(context):
+            outcome = await elicitation.ask_user("delete_transaction", "x", 900)
+        assert outcome.accepted is True
+        assert outcome.grant_seconds == 900
+
+    async def test_declining_grants_nothing(self):
+        context = fake_context(result=AcceptedElicitation(data="Decline"))
+        with with_context(context):
+            outcome = await elicitation.ask_user("delete_transaction", "x", 900)
+        assert outcome.accepted is False
+        assert outcome.grant_seconds == 0
+
+    async def test_a_grant_answer_for_another_operation_is_not_honoured(self):
+        """A grant string only means what it says for the operation it names."""
+        answer = "Approve all delete_account for 15 minutes"
+        context = fake_context(result=AcceptedElicitation(data=answer))
+        with with_context(context):
+            outcome = await elicitation.ask_user("delete_transaction", "x", 900)
+        assert outcome.accepted is False
+        assert outcome.grant_seconds == 0
+
+    async def test_an_unexpected_answer_is_not_consent(self):
+        context = fake_context(result=AcceptedElicitation(data="Sure, go ahead"))
+        with with_context(context):
+            outcome = await elicitation.ask_user("delete_transaction", "x", 900)
+        assert outcome.accepted is False
+
+    async def test_a_bool_answer_is_still_honoured(self):
+        """A client answering the older shape must not be misread."""
+        for value, expected in ((True, True), (False, False)):
+            context = fake_context(result=AcceptedElicitation(data=value))
+            with with_context(context):
+                outcome = await elicitation.ask_user("delete_transaction", "x", 900)
+            assert outcome.accepted is expected
+            assert outcome.grant_seconds == 0
+
+
+class TestGateHonoursGrants:
+    async def test_a_grant_stops_the_prompting(self, guard):
+        answer = "Approve all delete_transaction for 15 minutes"
+        context = fake_context(result=AcceptedElicitation(data=answer))
+
+        with with_context(context):
+            allowed, _ = await guard.confirm_operation(
+                "delete_transaction", {"transaction_id": "t1"}, None
+            )
+            assert allowed is True
+            assert context.elicit.await_count == 1
+
+            # The next two calls are covered and must not ask again.
+            for txn in ("t2", "t3"):
+                allowed, refusal = await guard.confirm_operation(
+                    "delete_transaction", {"transaction_id": txn}, None
+                )
+                assert allowed is True
+                assert refusal is None
+
+        assert context.elicit.await_count == 1
+
+    async def test_a_grant_does_not_cover_a_different_operation(self, guard):
+        """The safety boundary, end to end through the gate."""
+        answer = "Approve all delete_transaction for 15 minutes"
+        context = fake_context(result=AcceptedElicitation(data=answer))
+
+        with with_context(context):
+            await guard.confirm_operation(
+                "delete_transaction", {"transaction_id": "t1"}, None
+            )
+            # A different destructive operation must still be asked about.
+            context.elicit.return_value = AcceptedElicitation(data="Decline")
+            allowed, refusal = await guard.confirm_operation(
+                "delete_account", {"account_id": "a1"}, None
+            )
+
+        assert allowed is False
+        assert refusal["error"] == "Not approved"
+        assert context.elicit.await_count == 2
+
+    async def test_approve_once_does_not_cover_the_next_call(self, guard):
+        context = fake_context(result=AcceptedElicitation(data="Approve once"))
+        with with_context(context):
+            await guard.confirm_operation(
+                "delete_transaction", {"transaction_id": "t1"}, None
+            )
+            await guard.confirm_operation(
+                "delete_transaction", {"transaction_id": "t2"}, None
+            )
+        assert context.elicit.await_count == 2
+
+    async def test_an_expired_grant_asks_again(self, guard):
+        import time as _time
+
+        answer = "Approve all delete_transaction for 15 minutes"
+        context = fake_context(result=AcceptedElicitation(data=answer))
+        with with_context(context):
+            await guard.confirm_operation(
+                "delete_transaction", {"transaction_id": "t1"}, None
+            )
+            guard.grants._granted["delete_transaction"] = _time.time() - 1
+            await guard.confirm_operation(
+                "delete_transaction", {"transaction_id": "t2"}, None
+            )
+        assert context.elicit.await_count == 2
+
+    async def test_the_token_fallback_can_never_create_a_grant(self, guard):
+        """A token is answered by the caller. Letting one mint a standing
+        approval would hand an agent the power to stop being asked."""
+        context = fake_context(can_elicit=False)
+        params = {"transaction_id": "t1"}
+
+        with with_context(context):
+            _, refusal = await guard.confirm_operation(
+                "delete_transaction", params, None
+            )
+            await guard.confirm_operation(
+                "delete_transaction",
+                {**params, "confirmation_token": refusal["confirmation_token"]},
+                None,
+            )
+
+        assert guard.grants.active() == {}
+
+    async def test_daily_caps_still_apply_under_a_grant(self, guard):
+        """A grant silences the prompt; it does not raise the ceiling."""
+        guard.config.config["daily_limits"] = {"delete_transaction": 1}
+        guard.grants.grant("delete_transaction", 900)
+
+        guard.record_operation("delete_transaction", success=True)
+
+        allowed, message = guard.check_operation("delete_transaction", {})
+        assert allowed is False
+        assert "Daily limit reached" in message
+
+    async def test_disabling_grants_means_every_call_is_asked(self, guard):
+        guard.config.config["approval_grant_seconds"] = 0
+        context = fake_context(result=AcceptedElicitation(data="Approve once"))
+
+        with with_context(context):
+            await guard.confirm_operation(
+                "delete_transaction", {"transaction_id": "t1"}, None
+            )
+            choices = context.elicit.await_args.kwargs["response_type"]
+            await guard.confirm_operation(
+                "delete_transaction", {"transaction_id": "t2"}, None
+            )
+
+        assert choices == ["Approve once", "Decline"]
+        assert context.elicit.await_count == 2

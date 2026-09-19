@@ -16,6 +16,14 @@ Approval is asked of the **user**, not of you. Where the client supports MCP
 elicitation, the server prompts them directly and waits; a decline refuses the
 operation and issues no token, so you cannot approve what they turned down.
 
+The prompt also lets them approve that operation for a while (15 minutes by
+default), which is how a cleanup run avoids twenty identical prompts. A grant
+covers **one operation name** — approving `delete_transaction` still leaves
+`delete_account` asking — expires, and is revoked by `enable_emergency_stop`.
+Check `get_safety_stats().standing_approvals` to see what is currently
+covered; a call that goes through without a prompt is not a sign that
+confirmation is off.
+
 Where the client cannot be prompted, the server falls back to a
 `confirmation_token`: the first call is refused with a description of what will
 be destroyed, and repeating the identical call with the token proceeds. The

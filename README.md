@@ -158,11 +158,32 @@ unless a snapshot was captured.
 
 About to change: Transaction 'Cafe Example' for -42.5 on 2026-03-04
 
-Approve this?                                      [ Approve ]  [ Decline ]
+Approve this?
+  ( ) Approve once
+  ( ) Approve all delete_transaction for 15 minutes
+  ( ) Decline
 ```
 
 Declining refuses the operation and issues no token, so the caller has no way
 to approve what you just turned down.
+
+**Approving for a while** stops the prompting during a cleanup run, where being
+asked twenty times in a row would just train you to click through. It is kept
+deliberately narrow:
+
+- **Scoped to that one operation.** Approving a run of `delete_transaction`
+  grants nothing to `delete_account` — that still asks.
+- **Time-boxed**, 15 minutes by default (`approval_grant_seconds`), and held
+  only in memory, so restarting the server revokes it.
+- **Revoked by `enable_emergency_stop`**, which says how many it cleared.
+- **Daily caps are unaffected.** A grant silences the prompt; it does not raise
+  the ceiling, so a runaway loop still hits its limit.
+- **Only a person can create one.** The token fallback below never mints a
+  grant, so an agent cannot approve its way out of being asked.
+
+Active grants show up in `get_safety_stats` under `standing_approvals`. Set
+`approval_grant_seconds: 0` to remove the option and confirm every call
+individually.
 
 **On clients without elicitation**, the server falls back to an in-band token.
 The first call is refused and returns a description plus a token; repeating the

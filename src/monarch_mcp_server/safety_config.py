@@ -46,6 +46,11 @@ class SafetyConfig:
             # old warn-and-proceed behavior.
             "require_confirmation": True,
             "confirmation_ttl_seconds": 300,
+            # How long a user can choose to stop being asked about one
+            # operation. Offered only through elicitation, where a person
+            # answers. 0 removes the option, so every destructive call is
+            # confirmed individually.
+            "approval_grant_seconds": 900,
             # Per-operation ceilings on successful writes per day. Counts were
             # already tracked and reported; nothing enforced them, so a runaway
             # caller was caught only by a human noticing. Generous by default —
@@ -104,6 +109,14 @@ class SafetyConfig:
         except (TypeError, ValueError):
             return 300
         return ttl if ttl > 0 else 300
+
+    def approval_grant_seconds(self) -> int:
+        """How long a standing approval lasts, or 0 to disable the option."""
+        try:
+            seconds = int(self.config.get("approval_grant_seconds", 900))
+        except (TypeError, ValueError):
+            return 900
+        return max(0, seconds)
 
     def daily_limit(self, operation_name: str) -> int | None:
         """Successful writes allowed per day, or None when uncapped."""

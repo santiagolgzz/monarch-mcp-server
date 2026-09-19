@@ -225,3 +225,70 @@ def preview_of(operation_name: str, params: dict, pre_state: dict | None) -> str
     except Exception:  # noqa: BLE001 - a preview must never break the gate
         logger.debug("Failed to summarize %s", operation_name, exc_info=True)
         return f"{operation_name} (details unavailable)"
+
+
+class GrantStore:
+    """Time-boxed standing approvals, granted by the user during a prompt.
+
+    Asking before every single delete is right for a one-off and wrong for a
+    cleanup session — a prompt answered twenty times in a row stops being read,
+    which is worse than not asking. A grant lets the user say "yes, and stop
+    asking for a bit".
+
+    It is deliberately narrow, because a standing approval is a real weakening
+    of the gate:
+
+    * **Scoped to one operation.** Approving `delete_transaction` for a while
+      grants nothing to `delete_account`. The blast radius is the operation the
+      user was actually looking at.
+    * **Time-boxed**, and held only in memory, so a restart revokes it.
+    * **Revocable** — the emergency stop clears every grant.
+    * Daily caps are unaffected and still enforced. They, not the prompt, are
+      what stops a runaway loop once a grant is active.
+
+    Grants are only ever created from an elicitation answer, never from the
+    token fallback. A token is answered by the caller, so letting one mint a
+    standing approval would hand an agent the power to stop being asked.
+    """
+
+    def __init__(self) -> None:
+        self._granted: dict[str, float] = {}
+
+    def grant(self, operation_name: str, seconds: int) -> float:
+        """Allow this operation without prompting until the returned expiry."""
+        expires_at = time.time() + seconds
+        self._granted[operation_name] = expires_at
+        logger.info("Standing approval granted for %s for %ss", operation_name, seconds)
+        return expires_at
+
+    def is_granted(self, operation_name: str) -> bool:
+        """Whether an unexpired grant covers this operation."""
+        expires_at = self._granted.get(operation_name)
+        if expires_at is None:
+            return False
+        if expires_at <= time.time():
+            del self._granted[operation_name]
+            return False
+        return True
+
+    def remaining(self, operation_name: str) -> int:
+        """Seconds left on a grant, or 0 when none is active."""
+        if not self.is_granted(operation_name):
+            return 0
+        return max(0, int(self._granted[operation_name] - time.time()))
+
+    def clear(self) -> int:
+        """Revoke every grant. Returns how many were active."""
+        active = sum(1 for name in list(self._granted) if self.is_granted(name))
+        self._granted.clear()
+        if active:
+            logger.warning("Revoked %d standing approval(s)", active)
+        return active
+
+    def active(self) -> dict[str, int]:
+        """Currently granted operations and their remaining seconds."""
+        return {
+            name: self.remaining(name)
+            for name in list(self._granted)
+            if self.is_granted(name)
+        }

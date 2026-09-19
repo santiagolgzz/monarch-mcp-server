@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from monarch_mcp_server.approval import ApprovalStore, preview_of
+from monarch_mcp_server.approval import ApprovalStore, GrantStore, preview_of
 from monarch_mcp_server.elicitation import ask_user
 from monarch_mcp_server.paths import mm_file
 from monarch_mcp_server.rollback import build_rollback
@@ -59,6 +59,7 @@ class SafetyGuard:
             lambda: defaultdict(int)
         )
         self.approvals = ApprovalStore(ttl_seconds=self.config.confirmation_ttl())
+        self.grants = GrantStore()
         self._load_operation_log()
 
     def _load_operation_log(self) -> None:
@@ -158,6 +159,16 @@ class SafetyGuard:
         if not self.config.confirmation_enabled():
             return True, None
 
+        # A standing approval the user gave earlier, scoped to this operation
+        # and still unexpired. Daily caps are unaffected and still apply.
+        if self.grants.is_granted(operation_name):
+            logger.info(
+                "%s covered by a standing approval (%ss left)",
+                operation_name,
+                self.grants.remaining(operation_name),
+            )
+            return True, None
+
         token = params.get("confirmation_token")
         if token:
             accepted, reason = self.approvals.redeem(token, operation_name, params)
@@ -173,10 +184,16 @@ class SafetyGuard:
 
         preview = preview_of(operation_name, params, pre_state)
 
-        outcome = await ask_user(operation_name, preview)
+        outcome = await ask_user(
+            operation_name, preview, self.config.approval_grant_seconds()
+        )
         if outcome.available:
             if outcome.accepted:
                 logger.info("User approved %s via elicitation", operation_name)
+                if outcome.grant_seconds:
+                    # Only an answer from a person can create a grant. The
+                    # token path never reaches here.
+                    self.grants.grant(operation_name, outcome.grant_seconds)
                 return True, None
             logger.info("User did not approve %s: %s", operation_name, outcome.reason)
             return False, {
@@ -309,6 +326,7 @@ class SafetyGuard:
             "total_operations_today": sum(self.daily_counts[today].values()),
             "emergency_stop": self.config.config.get("emergency_stop", False),
             "confirmation_required": self.config.confirmation_enabled(),
+            "standing_approvals": self.grants.active(),
             "approval_required_for": self.config.config.get("require_approval", []),
             "pending_confirmations": self.approvals.pending_count(),
             "daily_limits": self.config.config.get("daily_limits", {}),
@@ -318,8 +336,15 @@ class SafetyGuard:
         """Enable emergency stop."""
         self.config.config["emergency_stop"] = True
         self.config.save_config()
+        # Revoke standing approvals too. Someone hitting the stop wants the
+        # prompting back, not a window where deletes still pass unasked.
+        revoked = self.grants.clear()
         logger.critical("🚨 EMERGENCY STOP ACTIVATED")
-        return "🚨 Emergency stop activated. All write operations are now disabled."
+        suffix = f" {revoked} standing approval(s) revoked." if revoked else ""
+        return (
+            "🚨 Emergency stop activated. All write operations are now "
+            f"disabled.{suffix}"
+        )
 
     def disable_emergency_stop(self) -> str:
         """Disable emergency stop."""

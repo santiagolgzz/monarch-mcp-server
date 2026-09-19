@@ -351,3 +351,100 @@ class TestSafetyConfigRobustness:
         config = SafetyConfig(config_path="/proc/nonexistent/safety_config.json")
         config.config["emergency_stop"] = True
         config.save_config()  # logs, does not raise
+
+
+class TestGrantStore:
+    """Standing approvals: narrow, expiring, and revocable by design."""
+
+    def test_a_grant_covers_its_own_operation(self):
+        from monarch_mcp_server.approval import GrantStore
+
+        grants = GrantStore()
+        assert grants.is_granted("delete_transaction") is False
+        grants.grant("delete_transaction", 900)
+        assert grants.is_granted("delete_transaction") is True
+
+    def test_a_grant_does_not_leak_to_other_operations(self):
+        """The property that keeps this from being a blanket key.
+
+        A user approving a run of transaction deletes has not agreed to let an
+        account be deleted without being asked.
+        """
+        from monarch_mcp_server.approval import GrantStore
+
+        grants = GrantStore()
+        grants.grant("delete_transaction", 900)
+
+        assert grants.is_granted("delete_account") is False
+        assert grants.is_granted("delete_transaction_category") is False
+        assert grants.is_granted("upload_account_balance_history") is False
+
+    def test_an_expired_grant_stops_covering(self):
+        from monarch_mcp_server.approval import GrantStore
+
+        grants = GrantStore()
+        grants.grant("delete_transaction", 900)
+        grants._granted["delete_transaction"] = time.time() - 1
+
+        assert grants.is_granted("delete_transaction") is False
+        assert grants.remaining("delete_transaction") == 0
+
+    def test_remaining_counts_down(self):
+        from monarch_mcp_server.approval import GrantStore
+
+        grants = GrantStore()
+        grants.grant("delete_transaction", 900)
+        assert 0 < grants.remaining("delete_transaction") <= 900
+
+    def test_clear_revokes_everything(self):
+        from monarch_mcp_server.approval import GrantStore
+
+        grants = GrantStore()
+        grants.grant("delete_transaction", 900)
+        grants.grant("delete_account", 900)
+
+        assert grants.clear() == 2
+        assert grants.is_granted("delete_transaction") is False
+        assert grants.is_granted("delete_account") is False
+
+    def test_active_lists_only_live_grants(self):
+        from monarch_mcp_server.approval import GrantStore
+
+        grants = GrantStore()
+        grants.grant("delete_transaction", 900)
+        grants.grant("delete_account", 900)
+        grants._granted["delete_account"] = time.time() - 1
+
+        assert list(grants.active()) == ["delete_transaction"]
+
+
+class TestEmergencyStopRevokesGrants:
+    def test_stopping_clears_standing_approvals(self, guard):
+        """Someone hitting the stop wants prompting back immediately, not a
+        window where deletes still pass unasked."""
+        guard.grants.grant("delete_transaction", 900)
+        assert guard.grants.is_granted("delete_transaction") is True
+
+        message = guard.enable_emergency_stop()
+
+        assert guard.grants.is_granted("delete_transaction") is False
+        assert "revoked" in message
+
+    def test_the_message_is_unchanged_when_nothing_was_granted(self, guard):
+        assert "revoked" not in guard.enable_emergency_stop()
+
+    def test_stats_report_standing_approvals(self, guard):
+        assert guard.get_operation_stats()["standing_approvals"] == {}
+        guard.grants.grant("delete_transaction", 900)
+        assert "delete_transaction" in guard.get_operation_stats()["standing_approvals"]
+
+
+class TestGrantConfig:
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [(900, 900), ("600", 600), (0, 0), (-5, 0), ("soon", 900), (None, 900)],
+    )
+    def test_grant_seconds_rejects_nonsense(self, tmp_path, value, expected):
+        config = SafetyConfig(config_path=str(tmp_path / "c.json"))
+        config.config["approval_grant_seconds"] = value
+        assert config.approval_grant_seconds() == expected

@@ -159,7 +159,12 @@ audit log), `safety_decorator.py` (the wrapper), `pre_state.py` (snapshots),
    proceeds, because refusing a delete over a failed snapshot read is the worse
    trade.
 3. **`confirm_operation`** — the approval gate, *after* capture so the prompt
-   can describe what is about to be destroyed. It prefers MCP **elicitation**,
+   can describe what is about to be destroyed. An unexpired standing approval
+   for that operation short-circuits it (`GrantStore`); grants are scoped to
+   one operation name, time-boxed, memory-only, revoked by the emergency stop,
+   and creatable **only** from an elicitation answer — never from the token
+   fallback, which the caller answers. Otherwise it prefers MCP
+   **elicitation**,
    which asks the user through the client; only when the client cannot be asked
    does it fall back to an in-band confirmation token. That ordering matters:
    a token is answered by the caller, so an agent can confirm its own delete,

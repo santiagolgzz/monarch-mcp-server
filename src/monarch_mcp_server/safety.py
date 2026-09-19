@@ -16,5 +16,13 @@ def get_safety_guard() -> SafetyGuard:
 
 
 def require_safety_check(operation_name: str):
-    """Compatibility wrapper that delegates to the shared decorator helper."""
-    return _require_safety(operation_name, get_safety_guard)
+    """Compatibility wrapper that delegates to the shared decorator helper.
+
+    The guard is looked up through a lambda rather than passed directly, so
+    the lookup happens per call against this module's current attribute.
+    Passing ``get_safety_guard`` itself bound the decorator to the original
+    function at registration time, which meant patching
+    ``monarch_mcp_server.safety.get_safety_guard`` had no effect on tools that
+    were already registered — the seam existed to be patched, and wasn't.
+    """
+    return _require_safety(operation_name, lambda: get_safety_guard())

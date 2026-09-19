@@ -129,6 +129,60 @@ Enforced in two places:
 
 When you deliberately widen or accept a gap, re-record it with `--update-baseline` and say why in the commit message. The issue #15 gap is additionally pinned by its own test, so `--update-baseline` alone cannot re-accept it.
 
+## Safety System
+
+Split across `safety_config.py` (policy), `safety_guard.py` (checks, counters,
+audit log), `safety_decorator.py` (the wrapper), `pre_state.py` (snapshots),
+`rollback.py` (undo planning), `approval.py` (confirmation tokens), and
+`safety.py` (facade + global singleton).
+
+`require_safety_check` runs four steps in this order, and the order matters:
+
+1. **`check_operation`** — emergency stop, then the daily cap. Both refuse
+   before any work happens.
+2. **`pre_state.capture`** — snapshot the record the write is about to change.
+   Best-effort: a failure is recorded as `pre_state_error` and the write still
+   proceeds, because refusing a delete over a failed snapshot read is the worse
+   trade.
+3. **`confirm_operation`** — the two-step token gate, *after* capture so the
+   challenge can describe what is about to be destroyed.
+4. **run, then `record_operation`** — successes and failures alike.
+
+### What was wrong before
+
+Three claims the code made and did not honor. Each is now pinned by a test:
+
+- **`require_approval` gated nothing.** `check_operation` returned True for it,
+  so "destructive" operations ran exactly like warned ones while
+  `get_safety_stats` reported `approval_required_for` (issue #20).
+- **`reversible` was hardcoded True** in every rollback branch, and
+  `_extract_id_from_result` read only top-level keys — but the SDK returns
+  GraphQL envelopes, so `created_id` was always None. Nothing captured
+  pre-state, so deletes and updates pointed at data they had destroyed.
+- **Failures were never logged.** `record_operation(success=False)` was a no-op
+  behind `if success:`.
+
+The through-line is that **test fixtures did not match the API**. The mocks
+returned flat dicts like `{"id": "txn_1"}`, so the extraction bug passed its
+tests. `get_budgets` had the same bug in reverse: it read a `budgets` key that
+`GetJointPlanningData` has never returned, and always gave an empty list.
+
+`tests/sdk_fixtures.py` holds shapes transcribed from the SDK's own GraphQL
+documents, and `tests/test_sdk_fixture_shapes.py` parses those documents to
+check the fixtures still match. **Use those fixtures for any test involving an
+SDK response.** A hand-written response shape is how this class of bug returns.
+
+### Invariants
+
+- `reversible` is true only when `reverse_call` holds a complete, executable
+  call. Otherwise `blocked_reason` says what is missing. Swept in
+  `tests/test_rollback.py` across every operation.
+- Snapshots are keyed by **tool parameter name**, not Monarch's field names, so
+  they drop straight into a reverse call.
+- Confirmation tokens are single-use, bound to `(operation, arguments)`, and
+  expire.
+- Daily caps count successes only.
+
 ## Bundled Claude Skill
 
 `.claude/skills/monarch-money-mcp/` documents the tool surface for agents:

@@ -7,6 +7,8 @@ from fastmcp import FastMCP
 
 from monarch_mcp_server.tools import register_tools
 
+from .conftest import permit_all
+
 
 @pytest.fixture
 def mcp():
@@ -29,8 +31,7 @@ async def test_create_tag_with_default_color(mcp):
         "monarch_mcp_server.tools.tags.get_monarch_client", return_value=mock_client
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("create_tag")
             data = await tool.fn(name="New Tag")
             assert data["id"] == "tag_123"
@@ -56,8 +57,7 @@ async def test_create_tag_with_custom_color(mcp):
         "monarch_mcp_server.tools.tags.get_monarch_client", return_value=mock_client
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("create_tag")
             data = await tool.fn(name="Important", color="#FF0000")
             assert data["color"] == "#FF0000"
@@ -77,8 +77,7 @@ async def test_create_tag_empty_name_error(mcp):
         "monarch_mcp_server.tools.tags.get_monarch_client", return_value=mock_client
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("create_tag")
             with pytest.raises(RuntimeError, match="name cannot be empty"):
                 await tool.fn(name="")
@@ -96,8 +95,7 @@ async def test_set_transaction_tags_single(mcp):
         "monarch_mcp_server.tools.tags.get_monarch_client", return_value=mock_client
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("set_transaction_tags")
             data = await tool.fn(transaction_id="txn_123", tag_ids="tag_1")
             assert data["success"] is True
@@ -118,8 +116,7 @@ async def test_set_transaction_tags_multiple_with_whitespace(mcp):
         "monarch_mcp_server.tools.tags.get_monarch_client", return_value=mock_client
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("set_transaction_tags")
             # Tags with whitespace around them
             data = await tool.fn(
@@ -149,8 +146,7 @@ async def test_add_transaction_tag_appends(mcp):
         "monarch_mcp_server.tools.tags.get_monarch_client", return_value=mock_client
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("add_transaction_tag")
             data = await tool.fn(transaction_id="txn_123", tag_id="tag2")
             assert data["success"] is True
@@ -177,8 +173,7 @@ async def test_add_transaction_tag_no_duplicate(mcp):
         "monarch_mcp_server.tools.tags.get_monarch_client", return_value=mock_client
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("add_transaction_tag")
             # Try to add tag1 again (already exists)
             data = await tool.fn(transaction_id="txn_123", tag_id="tag1")
@@ -206,8 +201,7 @@ async def test_add_transaction_tag_empty_tags(mcp):
         "monarch_mcp_server.tools.tags.get_monarch_client", return_value=mock_client
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("add_transaction_tag")
             data = await tool.fn(transaction_id="txn_123", tag_id="tag1")
             assert data["success"] is True
@@ -228,8 +222,7 @@ async def test_add_transaction_tag_validates_empty_id(mcp):
         "monarch_mcp_server.tools.tags.get_monarch_client", return_value=mock_client
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("add_transaction_tag")
             with pytest.raises(RuntimeError, match="transaction_id cannot be empty"):
                 await tool.fn(transaction_id="", tag_id="tag1")

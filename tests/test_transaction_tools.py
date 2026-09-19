@@ -5,6 +5,8 @@ from fastmcp import FastMCP
 
 from monarch_mcp_server.tools import register_tools
 
+from .conftest import permit_all
+
 
 @pytest.fixture
 def mcp():
@@ -31,7 +33,7 @@ async def test_create_transaction_success(mcp):
         return_value=mock_client,
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, "OK")
+            permit_all(mock_guard.return_value)
             mock_guard.return_value.record_operation = MagicMock()
 
             tool = await mcp.get_tool("create_transaction")
@@ -64,7 +66,7 @@ async def test_create_transaction_passes_update_balance(mcp):
         return_value=mock_client,
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, "OK")
+            permit_all(mock_guard.return_value)
             mock_guard.return_value.record_operation = MagicMock()
 
             tool = await mcp.get_tool("create_transaction")
@@ -267,8 +269,7 @@ async def test_delete_transaction_bool_result(mcp):
         return_value=mock_client,
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("delete_transaction")
             data = await tool.fn(transaction_id="txn_to_delete")
             assert data["deleted"] is True
@@ -287,8 +288,7 @@ async def test_update_splits_invalid_json(mcp):
         return_value=mock_client,
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("update_transaction_splits")
             with pytest.raises(RuntimeError, match="Expecting value"):
                 await tool.fn(transaction_id="txn_123", splits_data="not valid json")
@@ -366,8 +366,7 @@ async def test_categorize_transaction_success(mcp):
         return_value=mock_client,
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("categorize_transaction")
             data = await tool.fn(transaction_id="txn_123", category_id="cat_456")
             assert data["id"] == "txn_123"
@@ -390,8 +389,7 @@ async def test_categorize_transaction_validates_empty_transaction_id(mcp):
         return_value=mock_client,
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("categorize_transaction")
             with pytest.raises(RuntimeError, match="transaction_id cannot be empty"):
                 await tool.fn(transaction_id="", category_id="cat_456")

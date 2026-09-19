@@ -28,9 +28,12 @@ get_budgets                   # Budget vs actual
 
 - **Read-only tools are safe** — All `get_*`, `search_*`, and `is_*` tools
 - **9 write ops show warnings** — `create_transaction`, `update_transaction`, `update_transaction_splits`, `create_manual_account`, `update_account`, `set_budget_amount`, `add_transaction_tag`, `categorize_transaction`, `upload_attachment`
-- **5 destructive ops require approval** — `delete_transaction`, `delete_account`, `delete_transaction_category`, `delete_transaction_categories`, `upload_account_balance_history`
+- **5 destructive ops require a confirmation token** — `delete_transaction`, `delete_account`, `delete_transaction_category`, `delete_transaction_categories`, `upload_account_balance_history`
+  - Call once with no token to get a challenge naming what will be destroyed, show the user, then repeat the identical call with the token. See [tools.md](references/tools.md#destructive-tool-confirmation).
 - **Other write ops** (`create_tag`, `set_transaction_tags`, `create_transaction_category`) are recorded but execute without warning
 - **Emergency stop** — `enable_emergency_stop` blocks all writes immediately
+- **Daily caps** — each write op has a per-day ceiling; exceeding it returns an error naming the setting to raise
+- **Undo** — `get_rollback_suggestions(0)` prints the exact call that reverses the last write, or says what is missing
 - **All dates** — YYYY-MM-DD format
 
 ## Tool Selection Guide

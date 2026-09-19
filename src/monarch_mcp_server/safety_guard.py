@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from monarch_mcp_server.approval import ApprovalStore, preview_of
 from monarch_mcp_server.paths import mm_file
 from monarch_mcp_server.rollback import build_rollback
 from monarch_mcp_server.safety_config import SafetyConfig
@@ -56,6 +57,7 @@ class SafetyGuard:
         self.daily_counts: dict[str, dict[str, int]] = defaultdict(
             lambda: defaultdict(int)
         )
+        self.approvals = ApprovalStore(ttl_seconds=self.config.confirmation_ttl())
         self._load_operation_log()
 
     def _load_operation_log(self) -> None:
@@ -109,6 +111,22 @@ class SafetyGuard:
                 f"Use disable_emergency_stop() to re-enable or edit {self.config.config_path}",
             )
 
+        # Daily ceilings. These were counted and reported but never enforced,
+        # so a runaway caller was stopped only by a human noticing and hitting
+        # the emergency stop.
+        limit = self.config.daily_limit(operation_name)
+        if limit is not None:
+            today = datetime.now().strftime("%Y-%m-%d")
+            used = self.daily_counts[today].get(operation_name, 0)
+            if used >= limit:
+                return (
+                    False,
+                    f"Daily limit reached for {operation_name}: {used}/{limit} "
+                    f"already succeeded today. This exists to stop runaway "
+                    f"loops. Raise 'daily_limits.{operation_name}' in "
+                    f"{self.config.config_path} if this is deliberate work.",
+                )
+
         if self.config.requires_approval(operation_name):
             return True, f"⚠️  Destructive operation: {operation_name}"
 
@@ -116,6 +134,44 @@ class SafetyGuard:
             return True, f"ℹ️  Executing write operation: {operation_name}"
 
         return True, "Operation allowed"
+
+    def confirm_operation(
+        self,
+        operation_name: str,
+        params: dict,
+        pre_state: dict | None,
+    ) -> tuple[bool, dict | None]:
+        """Apply the two-step confirmation gate.
+
+        Returns ``(allowed, refusal)``. The refusal is the challenge to hand
+        back to the caller, carrying a token and a description of the record
+        about to be destroyed.
+        """
+        if not self.config.requires_approval(operation_name):
+            return True, None
+
+        if not self.config.confirmation_enabled():
+            return True, None
+
+        token = params.get("confirmation_token")
+        if token:
+            accepted, reason = self.approvals.redeem(token, operation_name, params)
+            if accepted:
+                logger.info("Confirmation accepted for %s", operation_name)
+                return True, None
+            logger.warning("Confirmation rejected for %s: %s", operation_name, reason)
+            return False, {
+                "error": "Confirmation rejected",
+                "operation": operation_name,
+                "reason": reason,
+            }
+
+        challenge = self.approvals.issue(
+            operation_name,
+            params,
+            preview_of(operation_name, params, pre_state),
+        )
+        return False, challenge.as_response()
 
     def record_operation(
         self,
@@ -231,7 +287,10 @@ class SafetyGuard:
             "operations_today": dict(self.daily_counts[today]),
             "total_operations_today": sum(self.daily_counts[today].values()),
             "emergency_stop": self.config.config.get("emergency_stop", False),
+            "confirmation_required": self.config.confirmation_enabled(),
             "approval_required_for": self.config.config.get("require_approval", []),
+            "pending_confirmations": self.approvals.pending_count(),
+            "daily_limits": self.config.config.get("daily_limits", {}),
         }
 
     def enable_emergency_stop(self) -> str:

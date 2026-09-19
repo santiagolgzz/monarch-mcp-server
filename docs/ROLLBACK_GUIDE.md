@@ -147,8 +147,9 @@ Bulk deletes have no single reverse call. The entry reports this and carries a
    are undone before the earlier ones they were layered on.
 4. `disable_emergency_stop` when finished.
 
-Daily caps stop this automatically before it gets far — see
-[Operation caps](#operation-caps).
+Two things now stop this before it gets far: destructive calls are refused
+until confirmed, and each operation has a daily cap. See the README's safety
+section for both.
 
 ## Limitations
 

@@ -8,6 +8,7 @@ from fastmcp import FastMCP
 from monarch_mcp_server.tools import register_tools
 
 from . import sdk_fixtures
+from .conftest import permit_all
 
 
 @pytest.fixture
@@ -161,8 +162,7 @@ async def test_set_budget_amount_success(mcp):
     ):
         # Also mock safety guard - must return (True, None) tuple
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("set_budget_amount")
             data = await tool.fn(category_id="cat_123", amount=750.0)
             assert data["success"] is True

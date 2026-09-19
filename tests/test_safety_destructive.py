@@ -31,9 +31,17 @@ class TestDestructiveToolsInServer:
                 )
 
                 tool = await mcp.get_tool("delete_transaction")
-                result = await tool.fn(transaction_id="txn_123")  # type: ignore[attr-defined]
 
-                # Should not be blocked
+                # First call is refused with a challenge rather than deleting.
+                challenge = await tool.fn(transaction_id="txn_123")  # type: ignore[attr-defined]
+                assert challenge["error"] == "Confirmation required"
+                assert challenge["confirmation_token"]
+
+                # Repeating it with the token carries the delete out.
+                result = await tool.fn(  # type: ignore[attr-defined]
+                    transaction_id="txn_123",
+                    confirmation_token=challenge["confirmation_token"],
+                )
                 assert result["deleted"] in (True, False)
         finally:
             guard.config.config["emergency_stop"] = original_stop

@@ -13,6 +13,8 @@ from fastmcp import FastMCP
 
 from monarch_mcp_server.tools import register_tools
 
+from .conftest import permit_all
+
 TXN_PATH = "monarch_mcp_server.tools.transactions.get_monarch_client"
 ACCT_PATH = "monarch_mcp_server.tools.accounts.get_monarch_client"
 BUDGET_PATH = "monarch_mcp_server.tools.budgets.get_monarch_client"
@@ -47,7 +49,7 @@ def client():
 def allow_writes():
     """Bypass the safety guard for write-path tools."""
     with patch("monarch_mcp_server.safety.get_safety_guard") as guard:
-        guard.return_value.check_operation.return_value = (True, "OK")
+        permit_all(guard.return_value)
         guard.return_value.record_operation = MagicMock()
         yield guard
 

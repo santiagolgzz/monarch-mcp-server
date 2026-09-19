@@ -335,18 +335,41 @@ class TestDestructiveOperationBehavior:
             guard.operation_log_path = str(Path(tmpdir) / "operation_log.json")
             yield guard
 
-    def test_destructive_op_allowed_with_warning(self, temp_guard):
-        """Test that destructive operations are allowed (Claude Code handles approval)."""
+    def test_check_operation_flags_destructive_ops_but_does_not_gate_them(
+        self, temp_guard
+    ):
+        """check_operation warns; confirm_operation is what actually gates.
+
+        This used to be the whole story, and it was the bug behind issue #20:
+        an operation named require_approval executed exactly like a warned one.
+        """
         temp_guard.config.config["require_approval"] = ["test_destructive_op"]
 
-        operation_details = {"some_id": "123"}
         allowed, message = temp_guard.check_operation(
-            "test_destructive_op", operation_details
+            "test_destructive_op", {"some_id": "123"}
         )
 
-        # Should be allowed - Claude Code prompts user for approval
         assert allowed is True
         assert "destructive" in message.lower()
+
+    def test_destructive_op_requires_confirmation(self, temp_guard):
+        """The gate that issue #20 said was missing."""
+        temp_guard.config.config["require_approval"] = ["test_destructive_op"]
+
+        params = {"some_id": "123"}
+        confirmed, refusal = temp_guard.confirm_operation(
+            "test_destructive_op", params, None
+        )
+
+        assert confirmed is False
+        assert refusal["error"] == "Confirmation required"
+
+        token = refusal["confirmation_token"]
+        confirmed, refusal = temp_guard.confirm_operation(
+            "test_destructive_op", {**params, "confirmation_token": token}, None
+        )
+        assert confirmed is True
+        assert refusal is None
 
     def test_destructive_op_blocked_by_emergency_stop(self, temp_guard):
         """Test that emergency stop blocks destructive operations."""
@@ -362,11 +385,46 @@ class TestDestructiveOperationBehavior:
         assert "EMERGENCY STOP" in message
 
     @pytest.mark.asyncio
-    async def test_decorator_allows_destructive_ops(self, temp_guard):
-        """Test decorator allows destructive operations (Claude Code handles approval)."""
+    async def test_decorator_gates_destructive_ops_behind_confirmation(
+        self, temp_guard
+    ):
+        """The decorator withholds a destructive op until it is confirmed."""
         guard = get_safety_guard()
         original_approval = guard.config.config.get("require_approval", [])
         guard.config.config["require_approval"] = ["decorator_test_op"]
+
+        calls: list[str] = []
+
+        try:
+
+            @require_safety_check("decorator_test_op")
+            async def destructive_func(item_id: str, confirmation_token=None):
+                calls.append(item_id)
+                return f"Deleted {item_id}"
+
+            challenge = await destructive_func("item_123")
+            assert challenge["error"] == "Confirmation required"
+            assert not calls, "the operation must not run before confirmation"
+
+            result = await destructive_func(
+                "item_123", confirmation_token=challenge["confirmation_token"]
+            )
+            assert result == "Deleted item_123"
+            assert calls == ["item_123"]
+
+        finally:
+            guard.config.config["require_approval"] = original_approval
+
+    @pytest.mark.asyncio
+    async def test_decorator_runs_destructive_ops_when_gate_is_disabled(
+        self, temp_guard
+    ):
+        """Operators can opt back into warn-and-proceed."""
+        guard = get_safety_guard()
+        original_approval = guard.config.config.get("require_approval", [])
+        original_confirm = guard.config.config.get("require_confirmation", True)
+        guard.config.config["require_approval"] = ["decorator_test_op"]
+        guard.config.config["require_confirmation"] = False
 
         try:
 
@@ -374,11 +432,10 @@ class TestDestructiveOperationBehavior:
             async def destructive_func(item_id: str):
                 return f"Deleted {item_id}"
 
-            result = await destructive_func("item_123")
-            assert result == "Deleted item_123"
-
+            assert await destructive_func("item_123") == "Deleted item_123"
         finally:
             guard.config.config["require_approval"] = original_approval
+            guard.config.config["require_confirmation"] = original_confirm
 
     def test_non_destructive_op_allowed(self, temp_guard):
         """Test that non-destructive read operations are allowed."""

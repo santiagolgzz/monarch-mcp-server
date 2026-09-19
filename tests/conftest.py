@@ -2,7 +2,7 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -125,3 +125,66 @@ def writable_fastmcp_home(tmp_path, monkeypatch):
         oauth_proxy.settings.home = fastmcp_home  # type: ignore[attr-defined]
     except Exception:
         pass
+
+
+@pytest.fixture(autouse=True)
+def isolated_mm_home(tmp_path, monkeypatch):
+    """Point ``~/.mm`` at a temp directory for every test.
+
+    ``SafetyGuard`` resolves its log path in ``__init__`` via ``Path.home()``,
+    before a fixture can override the attribute, so tests were reading and
+    writing the developer's real ``~/.mm/operation_log.json``. That made daily
+    counts leak between runs — a limit test could fail because an earlier run
+    had already spent the budget — and appended real audit entries on every
+    test invocation.
+    """
+    home = tmp_path / "home"
+    (home / ".mm").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))  # Windows equivalent
+
+    # The global guard in safety.py is built at import time, so it resolved
+    # the real home before this fixture could run. Rebuild it against the temp
+    # one; this also gives each test a clean set of daily counts, which the
+    # shared singleton otherwise carried between tests.
+    from monarch_mcp_server import safety as safety_module
+
+    monkeypatch.setattr(safety_module, "_safety_guard", safety_module.SafetyGuard())
+    return home
+
+
+@pytest.fixture(autouse=True)
+def offline_pre_state():
+    """Keep pre-operation snapshots from reaching the network.
+
+    Capture runs inside ``require_safety_check``, so any test exercising a
+    write path would otherwise try to authenticate against Monarch. Capture is
+    best-effort and swallows the failure, but the attempt is slow and fills the
+    logs with auth warnings that look like real problems.
+
+    Tests that care about snapshot contents patch this themselves; an inner
+    patch wins over this one.
+    """
+    client = AsyncMock()
+    client.get_transaction_details.return_value = {}
+    client.get_transaction_splits.return_value = {}
+    client.get_accounts.return_value = {}
+    client.get_transaction_categories.return_value = {}
+    client.get_budgets.return_value = {}
+    with patch("monarch_mcp_server.pre_state.get_monarch_client", return_value=client):
+        yield client
+
+
+def permit_all(guard_mock):
+    """Configure a patched safety guard to allow every operation.
+
+    Tests that exercise a write path patch ``get_safety_guard`` and then have
+    to stub each gate the decorator consults. Centralizing that means adding a
+    gate needs one edit here rather than one per call site — when the
+    confirmation gate landed, every such test broke on an unstubbed method.
+
+    Returns the guard mock so callers can still assert against it.
+    """
+    guard_mock.check_operation.return_value = (True, "OK")
+    guard_mock.confirm_operation.return_value = (True, None)
+    return guard_mock

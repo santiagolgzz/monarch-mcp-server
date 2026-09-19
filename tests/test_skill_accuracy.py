@@ -379,7 +379,7 @@ class TestSkillEntrypoint:
 
         for label, key in (
             ("write ops show warnings", "warn"),
-            ("destructive ops require approval", "approval"),
+            ("destructive ops require a confirmation token", "approval"),
         ):
             match = re.search(rf"\*\*(\d+) {label}\*\* — (.+)", text)
             assert match, f"{SKILL_MD.name} has no '{label}' bullet"

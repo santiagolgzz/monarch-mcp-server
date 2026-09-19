@@ -137,13 +137,41 @@ Write operations are tiered, logged, and — where the data allows — reversibl
 
 | Tier | Behavior | Operations |
 |------|----------|------------|
-| **Destructive** | Warned and logged with a pre-operation snapshot | `delete_transaction`, `delete_account`, `delete_transaction_category`, `delete_transaction_categories`, `upload_account_balance_history` |
+| **Destructive** | **Withheld until confirmed**, snapshotted, logged | `delete_transaction`, `delete_account`, `delete_transaction_category`, `delete_transaction_categories`, `upload_account_balance_history` |
 | **Write** | Warned and logged | `create_transaction`, `update_transaction`, `update_transaction_splits`, `create_manual_account`, `update_account`, `set_budget_amount`, `add_transaction_tag`, `categorize_transaction`, `upload_attachment` |
 | **Recorded** | Logged, no warning | `create_tag`, `set_transaction_tags`, `create_transaction_category` |
 | **Read** | No protection needed | All `get_*`, `search_*`, `is_*` |
 
 > **Note:** warnings are advisory — they are logged, and the operation proceeds.
-> Only `enable_emergency_stop` refuses writes outright.
+> Destructive operations are different: they are refused until confirmed.
+
+### Confirming a destructive operation
+
+Destructive tools take a `confirmation_token`. Call once without it and the
+server refuses, describing what is about to be destroyed:
+
+```
+delete_transaction(transaction_id="txn_1")
+→ {"error": "Confirmation required",
+   "about_to_change": "Transaction 'Cafe Example' for -42.5 on 2026-03-04",
+   "confirmation_token": "8Kq...", "expires_in_seconds": 300}
+```
+
+Repeat the identical call with the token to carry it out. The token is
+single-use, bound to those exact arguments — one issued for `txn_1` cannot
+delete `txn_2` — and expires.
+
+This is what `require_approval` in the config always implied. Until now it
+implied it without doing it: the list existed, `get_safety_stats` reported it,
+and nothing was ever withheld. Set `require_confirmation: false` in
+`~/.mm/safety_config.json` to restore the old warn-and-proceed behavior.
+
+### Daily caps
+
+Each operation has a per-day ceiling on successful writes (`daily_limits` in
+the config). Exceeding one refuses the call and names the setting to raise.
+Defaults are generous — they exist to stop a runaway loop, not to get in the
+way of bulk work. Failed calls don't count against the budget.
 
 ### Safety Tools
 

@@ -74,6 +74,31 @@ The **Safety** column uses the tiers defined in [safety.md](safety.md):
 | `file_content_base64` | string | Yes | The file's bytes, base64-encoded (MCP carries text, not raw bytes) |
 | `filename` | string | Yes | File name including extension, e.g. `receipt.pdf` |
 
+### Destructive tool confirmation
+
+`delete_transaction`, `delete_account`, `delete_transaction_category`,
+`delete_transaction_categories` and `upload_account_balance_history` each take
+one extra parameter:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `confirmation_token` | string | No | Omit on the first call. The server refuses and replies with a token plus a description of the record about to be destroyed; repeat the identical call with that token to carry it out. Single-use, bound to those exact arguments, and expires (5 minutes by default). |
+
+Flow:
+
+```
+delete_transaction(transaction_id="txn_1")
+→ {"error": "Confirmation required",
+   "about_to_change": "Transaction 'Cafe Example' for -42.5 on 2026-03-04",
+   "confirmation_token": "8Kq...", "expires_in_seconds": 300}
+
+delete_transaction(transaction_id="txn_1", confirmation_token="8Kq...")
+→ {"deleted": true, "transaction_id": "txn_1"}
+```
+
+Show the user `about_to_change` before confirming. A token reused for a
+different record is rejected, so confirm the call you were actually given.
+
 ## Accounts (12 tools)
 | # | Tool | Description | Safety |
 |---|------|-------------|--------|

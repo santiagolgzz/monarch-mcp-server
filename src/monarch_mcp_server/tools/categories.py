@@ -117,8 +117,20 @@ def register_category_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     @require_safety_check("delete_transaction_category")
     @tool_handler("delete_transaction_category")
-    async def delete_transaction_category(category_id: str) -> dict:
-        """Delete a transaction category."""
+    async def delete_transaction_category(
+        category_id: str,
+        confirmation_token: str | None = None,
+    ) -> dict:
+        """Delete a transaction category.
+
+        Args:
+            category_id: The category to delete.
+            confirmation_token: Leave unset on the first call. The server
+                replies with a token and a description of what will be
+                destroyed; repeat the call with that token to carry it out.
+                The token works once, only for these exact arguments, and
+                expires.
+        """
         client = await get_monarch_client()
         result = await client.delete_transaction_category(category_id)
         return {"deleted": result, "category_id": category_id}
@@ -126,8 +138,20 @@ def register_category_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     @require_safety_check("delete_transaction_categories")
     @tool_handler("delete_transaction_categories")
-    async def delete_transaction_categories(category_ids: str) -> dict:
-        """Delete multiple transaction categories."""
+    async def delete_transaction_categories(
+        category_ids: str,
+        confirmation_token: str | None = None,
+    ) -> dict:
+        """Delete multiple transaction categories.
+
+        Args:
+            category_ids: Comma-separated category IDs.
+            confirmation_token: Leave unset on the first call. The server
+                replies with a token and a description of what will be
+                destroyed; repeat the call with that token to carry it out.
+                The token works once, only for these exact arguments, and
+                expires.
+        """
         client = await get_monarch_client()
         ids_list = [id.strip() for id in category_ids.split(",")]
         results = await client.delete_transaction_categories(ids_list)

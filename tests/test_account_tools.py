@@ -5,6 +5,8 @@ from fastmcp import FastMCP
 
 from monarch_mcp_server.tools import register_tools
 
+from .conftest import permit_all
+
 
 @pytest.fixture
 def mcp():
@@ -180,8 +182,7 @@ async def test_create_manual_account_success(mcp):
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("create_manual_account")
             data = await tool.fn(
                 account_name="My New Account",
@@ -204,8 +205,7 @@ async def test_create_manual_account_with_subtype(mcp):
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("create_manual_account")
             await tool.fn(
                 account_name="Investment",
@@ -233,8 +233,7 @@ async def test_update_account_success(mcp):
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("update_account")
             data = await tool.fn(account_id="acc_123", name="Updated Name")
             assert data["name"] == "Updated Name"
@@ -252,8 +251,7 @@ async def test_delete_account_bool_result(mcp):
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("delete_account")
             data = await tool.fn(account_id="acc_to_delete")
             assert data["deleted"] is True
@@ -272,8 +270,7 @@ async def test_upload_account_balance_history(mcp):
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("upload_account_balance_history")
             csv_data = "date,amount\n2024-01-01,1000\n2024-01-02,1050"
             data = await tool.fn(account_id="acc_123", csv_data=csv_data)
@@ -294,8 +291,7 @@ async def test_upload_account_balance_history_balance_column(mcp):
         "monarch_mcp_server.tools.accounts.get_monarch_client", return_value=mock_client
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("upload_account_balance_history")
             csv_data = "date,balance\n2024-01-01,1000\n2024-01-02,1050"
             data = await tool.fn(account_id="acc_123", csv_data=csv_data)

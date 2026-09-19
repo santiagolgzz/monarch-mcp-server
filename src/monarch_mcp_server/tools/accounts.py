@@ -247,8 +247,23 @@ def register_account_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     @require_safety_check("delete_account")
     @tool_handler("delete_account")
-    async def delete_account(account_id: str) -> dict:
-        """Delete an account from Monarch Money."""
+    async def delete_account(
+        account_id: str,
+        confirmation_token: str | None = None,
+    ) -> dict:
+        """Delete an account from Monarch Money.
+
+        Deleting an account also removes its transaction history, which this
+        server cannot restore.
+
+        Args:
+            account_id: The account to delete.
+            confirmation_token: Leave unset on the first call. The server
+                replies with a token and a description of what will be
+                destroyed; repeat the call with that token to carry it out.
+                The token works once, only for these exact arguments, and
+                expires.
+        """
         client = await get_monarch_client()
         result = await client.delete_account(account_id)
         # SDK returns bool, wrap for consistency
@@ -264,6 +279,7 @@ def register_account_tools(mcp: FastMCP) -> None:
         csv_data: str,
         timeout: int = 300,
         delay: int = 10,
+        confirmation_token: str | None = None,
     ) -> dict:
         """Upload account balance history from CSV data.
 
@@ -275,6 +291,12 @@ def register_account_tools(mcp: FastMCP) -> None:
             csv_data: CSV text as described above.
             timeout: Seconds to wait for the upload to be processed. Default 300.
             delay: Seconds between status checks while waiting. Default 10.
+            confirmation_token: Leave unset on the first call. The server
+                replies with a token and a description of what will be
+                overwritten; repeat the call with that token to carry it out.
+                The token works once, only for these exact arguments, and
+                expires. This upload overwrites existing balance snapshots in
+                bulk and cannot be undone through this server.
         """
         rows: list[BalanceHistoryRow] = []
         reader = csv.DictReader(io.StringIO(csv_data))

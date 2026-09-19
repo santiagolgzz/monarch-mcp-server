@@ -46,6 +46,15 @@ def require_safety_check(
                 operation_name, operation_details
             )
 
+            # The confirmation gate runs after capture so the challenge can
+            # describe the record that is about to be destroyed. A token the
+            # caller cannot evaluate would be a rubber stamp.
+            confirmed, refusal = guard.confirm_operation(
+                operation_name, operation_details, pre_state
+            )
+            if not confirmed:
+                return refusal
+
             try:
                 if inspect.iscoroutinefunction(func):
                     result = await func(*args, **kwargs)

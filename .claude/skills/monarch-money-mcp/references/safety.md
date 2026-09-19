@@ -3,7 +3,7 @@
 ## Three-Tier Protection
 
 ### Tier 1: Destructive Operations
-**Require user approval before execution.**
+**Withheld until confirmed with a token.**
 
 Operations:
 - `delete_transaction`
@@ -12,12 +12,24 @@ Operations:
 - `delete_transaction_categories`
 - `upload_account_balance_history`
 
-Example flow:
+Each takes a `confirmation_token` parameter. The first call is refused and
+returns a challenge; repeating the identical call with that token carries the
+operation out. The token is single-use, bound to those exact arguments, and
+expires after `confirmation_ttl_seconds` (300 by default).
+
 ```
-User: "Delete transaction ABC123"
-Claude: About to execute: delete_transaction(transaction_id="ABC123")
-        [Approve] [Deny]
+delete_transaction(transaction_id="txn_1")
+→ {"error": "Confirmation required",
+   "about_to_change": "Transaction 'Cafe Example' for -42.5 on 2026-03-04",
+   "confirmation_token": "8Kq...", "expires_in_seconds": 300}
+
+delete_transaction(transaction_id="txn_1", confirmation_token="8Kq...")
+→ {"deleted": true, "transaction_id": "txn_1"}
 ```
+
+Show `about_to_change` to the user before confirming — that is the point of the
+two steps. Setting `require_confirmation: false` in `~/.mm/safety_config.json`
+restores warn-and-proceed.
 
 ### Tier 2: Write Operations
 **Show warning, don't require approval.**
@@ -46,6 +58,18 @@ Operations:
 
 All `get_*`, `search_*`, and `is_*` tools are completely safe.
 
+## Daily Caps
+
+Each operation has a per-day ceiling on **successful** writes, set under
+`daily_limits` in `~/.mm/safety_config.json`. Exceeding one refuses the call
+and names the setting to raise. Failures do not count, so a flapping upstream
+cannot exhaust the day's allowance. `null` means no limit.
+
+Defaults: `delete_transaction` 50, `delete_account` 5,
+`delete_transaction_category` 25, `delete_transaction_categories` 5,
+`upload_account_balance_history` 10, `create_transaction` 200,
+`update_transaction` 200.
+
 ## Emergency Controls
 
 ```python
@@ -68,6 +92,25 @@ get_recent_operations(limit=10)
 # Get undo instructions for a specific operation
 get_rollback_suggestions(operation_index=0)
 ```
+
+## Rollback
+
+`get_rollback_suggestions(operation_index=0)` prints the exact call that
+reverses an operation, built from a snapshot captured before the write ran:
+
+```
+REVERSIBLE
+
+Run this to undo it:
+
+  create_transaction(account_id='acc_1', amount=-42.5,
+                     merchant_name='Cafe Example', category_id='cat_food',
+                     date='2026-03-04')
+```
+
+When the data needed to reverse it was not captured, it says so and names what
+is missing rather than implying an undo that would not work. Recreated records
+get new IDs; a deleted account's transaction history is not restored.
 
 ## Audit Log Location
 - Summary: `~/.mm/operation_log.json`

@@ -505,8 +505,20 @@ def register_transaction_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     @require_safety_check("delete_transaction")
     @tool_handler("delete_transaction")
-    async def delete_transaction(transaction_id: str) -> dict:
-        """Delete a transaction from Monarch Money."""
+    async def delete_transaction(
+        transaction_id: str,
+        confirmation_token: str | None = None,
+    ) -> dict:
+        """Delete a transaction from Monarch Money.
+
+        Args:
+            transaction_id: The transaction to delete.
+            confirmation_token: Leave unset on the first call. The server
+                replies with a token and a description of what will be
+                destroyed; repeat the call with that token to carry it out.
+                The token works once, only for these exact arguments, and
+                expires.
+        """
         validate_non_empty_string(transaction_id, "transaction_id")
         client = await get_monarch_client()
         result = await client.delete_transaction(transaction_id)

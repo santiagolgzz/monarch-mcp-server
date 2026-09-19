@@ -7,6 +7,8 @@ from fastmcp import FastMCP
 
 from monarch_mcp_server.tools import register_tools
 
+from .conftest import permit_all
+
 
 @pytest.fixture
 def mcp():
@@ -137,8 +139,7 @@ async def test_create_category_validation(mcp):
         return_value=mock_client,
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("create_transaction_category")
             with pytest.raises(RuntimeError, match="group_id cannot be empty"):
                 await tool.fn(name="New Category", group_id="")
@@ -160,8 +161,7 @@ async def test_create_category_success(mcp):
         return_value=mock_client,
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("create_transaction_category")
             data = await tool.fn(name="Coffee", group_id="grp_food")
             assert data["id"] == "new_cat_123"
@@ -188,8 +188,7 @@ async def test_delete_category_false_result(mcp):
         return_value=mock_client,
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("delete_transaction_category")
             data = await tool.fn(category_id="cat_123")
             assert data["deleted"] is False
@@ -213,8 +212,7 @@ async def test_delete_categories_mixed_results(mcp):
         return_value=mock_client,
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("delete_transaction_categories")
             data = await tool.fn(category_ids="cat_1,cat_2")
             assert "results" in data
@@ -244,8 +242,7 @@ async def test_create_category_with_all_optional_params(mcp):
         return_value=mock_client,
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("create_transaction_category")
             data = await tool.fn(
                 name="Pizza",
@@ -282,8 +279,7 @@ async def test_create_category_with_partial_params(mcp):
         return_value=mock_client,
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("create_transaction_category")
             # Only pass icon, not rollover params
             data = await tool.fn(name="Coffee", group_id="grp_food", icon="☕")
@@ -313,8 +309,7 @@ async def test_create_category_required_only(mcp):
         return_value=mock_client,
     ):
         with patch("monarch_mcp_server.safety.get_safety_guard") as mock_guard:
-            mock_guard.return_value.check_operation.return_value = (True, None)
-
+            permit_all(mock_guard.return_value)
             tool = await mcp.get_tool("create_transaction_category")
             # Only pass required params
             data = await tool.fn(name="Miscellaneous", group_id="grp_other")

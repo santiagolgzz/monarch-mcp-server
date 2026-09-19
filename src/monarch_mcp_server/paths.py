@@ -26,5 +26,12 @@ def mm_data_dir() -> Path:
 
 
 def mm_file(name: str) -> Path:
-    """Get full path for a file under the Monarch MCP data directory."""
-    return mm_data_dir() / name
+    """Get full path for a file under the Monarch MCP data directory.
+
+    This only computes a path; it does not create the directory. Several
+    modules call it at import time to resolve their file locations, so
+    creating here meant merely importing the package wrote a directory into
+    the user's home. Every site that actually writes creates the parent
+    itself. Use ``mm_data_dir`` when the directory must exist.
+    """
+    return resolve_home_dir() / ".mm" / name

@@ -158,14 +158,20 @@ unless a snapshot was captured.
 
 About to change: Transaction 'Cafe Example' for -42.5 on 2026-03-04
 
-Approve this?
+Approve this? Declining or dismissing this prompt cancels it.
   ( ) Approve once
   ( ) Approve all delete_transaction for 15 minutes
-  ( ) Decline
+
+                                      [ Submit ]   [ Decline ]   [ Cancel ]
 ```
 
-Declining refuses the operation and issues no token, so the caller has no way
-to approve what you just turned down.
+The form asks only how long the approval should last. Saying no is your
+client's own Decline or Cancel — MCP carries refusal as part of the reply, so
+adding a "Decline" option to the list would just put a second no beside the
+one your client already draws.
+
+Declining or dismissing refuses the operation and issues no token, so the
+caller has no way to approve what you just turned down.
 
 **Approving for a while** stops the prompting during a cleanup run, where being
 asked twenty times in a row would just train you to click through. It is kept

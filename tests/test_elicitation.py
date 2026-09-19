@@ -232,7 +232,7 @@ class TestGatePrefersElicitation:
 class TestPromptChoices:
     """The prompt offers a way to stop being asked, and names its scope."""
 
-    async def test_offers_once_grant_and_decline(self):
+    async def test_offers_only_the_approval_scopes(self):
         context = fake_context(result=AcceptedElicitation(data="Approve once"))
         with with_context(context):
             await elicitation.ask_user("delete_transaction", "a coffee", 900)
@@ -241,8 +241,28 @@ class TestPromptChoices:
         assert choices == [
             "Approve once",
             "Approve all delete_transaction for 15 minutes",
-            "Decline",
         ]
+
+    async def test_declining_is_not_offered_as_a_value(self):
+        """The protocol already carries refusal as an action.
+
+        Offering a "Decline" option too would put a second no beside the
+        client's own, duplicating an intent the protocol models directly.
+        """
+        context = fake_context(result=AcceptedElicitation(data="Approve once"))
+        with with_context(context):
+            await elicitation.ask_user("delete_transaction", "a coffee", 900)
+
+        choices = context.elicit.await_args.kwargs["response_type"]
+        assert not any("ecline" in choice for choice in choices)
+
+    async def test_the_prompt_points_at_the_clients_own_refusal(self):
+        context = fake_context(result=AcceptedElicitation(data="Approve once"))
+        with with_context(context):
+            await elicitation.ask_user("delete_transaction", "a coffee", 900)
+
+        message = context.elicit.await_args.args[0]
+        assert "Declining or dismissing" in message
 
     async def test_the_grant_option_names_the_operation(self):
         """Its scope is the operation, so the wording has to say which."""
@@ -253,16 +273,16 @@ class TestPromptChoices:
         grant_option = context.elicit.await_args.kwargs["response_type"][1]
         assert "delete_account" in grant_option
 
-    async def test_zero_seconds_removes_the_option(self):
-        """Operators who want every call confirmed individually can have it."""
+    async def test_zero_seconds_leaves_a_plain_confirmation(self):
+        """Operators who want every call confirmed individually can have it.
+
+        One option left: submitting means yes, the client's decline means no.
+        """
         context = fake_context(result=AcceptedElicitation(data="Approve once"))
         with with_context(context):
             await elicitation.ask_user("delete_transaction", "a coffee", 0)
 
-        assert context.elicit.await_args.kwargs["response_type"] == [
-            "Approve once",
-            "Decline",
-        ]
+        assert context.elicit.await_args.kwargs["response_type"] == ["Approve once"]
 
 
 class TestInterpretingTheAnswer:
@@ -281,7 +301,12 @@ class TestInterpretingTheAnswer:
         assert outcome.accepted is True
         assert outcome.grant_seconds == 900
 
-    async def test_declining_grants_nothing(self):
+    async def test_a_stale_decline_value_still_refuses(self):
+        """A client holding an older schema might still send "Decline".
+
+        It is no longer offered, so it lands in the unrecognized branch — which
+        refuses. Not offering it costs nothing precisely because of that.
+        """
         context = fake_context(result=AcceptedElicitation(data="Decline"))
         with with_context(context):
             outcome = await elicitation.ask_user("delete_transaction", "x", 900)
@@ -422,5 +447,5 @@ class TestGateHonoursGrants:
                 "delete_transaction", {"transaction_id": "t2"}, None
             )
 
-        assert choices == ["Approve once", "Decline"]
+        assert choices == ["Approve once"]
         assert context.elicit.await_count == 2

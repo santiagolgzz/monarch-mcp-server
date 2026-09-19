@@ -52,7 +52,6 @@ class ElicitationOutcome:
 UNAVAILABLE = ElicitationOutcome(available=False)
 
 APPROVE_ONCE = "Approve once"
-DECLINE = "Decline"
 
 
 def grant_choice(operation_name: str, seconds: int) -> str:
@@ -87,16 +86,26 @@ def _prompt(operation_name: str, preview: str) -> str:
         f"{operation_name} is about to run and cannot be undone automatically "
         f"unless a snapshot was captured.\n\n"
         f"About to change: {preview}\n\n"
-        f"Approve this?"
+        f"Approve this? Declining or dismissing this prompt cancels it."
     )
 
 
 def _choices(operation_name: str, grant_seconds: int) -> list[str]:
-    """Options offered in the prompt, most conservative first."""
+    """Options offered in the prompt, most conservative first.
+
+    Refusing is deliberately *not* one of them. The protocol already carries
+    it: a client answers an elicitation with accept, decline or cancel, and
+    the last two both mean no. Offering a "Decline" option as well would put a
+    second no next to the client's own, and duplicate an intent the protocol
+    models directly.
+
+    So the form asks only what the protocol cannot express — how long the
+    approval should last. Submitting it means yes; the client's own decline or
+    cancel means no.
+    """
     options = [APPROVE_ONCE]
     if grant_seconds > 0:
         options.append(grant_choice(operation_name, grant_seconds))
-    options.append(DECLINE)
     return options
 
 
@@ -207,11 +216,9 @@ def _interpret(
             grant_seconds=grant_seconds,
         )
 
-    if answer == DECLINE:
-        return ElicitationOutcome(
-            available=True, accepted=False, reason="The user declined."
-        )
-
+    # Anything else — including a "Decline" value from a client holding an
+    # older schema — falls through to the refusal below. Not offering it costs
+    # nothing, because an unrecognized answer is already not consent.
     logger.warning(
         "Unrecognized elicitation answer %r for %s; treating as not approved.",
         answer,

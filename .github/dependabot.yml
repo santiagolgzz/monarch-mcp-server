@@ -13,3 +13,27 @@ updates:
       actions:
         patterns:
           - "*"
+
+  # Python dependencies, resolved through uv so the lockfile and pyproject move
+  # together. Dependabot respects `exclude-newer` in [tool.uv], so proposals
+  # stay inside the same quarantine window a local `uv lock` would use.
+  #
+  # This was missing until now: only github-actions was watched, so the Python
+  # stack sat on `==` pins taken during an April CVE response and drifted a
+  # major version behind on fastmcp, mcp, starlette and redis.
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # One PR for routine movement; majors come separately so a breaking
+      # change is never bundled with patch noise.
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+

@@ -65,6 +65,20 @@ uv run monarch-mcp-http
 
 ### Tool Registration Pattern
 
+Tools register with `@annotated_tool(mcp)`, **not** a bare `@mcp.tool()`. It
+declares the tool's MCP `ToolAnnotations` — `readOnlyHint`, `destructiveHint`,
+`idempotentHint`, `openWorldHint` — which is how a *client* learns that
+`delete_account` is not `get_accounts` and puts a person in front of the
+difference. The server's own confirmation gate cannot do that: it runs in-band
+and only ever learns that the caller answered.
+
+Hints are derived, never restated. `require_safety_check` tags its wrapper with
+the operation name, and `annotations.py` reads that tag plus `SafetyConfig` to
+decide the hints, so the destructive tier is written down exactly once.
+`tests/test_annotations.py` fails if any tool ships unannotated or if the hints
+drift from the config.
+
+
 Tools live in `src/monarch_mcp_server/tools/`, one file per domain (accounts, transactions, budgets, categories, tags, metadata, refresh, safety). Each module exports a `register_<domain>_tools(mcp: FastMCP)` function. The `tools/__init__.py` coordinator calls all of them.
 
 Every tool function follows a consistent decorator stack:

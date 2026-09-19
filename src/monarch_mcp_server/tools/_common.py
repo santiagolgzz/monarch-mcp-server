@@ -7,11 +7,14 @@ Contains shared decorator and constants used across all tool modules.
 import functools
 import logging
 from collections.abc import Awaitable, Callable
-from typing import ParamSpec, TypeVar
+from typing import TYPE_CHECKING, ParamSpec, TypeVar
 
 from monarch_mcp_server.exceptions import AuthenticationError
 from monarch_mcp_server.secure_session import secure_session
 from monarch_mcp_server.utils import format_error
+
+if TYPE_CHECKING:
+    from fastmcp import FastMCP
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +60,7 @@ def tool_handler(
         Decorated function that preserves the wrapped function's return type.
 
     Example:
-        @mcp.tool()
+        @annotated_tool(mcp)
         @require_safety_check("create_tag")  # Safety first (for write ops)
         @tool_handler("create_tag")          # Error handling innermost
         async def create_tag(name: str) -> dict:
@@ -89,5 +92,31 @@ def tool_handler(
                 raise RuntimeError(format_error(e, operation_name)) from e
 
         return wrapper
+
+    return decorator
+
+
+def annotated_tool(mcp: "FastMCP"):
+    """Register a tool, declaring its MCP annotations.
+
+    Used in place of a bare ``@mcp.tool()`` so no tool can reach a client
+    without behaviour hints. A client that cannot tell `delete_account` from
+    `get_accounts` cannot put a person in front of the difference, and this
+    server's own confirmation gate can't either — it runs in-band and never
+    learns whether a human saw it.
+
+    Hints are derived from the tag ``require_safety_check`` leaves on its
+    wrapper, so this restates nothing about which operations write or destroy.
+    Place it outermost, above ``@require_safety_check``::
+
+        @annotated_tool(mcp)
+        @require_safety_check("delete_transaction")
+        @tool_handler("delete_transaction")
+        async def delete_transaction(...): ...
+    """
+    from monarch_mcp_server.annotations import annotations_for_function
+
+    def decorator(func):
+        return mcp.tool(annotations=annotations_for_function(func))(func)
 
     return decorator

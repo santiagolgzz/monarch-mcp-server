@@ -13,7 +13,7 @@ from monarch_mcp_server.client import get_monarch_client
 from monarch_mcp_server.safety import require_safety_check
 from monarch_mcp_server.utils import validate_date_format, validate_non_empty_string
 
-from ._common import tool_handler
+from ._common import annotated_tool, tool_handler
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 def register_category_tools(mcp: FastMCP) -> None:
     """Register category management tools with the FastMCP instance."""
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_transaction_categories")
     async def get_transaction_categories() -> list[dict]:
         """Get all transaction categories from Monarch Money with their IDs."""
@@ -38,14 +38,14 @@ def register_category_tools(mcp: FastMCP) -> None:
             category_list.append(category_info)
         return category_list
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_transaction_category_groups")
     async def get_transaction_category_groups() -> dict:
         """Get all category groups."""
         client = await get_monarch_client()
         return await client.get_transaction_category_groups()
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_transaction_tags")
     async def get_transaction_tags() -> list[dict]:
         """Get all transaction tags."""
@@ -67,7 +67,7 @@ def register_category_tools(mcp: FastMCP) -> None:
             tag_list.append(tag_info)
         return tag_list
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @require_safety_check("create_transaction_category")
     @tool_handler("create_transaction_category")
     async def create_transaction_category(
@@ -114,7 +114,7 @@ def register_category_tools(mcp: FastMCP) -> None:
             rollover_start_month=start_month,
         )
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @require_safety_check("delete_transaction_category")
     @tool_handler("delete_transaction_category")
     async def delete_transaction_category(
@@ -135,7 +135,7 @@ def register_category_tools(mcp: FastMCP) -> None:
         result = await client.delete_transaction_category(category_id)
         return {"deleted": result, "category_id": category_id}
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @require_safety_check("delete_transaction_categories")
     @tool_handler("delete_transaction_categories")
     async def delete_transaction_categories(

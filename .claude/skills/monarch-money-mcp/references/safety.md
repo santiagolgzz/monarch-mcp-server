@@ -116,6 +116,21 @@ get new IDs; a deleted account's transaction history is not restored.
 - Summary: `~/.mm/operation_log.json`
 - Detailed: `~/.mm/detailed_operation_log.jsonl`
 
+## Tool Annotations
+
+Every tool declares MCP annotations, so a client can gate destructive calls on
+its own without knowing anything about this server:
+
+| Hint | Meaning here |
+|------|--------------|
+| `readOnlyHint` | True for all `get_*`, `search_*`, `is_*`, `check_*` |
+| `destructiveHint` | True for exactly the Tier 1 operations below |
+| `idempotentHint` | False for creates and `upload_attachment`; true otherwise |
+| `openWorldHint` | False — every tool acts on one account on one service |
+
+A client that prompts on `destructiveHint` will prompt before the same five
+operations this server withholds.
+
 ## Source of Truth
 
 These tiers are the defaults in `SafetyConfig._load_config`

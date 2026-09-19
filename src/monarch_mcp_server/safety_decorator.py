@@ -10,6 +10,10 @@ from monarch_mcp_server.pre_state import capture as capture_pre_state
 
 logger = logging.getLogger(__name__)
 
+# Attribute name the tool registrar reads back to learn which operation — and
+# therefore which safety tier — a wrapped function belongs to.
+SAFETY_OPERATION_ATTR = "safety_operation"
+
 
 def require_safety_check(
     operation_name: str, get_safety_guard: Callable[[], Any]
@@ -84,6 +88,11 @@ def require_safety_check(
                 )
                 raise
 
+        # Tag the wrapper so tool registration can read back what this
+        # operation is, and at which tier, when declaring MCP annotations.
+        # Without it the annotation layer would need its own copy of the
+        # write/destructive split, which is one more thing to drift.
+        setattr(wrapper, SAFETY_OPERATION_ATTR, operation_name)
         return wrapper
 
     return decorator

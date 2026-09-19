@@ -20,6 +20,7 @@ from monarch_mcp_server.utils import validate_date_format, validate_non_empty_st
 from ._common import (
     MAX_AGGREGATION_TRANSACTIONS,
     MAX_ATTACHMENT_BYTES,
+    annotated_tool,
     tool_handler,
 )
 
@@ -80,7 +81,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
 
     # ========== LIGHTWEIGHT READ TOOLS (aggregates, summaries) ==========
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_transaction_stats")
     async def get_transaction_stats(
         start_date: str | None = None,
@@ -137,7 +138,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             "period": {"start": validated_start, "end": validated_end},
         }
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_transactions_summary")
     async def get_transactions_summary() -> dict:
         """Get aggregated transaction summary data across the whole account.
@@ -149,7 +150,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         client = await get_monarch_client()
         return await client.get_transactions_summary()
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_recurring_transactions")
     async def get_recurring_transactions(
         start_date: str | None = None,
@@ -170,7 +171,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             end_date=validated_end,
         )
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_cashflow")
     async def get_cashflow(
         limit: int = 100,
@@ -191,7 +192,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             limit=limit, start_date=validated_start, end_date=validated_end
         )
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_cashflow_summary")
     async def get_cashflow_summary(
         limit: int = 100,
@@ -214,7 +215,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
 
     # ========== TARGETED READ TOOLS (search, filtered lists) ==========
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("search_transactions")
     async def search_transactions(query: str, limit: int = 20) -> list[dict]:
         """
@@ -232,7 +233,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             transaction_list.append(_map_transaction(txn))
         return transaction_list
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_transactions")
     async def get_transactions(
         limit: int = 100,
@@ -326,7 +327,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             transaction_list.append(transaction_info)
         return transaction_list
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_transaction_details")
     async def get_transaction_details(
         transaction_id: str,
@@ -345,7 +346,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             transaction_id, redirect_posted=redirect_posted
         )
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_transaction_splits")
     async def get_transaction_splits(transaction_id: str) -> dict:
         """Get split information for a transaction."""
@@ -354,7 +355,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
 
     # ========== WRITE TOOLS ==========
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @require_safety_check("upload_attachment")
     @tool_handler("upload_attachment")
     async def upload_attachment(
@@ -406,7 +407,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             "result": result,
         }
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @require_safety_check("create_transaction")
     @tool_handler("create_transaction")
     async def create_transaction(
@@ -443,7 +444,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             update_balance=update_balance,
         )
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @require_safety_check("update_transaction")
     @tool_handler("update_transaction")
     async def update_transaction(
@@ -490,7 +491,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             notes=notes,
         )
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @require_safety_check("categorize_transaction")
     @tool_handler("categorize_transaction")
     async def categorize_transaction(transaction_id: str, category_id: str) -> dict:
@@ -502,7 +503,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             transaction_id=transaction_id, category_id=category_id
         )
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @require_safety_check("delete_transaction")
     @tool_handler("delete_transaction")
     async def delete_transaction(
@@ -527,7 +528,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             return {"deleted": result, "transaction_id": transaction_id}
         return result
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @require_safety_check("update_transaction_splits")
     @tool_handler("update_transaction_splits")
     async def update_transaction_splits(transaction_id: str, splits_data: str) -> dict:

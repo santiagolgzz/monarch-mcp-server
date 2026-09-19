@@ -13,7 +13,7 @@ from fastmcp import FastMCP
 from monarch_mcp_server.paths import mm_file
 from monarch_mcp_server.safety import get_safety_guard
 
-from ._common import tool_handler
+from ._common import annotated_tool, tool_handler
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +26,14 @@ def _format_args(arguments: dict) -> str:
 def register_safety_tools(mcp: FastMCP) -> None:
     """Register safety management tools with the FastMCP instance."""
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_safety_stats")
     async def get_safety_stats() -> dict:
         """Get current safety statistics including daily operation counts and emergency stop status."""
         guard = get_safety_guard()
         return guard.get_operation_stats()
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_recent_operations")
     async def get_recent_operations(limit: int = 10) -> dict:
         """View recent write operations with rollback information."""
@@ -63,7 +63,7 @@ def register_safety_tools(mcp: FastMCP) -> None:
             "log_file": str(detailed_log_path),
         }
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_rollback_suggestions")
     async def get_rollback_suggestions(operation_index: int = 0) -> str:
         """Get detailed rollback suggestions for a recent operation."""
@@ -162,14 +162,14 @@ def register_safety_tools(mcp: FastMCP) -> None:
 
         return "\n".join(lines)
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("enable_emergency_stop")
     async def enable_emergency_stop() -> str:
         """EMERGENCY: Disable all write operations immediately."""
         guard = get_safety_guard()
         return guard.enable_emergency_stop()
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("disable_emergency_stop")
     async def disable_emergency_stop() -> str:
         """Re-enable write operations after emergency stop."""

@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from fastmcp import FastMCP
 
 from monarch_mcp_server.tools import register_tools
+from monarch_mcp_server.tools._common import annotated_tool
 
 # Configure logging
 logging.basicConfig(
@@ -26,7 +27,7 @@ mcp = FastMCP(
 register_tools(mcp)
 
 
-@mcp.tool()
+@annotated_tool(mcp)
 def setup_authentication() -> str:
     """Get instructions for setting up authentication with Monarch Money."""
     return """🔐 Monarch Money Authentication

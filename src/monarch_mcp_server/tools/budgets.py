@@ -13,7 +13,7 @@ from monarch_mcp_server.exceptions import ValidationError
 from monarch_mcp_server.safety import require_safety_check
 from monarch_mcp_server.utils import validate_date_format
 
-from ._common import tool_handler
+from ._common import annotated_tool, tool_handler
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 def register_budget_tools(mcp: FastMCP) -> None:
     """Register budget management tools with the FastMCP instance."""
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_budgets")
     async def get_budgets(
         start_date: str | None = None,
@@ -77,7 +77,7 @@ def register_budget_tools(mcp: FastMCP) -> None:
 
         return budget_list
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @require_safety_check("set_budget_amount")
     @tool_handler("set_budget_amount")
     async def set_budget_amount(

@@ -17,7 +17,7 @@ from monarch_mcp_server.exceptions import ValidationError
 from monarch_mcp_server.safety import require_safety_check
 from monarch_mcp_server.utils import validate_date_format, validate_non_empty_string
 
-from ._common import tool_handler
+from ._common import annotated_tool, tool_handler
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 def register_account_tools(mcp: FastMCP) -> None:
     """Register account management tools with the FastMCP instance."""
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_accounts")
     async def get_accounts() -> list[dict]:
         """Get all financial accounts from Monarch Money."""
@@ -46,7 +46,7 @@ def register_account_tools(mcp: FastMCP) -> None:
             account_list.append(account_info)
         return account_list
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_account_holdings")
     async def get_account_holdings(account_id: str) -> dict:
         """Get investment holdings for a specific account."""
@@ -58,7 +58,7 @@ def register_account_tools(mcp: FastMCP) -> None:
         client = await get_monarch_client()
         return await client.get_account_holdings(acc_id)
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_account_history")
     async def get_account_history(
         account_id: str,
@@ -98,7 +98,7 @@ def register_account_tools(mcp: FastMCP) -> None:
 
         return {"history": entries}
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_recent_account_balances")
     async def get_recent_account_balances(start_date: str | None = None) -> dict:
         """Get daily balances for all accounts (defaults to last 31 days).
@@ -110,7 +110,7 @@ def register_account_tools(mcp: FastMCP) -> None:
         client = await get_monarch_client()
         return await client.get_recent_account_balances(start_date=validated_start)
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_account_snapshots_by_type")
     async def get_account_snapshots_by_type(
         start_date: str,
@@ -133,7 +133,7 @@ def register_account_tools(mcp: FastMCP) -> None:
             start_date=validated_start, timeframe=timeframe
         )
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_aggregate_snapshots")
     async def get_aggregate_snapshots(
         start_date: str | None = None,
@@ -161,7 +161,7 @@ def register_account_tools(mcp: FastMCP) -> None:
             start_date=start_d, end_date=end_d, account_type=account_type
         )
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_credit_history")
     async def get_credit_history() -> dict:
         """Get credit score history from Monarch Money.
@@ -173,14 +173,14 @@ def register_account_tools(mcp: FastMCP) -> None:
         client = await get_monarch_client()
         return await client.get_credit_history()
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("get_account_type_options")
     async def get_account_type_options() -> dict:
         """Get all available account types and subtypes."""
         client = await get_monarch_client()
         return await client.get_account_type_options()
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @require_safety_check("create_manual_account")
     @tool_handler("create_manual_account")
     async def create_manual_account(
@@ -202,7 +202,7 @@ def register_account_tools(mcp: FastMCP) -> None:
             account_balance=current_balance,
         )
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @require_safety_check("update_account")
     @tool_handler("update_account")
     async def update_account(
@@ -244,7 +244,7 @@ def register_account_tools(mcp: FastMCP) -> None:
             hide_transactions_from_reports=hide_transactions_from_reports,
         )
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @require_safety_check("delete_account")
     @tool_handler("delete_account")
     async def delete_account(
@@ -271,7 +271,7 @@ def register_account_tools(mcp: FastMCP) -> None:
             return {"deleted": result, "account_id": account_id}
         return result
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @require_safety_check("upload_account_balance_history")
     @tool_handler("upload_account_balance_history")
     async def upload_account_balance_history(

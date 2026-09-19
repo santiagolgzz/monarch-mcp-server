@@ -15,7 +15,7 @@ from fastmcp import FastMCP
 
 from monarch_mcp_server.client import get_monarch_client
 
-from ._common import tool_handler
+from ._common import annotated_tool, tool_handler
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ async def _resolve_account_ids(client, account_ids: list[str] | None) -> list[st
 def register_refresh_tools(mcp: FastMCP) -> None:
     """Register account refresh tools with the FastMCP instance."""
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("is_accounts_refresh_complete")
     async def is_accounts_refresh_complete(
         account_ids: list[str] | None = None,
@@ -54,7 +54,7 @@ def register_refresh_tools(mcp: FastMCP) -> None:
             "scope": "all" if not account_ids else "selected",
         }
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("refresh_accounts")
     async def refresh_accounts(account_ids: list[str] | None = None) -> dict:
         """Request an account data refresh from financial institutions.
@@ -77,7 +77,7 @@ def register_refresh_tools(mcp: FastMCP) -> None:
             "scope": "all" if not account_ids else "selected",
         }
 
-    @mcp.tool()
+    @annotated_tool(mcp)
     @tool_handler("request_accounts_refresh_and_wait")
     async def request_accounts_refresh_and_wait(
         account_ids: list[str] | None = None,

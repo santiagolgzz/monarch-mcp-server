@@ -84,12 +84,15 @@ def stdio_only_tools() -> frozenset[str]:
             continue
         for decorator in node.decorator_list:
             func = decorator.func if isinstance(decorator, ast.Call) else decorator
-            if (
+            # `@mcp.tool(...)`, or the `@annotated_tool(mcp)` wrapper that
+            # registers a tool together with its MCP annotations.
+            registers_a_tool = (
                 isinstance(func, ast.Attribute)
                 and func.attr == "tool"
                 and isinstance(func.value, ast.Name)
                 and func.value.id == "mcp"
-            ):
+            ) or (isinstance(func, ast.Name) and func.id == "annotated_tool")
+            if registers_a_tool:
                 names.add(node.name)
     return frozenset(names)
 

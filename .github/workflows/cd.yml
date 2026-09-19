@@ -49,12 +49,20 @@ jobs:
             --platform managed \
             --region ${{ vars.GCP_REGION || 'us-central1' }} \
             --allow-unauthenticated \
+            --max-instances 1 \
             --set-env-vars "MCP_AUTH_MODE=both" \
             --set-env-vars "GITHUB_CLIENT_ID=${{ vars.OAUTH_CLIENT_ID }}" \
             --set-env-vars "MCP_ENABLE_CI_SMOKE=true" \
             --set-env-vars "BASE_URL=${{ vars.CLOUD_RUN_URL }}" \
             --set-env-vars "^|^MCP_ALLOWED_GITHUB_USERS=${{ vars.OAUTH_ALLOWED_USERS }}" \
             --set-secrets "MCP_OAUTH_REDIS_URL=mcp-oauth-redis-url:latest,MCP_OAUTH_JWT_SIGNING_KEY=mcp-oauth-jwt-signing-key:latest,MCP_AUTH_TOKEN=mcp-auth-token:latest,GITHUB_CLIENT_SECRET=oauth-client-secret:latest,MCP_CI_SMOKE_TOKEN=mcp-ci-smoke-token:latest,MONARCH_EMAIL=monarch-email:latest,MONARCH_PASSWORD=monarch-password:latest,MONARCH_MFA_SECRET=monarch-mfa-secret:latest"
+
+      # --max-instances 1: confirmation tokens for destructive operations are
+      # held in the serving process. Across several instances a caller could
+      # be issued a token by one and refused by another. It fails closed —
+      # extra refusals, never an unauthorized delete — but the retry loop is
+      # confusing. This server backs one household, so it has no reason to
+      # scale out; revisit with a shared token store if that changes.
 
       - name: Verify Deployment
         run: |

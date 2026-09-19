@@ -19,8 +19,13 @@ The token is bound to the operation *and its arguments*, so one issued for
 ``delete_transaction(txn_1)`` cannot be spent on ``txn_2``. It is single-use
 and expires, so a token cannot be held and replayed later.
 
-Tokens live in memory only. A restart clears them, which fails closed: the
-worst outcome is that a caller has to re-confirm.
+Tokens live in memory only, in the serving process. A restart clears them, and
+across several server instances a token issued by one would be unknown to
+another. Both fail closed — the caller is refused and asks for a new token,
+never the reverse — so the cost is a confusing retry rather than an
+unauthorized delete. The HTTP deployment pins itself to a single instance for
+this reason (see `.github/workflows/cd.yml`); scaling out would need a shared
+store, for which `oauth_state.py` already has encrypted Redis plumbing.
 """
 
 from __future__ import annotations

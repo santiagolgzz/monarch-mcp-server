@@ -402,3 +402,52 @@ def test_no_plan_ever_claims_reversible_without_a_reverse_call():
                     assert plan.get("blocked_reason"), (
                         f"{operation} is not reversible but gives no reason"
                     )
+
+
+class TestRemainingSnapshotPaths:
+    def test_category_delete_recreates_with_its_icon(self):
+        plan = build_rollback(
+            "delete_transaction_category",
+            {"category_id": "cat_1"},
+            {},
+            pre_state={"name": "Restaurants", "group_id": "grp_1", "icon": "🍽️"},
+        )
+        assert plan["reversible"] is True
+        assert plan["reverse_call"] == {
+            "tool": "create_transaction_category",
+            "arguments": {
+                "name": "Restaurants",
+                "group_id": "grp_1",
+                "icon": "🍽️",
+            },
+        }
+        assert "not reassigned" in plan["notes"]
+
+    def test_category_delete_without_a_group_is_not_reversible(self):
+        plan = build_rollback(
+            "delete_transaction_category",
+            {"category_id": "cat_1"},
+            {},
+            pre_state={"name": "Restaurants"},
+        )
+        assert plan["reversible"] is False
+        assert "lacked the fields needed" in plan["blocked_reason"]
+
+    def test_account_delete_carries_the_subtype(self):
+        plan = build_rollback(
+            "delete_account",
+            {"account_id": "acc_1"},
+            {},
+            pre_state={
+                "name": "Savings",
+                "account_type": "depository",
+                "account_sub_type": "savings",
+                "balance": 10.0,
+            },
+        )
+        assert plan["reverse_call"]["arguments"]["account_subtype"] == "savings"
+
+    def test_finds_an_id_inside_a_list_of_objects(self):
+        """Some payloads return a list of entities rather than one."""
+        result = {"createdItems": [{"id": "in_list_1"}]}
+        assert extract_entity_id(result) == "in_list_1"

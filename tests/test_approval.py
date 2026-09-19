@@ -276,3 +276,78 @@ class TestDailyLimits:
         allowed, message = guard.check_operation("delete_transaction", {})
         assert allowed is False
         assert "Daily limit reached" in message
+
+
+class TestSummarizeRemainingShapes:
+    """The preview is the only thing a user sees before confirming, so every
+    destructive operation must produce a readable one."""
+
+    def test_describes_a_single_category(self):
+        text = summarize(
+            "delete_transaction_category",
+            {"category_id": "c1"},
+            {"name": "Restaurants", "group_id": "grp_spending"},
+        )
+        assert "Restaurants" in text
+        assert "grp_spending" in text
+
+    def test_falls_back_to_the_snapshot_for_unlisted_operations(self):
+        text = summarize(
+            "upload_account_balance_history",
+            {"account_id": "a1"},
+            {"rows": 1200},
+        )
+        assert "upload_account_balance_history" in text
+        assert "1200" in text
+
+    def test_preview_never_raises(self):
+        """A malformed snapshot must not break the gate it describes."""
+        from monarch_mcp_server.approval import preview_of
+
+        class Exploding(dict):
+            def get(self, *args, **kwargs):
+                raise RuntimeError("boom")
+
+        text = preview_of("delete_transaction", {}, Exploding({"a": 1}))
+        assert "delete_transaction" in text
+        assert "details unavailable" in text
+
+
+class TestSafetyConfigRobustness:
+    """The config is a JSON file users edit by hand, so bad values must
+    degrade to safe defaults rather than crash a write path."""
+
+    def test_an_existing_config_file_keeps_new_defaults(self, tmp_path):
+        """Upgrading must not leave an older config without the new gate."""
+        path = tmp_path / "safety_config.json"
+        path.write_text('{"emergency_stop": false}')
+
+        config = SafetyConfig(config_path=str(path))
+
+        assert config.confirmation_enabled() is True
+        assert config.daily_limit("delete_transaction") == 50
+        assert "delete_transaction" in config.config["require_approval"]
+
+    def test_a_corrupt_config_file_falls_back_to_defaults(self, tmp_path):
+        path = tmp_path / "safety_config.json"
+        path.write_text("{not json at all")
+
+        config = SafetyConfig(config_path=str(path))
+
+        assert config.confirmation_enabled() is True
+        assert config.requires_approval("delete_transaction") is True
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [(600, 600), ("900", 900), (0, 300), (-5, 300), ("soon", 300), (None, 300)],
+    )
+    def test_confirmation_ttl_rejects_nonsense(self, tmp_path, value, expected):
+        config = SafetyConfig(config_path=str(tmp_path / "c.json"))
+        config.config["confirmation_ttl_seconds"] = value
+        assert config.confirmation_ttl() == expected
+
+    def test_saving_to_an_unwritable_path_does_not_raise(self, tmp_path):
+        """Emergency stop calls save_config; it must not blow up mid-incident."""
+        config = SafetyConfig(config_path="/proc/nonexistent/safety_config.json")
+        config.config["emergency_stop"] = True
+        config.save_config()  # logs, does not raise

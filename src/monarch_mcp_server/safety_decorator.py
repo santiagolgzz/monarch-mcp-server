@@ -50,8 +50,16 @@ def require_safety_check(
                     result=result,
                 )
                 return result
-            except Exception:
-                guard.record_operation(operation_name, success=False)
+            except Exception as exc:
+                # Record the failure before re-raising. A write that raised may
+                # still have applied, so this is the entry an operator most
+                # needs; dropping it is how a partial change goes unnoticed.
+                guard.record_operation(
+                    operation_name,
+                    success=False,
+                    operation_details=operation_details,
+                    error=f"{type(exc).__name__}: {exc}",
+                )
                 raise
 
         return wrapper

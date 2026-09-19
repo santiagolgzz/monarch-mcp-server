@@ -1,6 +1,5 @@
 """Tests for the safety module."""
 
-import json
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -299,87 +298,28 @@ class TestRequireSafetyCheckSyncPath:
 
 
 class TestGenerateRollbackInfo:
-    """Tests for rollback info generation."""
+    """Rollback planning moved to ``monarch_mcp_server.rollback``.
 
-    @pytest.fixture
-    def temp_guard(self):
-        """Create a SafetyGuard with temporary files."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = str(Path(tmpdir) / "safety_config.json")
-            config = SafetyConfig(config_path=config_path)
-            guard = SafetyGuard(config=config)
-            yield guard
+    These tests asserted a bare ``reversible: True`` against flat result
+    shapes the SDK never returns, which is what let the broken ID extraction
+    ship. ``tests/test_rollback.py`` covers the same ground against the real
+    envelopes in ``tests/sdk_fixtures.py``.
+    """
 
-    def test_delete_transaction_rollback(self, temp_guard):
-        """Test rollback info for delete_transaction."""
-        params = {"transaction_id": "txn_123"}
-        rollback = temp_guard._generate_rollback_info(
-            "delete_transaction", params, None
+    def test_planning_is_covered_in_test_rollback(self):
+        from monarch_mcp_server.rollback import build_rollback
+
+        from . import sdk_fixtures
+
+        plan = build_rollback(
+            "create_transaction",
+            {"account_id": "acc_1"},
+            sdk_fixtures.create_transaction_response("txn_1"),
         )
-
-        assert rollback["reversible"] is True
-        assert rollback["reverse_operation"] == "create_transaction"
-        assert rollback["deleted_id"] == "txn_123"
-
-    def test_create_transaction_rollback(self, temp_guard):
-        """Test rollback info for create_transaction."""
-        params = {"account_id": "acc_123", "amount": 50.00}
-        result = json.dumps({"id": "txn_new_456"})
-        rollback = temp_guard._generate_rollback_info(
-            "create_transaction", params, result
-        )
-
-        assert rollback["reversible"] is True
-        assert rollback["reverse_operation"] == "delete_transaction"
-        assert rollback["created_id"] == "txn_new_456"
-
-    def test_update_transaction_rollback(self, temp_guard):
-        """Test rollback info for update_transaction."""
-        params = {
-            "transaction_id": "txn_123",
-            "amount": 75.00,
-            "description": "New desc",
+        assert plan["reverse_call"] == {
+            "tool": "delete_transaction",
+            "arguments": {"transaction_id": "txn_1"},
         }
-        rollback = temp_guard._generate_rollback_info(
-            "update_transaction", params, None
-        )
-
-        assert rollback["reversible"] is True
-        assert rollback["reverse_operation"] == "update_transaction"
-        assert rollback["modified_id"] == "txn_123"
-        assert "amount" in rollback["modified_fields"]
-        assert "description" in rollback["modified_fields"]
-
-    def test_unknown_operation_rollback(self, temp_guard):
-        """Test rollback info for unknown operation."""
-        params = {"some_param": "value"}
-        rollback = temp_guard._generate_rollback_info("unknown_operation", params, None)
-
-        assert rollback["reversible"] is False
-
-    def test_rollback_info_add_transaction_tag(self, temp_guard):
-        """Test rollback info for add_transaction_tag."""
-        params = {"transaction_id": "txn1", "tag_id": "tag1"}
-        rollback = temp_guard._generate_rollback_info(
-            "add_transaction_tag", params, None
-        )
-
-        assert rollback["reversible"] is True
-        assert rollback["added_tag_id"] == "tag1"
-        assert rollback["modified_id"] == "txn1"
-        assert rollback["reverse_operation"] == "set_transaction_tags"
-
-    def test_rollback_info_categorize_transaction(self, temp_guard):
-        """Test rollback info for categorize_transaction."""
-        params = {"transaction_id": "txn1", "category_id": "cat1"}
-        rollback = temp_guard._generate_rollback_info(
-            "categorize_transaction", params, None
-        )
-
-        assert rollback["reversible"] is True
-        assert rollback["new_category_id"] == "cat1"
-        assert rollback["modified_id"] == "txn1"
-        assert rollback["reverse_operation"] == "categorize_transaction"
 
 
 class TestDestructiveOperationBehavior:

@@ -8,9 +8,42 @@ from pathlib import Path
 from typing import Any
 
 from monarch_mcp_server.paths import mm_file
+from monarch_mcp_server.rollback import build_rollback
 from monarch_mcp_server.safety_config import SafetyConfig
 
 logger = logging.getLogger(__name__)
+
+# Parameters whose values must never reach the audit log verbatim. Two reasons:
+# a base64 attachment or a balance-history CSV would bloat every line and put a
+# second copy of the file on disk, and a confirmation token is a capability —
+# logging it would let anyone who can read the log replay a destructive call.
+_REDACTED_PARAMS = {
+    "file_content_base64": "content",
+    "csv_data": "content",
+    "confirmation_token": "secret",
+}
+
+# Long free-text values are truncated rather than dropped, so the audit trail
+# keeps enough to identify the record without storing the whole payload.
+_MAX_LOGGED_VALUE_CHARS = 500
+
+
+def _redact(params: dict) -> dict:
+    """Strip oversized and sensitive values from parameters before logging."""
+    redacted: dict[str, Any] = {}
+    for key, value in params.items():
+        kind = _REDACTED_PARAMS.get(key)
+        if kind == "secret":
+            redacted[key] = "<redacted>"
+        elif kind == "content":
+            size = len(value) if isinstance(value, str | bytes) else 0
+            redacted[key] = f"<redacted: {size} bytes>"
+        elif isinstance(value, str) and len(value) > _MAX_LOGGED_VALUE_CHARS:
+            kept = value[:_MAX_LOGGED_VALUE_CHARS]
+            redacted[key] = f"{kept}… <truncated, {len(value)} chars total>"
+        else:
+            redacted[key] = value
+    return redacted
 
 
 class SafetyGuard:
@@ -90,168 +123,80 @@ class SafetyGuard:
         success: bool = True,
         operation_details: dict | None = None,
         result: Any = None,
+        pre_state: dict | None = None,
+        error: str | None = None,
     ) -> None:
-        """Record that an operation was performed with full details for rollback."""
+        """Record that an operation was attempted.
+
+        Failures are recorded too. A write that raised may still have applied
+        partially, so leaving it out of the audit log is exactly the case an
+        operator most needs to see. Only successes count toward the daily
+        totals, which drive the caps in ``check_operation``.
+        """
         if success:
             today = datetime.now().strftime("%Y-%m-%d")
             self.daily_counts[today][operation_name] += 1
-            self._save_detailed_operation(operation_name, operation_details, result)
             self._save_operation_log()
+
+        self._save_detailed_operation(
+            operation_name,
+            operation_details,
+            result,
+            success=success,
+            pre_state=pre_state,
+            error=error,
+        )
 
     def _save_detailed_operation(
         self,
         operation_name: str,
         operation_details: dict | None,
         result: Any,
+        *,
+        success: bool = True,
+        pre_state: dict | None = None,
+        error: str | None = None,
     ) -> None:
         """Save detailed operation log for potential rollback."""
         try:
             log_file = mm_file("detailed_operation_log.jsonl")
             log_file.parent.mkdir(parents=True, exist_ok=True)
-            log_entry = {
+            # Redact before planning too: a rollback record echoes the call's
+            # parameters back for context, which would otherwise smuggle the
+            # very payloads the redaction exists to keep out of the log. The
+            # reverse call itself is built from pre_state and IDs, never from
+            # the redacted values, so planning is unaffected.
+            safe_params = _redact(operation_details or {})
+            log_entry: dict[str, Any] = {
                 "timestamp": datetime.now().isoformat(),
                 "operation": operation_name,
-                "parameters": operation_details or {},
+                "success": success,
+                "parameters": safe_params,
                 "result_preview": self._preview_result(result),
-                "rollback_info": self._generate_rollback_info(
-                    operation_name, operation_details, result
+                "pre_state": pre_state,
+                "rollback_info": build_rollback(
+                    operation_name, safe_params, result, pre_state
                 ),
             }
+            if not success:
+                log_entry["error"] = error
+                # A failed call may still have applied. Say so rather than
+                # letting the rollback plan imply the change definitely landed.
+                log_entry["rollback_info"] = {
+                    "reversible": False,
+                    "reverse_operation": None,
+                    "reverse_call": None,
+                    "notes": "",
+                    "blocked_reason": (
+                        f"{operation_name} raised before completing, so whether "
+                        "it applied is unknown. Verify the record's current "
+                        "state in Monarch before attempting any correction."
+                    ),
+                }
             with open(log_file, "a") as f:
-                f.write(json.dumps(log_entry) + "\n")
+                f.write(json.dumps(log_entry, default=str) + "\n")
         except Exception as e:
             logger.error(f"Failed to save detailed operation log: {e}")
-
-    def _generate_rollback_info(
-        self, operation_name: str, params: dict | None, result: Any
-    ) -> dict:
-        """Generate rollback information for an operation."""
-        rollback = {"reversible": False, "reverse_operation": None, "notes": ""}
-
-        if not params:
-            return rollback
-
-        if operation_name == "delete_transaction":
-            rollback.update(
-                {
-                    "reversible": True,
-                    "reverse_operation": "create_transaction",
-                    "notes": f"To recreate: Use transaction details from get_transaction_details({params.get('transaction_id')})",
-                    "deleted_id": params.get("transaction_id"),
-                }
-            )
-        elif operation_name == "delete_account":
-            rollback.update(
-                {
-                    "reversible": True,
-                    "reverse_operation": "create_manual_account",
-                    "notes": "To recreate: Use account details from get_accounts before deletion",
-                    "deleted_id": params.get("account_id"),
-                }
-            )
-        elif operation_name == "delete_transaction_category":
-            rollback.update(
-                {
-                    "reversible": True,
-                    "reverse_operation": "create_transaction_category",
-                    "notes": "To recreate: Use category details from get_transaction_categories before deletion",
-                    "deleted_id": params.get("category_id"),
-                }
-            )
-        elif operation_name == "delete_transaction_categories":
-            rollback.update(
-                {
-                    "reversible": True,
-                    "reverse_operation": "create_transaction_category (multiple)",
-                    "notes": "To recreate: Use category details from get_transaction_categories before deletion",
-                    "deleted_ids": [
-                        id.strip() for id in params.get("category_ids", "").split(",")
-                    ],
-                }
-            )
-        elif operation_name == "update_transaction":
-            rollback.update(
-                {
-                    "reversible": True,
-                    "reverse_operation": "update_transaction",
-                    "notes": "To undo: Get original values from transaction history",
-                    "modified_id": params.get("transaction_id"),
-                    "modified_fields": {
-                        k: v
-                        for k, v in params.items()
-                        if k != "transaction_id" and v is not None
-                    },
-                }
-            )
-        elif operation_name == "update_account":
-            rollback.update(
-                {
-                    "reversible": True,
-                    "reverse_operation": "update_account",
-                    "notes": "To undo: Get original values from account history",
-                    "modified_id": params.get("account_id"),
-                    "modified_fields": {
-                        k: v
-                        for k, v in params.items()
-                        if k != "account_id" and v is not None
-                    },
-                }
-            )
-        elif operation_name == "create_transaction":
-            created_id = self._extract_id_from_result(result)
-            rollback.update(
-                {
-                    "reversible": True,
-                    "reverse_operation": "delete_transaction",
-                    "notes": "To undo: Delete the created transaction",
-                    "created_id": created_id,
-                    "creation_params": params,
-                }
-            )
-        elif operation_name == "create_manual_account":
-            created_id = self._extract_id_from_result(result)
-            rollback.update(
-                {
-                    "reversible": True,
-                    "reverse_operation": "delete_account",
-                    "notes": "To undo: Delete the created account",
-                    "created_id": created_id,
-                    "creation_params": params,
-                }
-            )
-        elif operation_name == "create_transaction_category":
-            created_id = self._extract_id_from_result(result)
-            rollback.update(
-                {
-                    "reversible": True,
-                    "reverse_operation": "delete_transaction_category",
-                    "notes": "To undo: Delete the created category",
-                    "created_id": created_id,
-                    "creation_params": params,
-                }
-            )
-        elif operation_name == "add_transaction_tag":
-            rollback.update(
-                {
-                    "reversible": True,
-                    "reverse_operation": "set_transaction_tags",
-                    "notes": "To undo: remove the tag_id from the transaction's tag list",
-                    "modified_id": params.get("transaction_id"),
-                    "added_tag_id": params.get("tag_id"),
-                }
-            )
-        elif operation_name == "categorize_transaction":
-            rollback.update(
-                {
-                    "reversible": True,
-                    "reverse_operation": "categorize_transaction",
-                    "notes": "To undo: get original category from transaction history",
-                    "modified_id": params.get("transaction_id"),
-                    "new_category_id": params.get("category_id"),
-                }
-            )
-
-        return rollback
 
     def _preview_result(self, result: Any) -> str | None:
         """Build a compact preview string for operation logs."""
@@ -265,28 +210,6 @@ class SafetyGuard:
             return json.dumps(result, default=str)[:500]
         except (TypeError, ValueError):
             return str(result)[:500]
-
-    def _extract_id_from_result(self, result: Any) -> str | None:
-        """Try to extract an ID from operation result."""
-        if result is None:
-            return None
-
-        if isinstance(result, dict):
-            for id_field in ["id", "transaction_id", "account_id", "category_id"]:
-                if id_field in result and result[id_field] is not None:
-                    return str(result[id_field])
-            return None
-
-        try:
-            result_data = json.loads(result) if isinstance(result, str) else result
-            if not isinstance(result_data, dict):
-                return None
-            for id_field in ["id", "transaction_id", "account_id", "category_id"]:
-                if id_field in result_data and result_data[id_field] is not None:
-                    return str(result_data[id_field])
-        except (json.JSONDecodeError, KeyError, TypeError):
-            pass
-        return None
 
     def get_operation_stats(self) -> dict:
         """Get operation statistics for today."""

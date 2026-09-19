@@ -86,274 +86,151 @@ Detailed, human-readable instructions on how to undo the operation.
 
 ## Rollback Scenarios
 
-### Scenario 1: Accidentally Deleted a Transaction
+The short version: run `get_rollback_suggestions(operation_index=0)` and it
+prints the exact call that undoes the most recent write, or tells you why it
+cannot.
 
-**What Happened:**
-You approved deletion of transaction without realizing which one it was.
+### Scenario 1: Accidentally deleted a transaction
 
-**How to Rollback:**
+```bash
+get_rollback_suggestions(operation_index=0)
+```
 
-1. **Check what was deleted:**
-   ```bash
-   get_recent_operations(limit=5)
-   ```
+```
+REVERSIBLE
 
-2. **Get rollback instructions:**
-   ```bash
-   get_rollback_suggestions(operation_index=0)
-   ```
-   Shows the deleted transaction ID.
+Recreates the deleted record from its pre-deletion snapshot. The recreated
+record gets a new ID, so anything referencing the old ID will not be
+reconnected.
 
-3. **Get original transaction details:**
-   - Check Monarch Money web interface for transaction history
-   - Or if you had exported data beforehand, use that
+Run this to undo it:
 
-4. **Recreate the transaction:**
-   ```bash
-   create_transaction(
-       account_id="account_xyz",
-       amount=-50.00,
-       description="Groceries at Safeway",
-       date="2025-01-28",
-       category_id="category_groceries"
-   )
-   ```
+  create_transaction(account_id='acc_1', amount=-42.5,
+                     merchant_name='Cafe Example', category_id='cat_food',
+                     date='2026-03-04', notes='lunch')
+```
 
-**Prevention:**
-Always check `get_transaction_details(transaction_id)` BEFORE deleting to save the details.
+Run that call. The values come from the snapshot taken before the delete, so
+you do not need to have saved anything yourself.
 
-### Scenario 2: Created Transaction by Mistake
+### Scenario 2: Created a transaction by mistake
 
-**What Happened:**
-Created a transaction with wrong data or duplicate.
+```
+REVERSIBLE
 
-**How to Rollback:**
+Deletes the transaction that was created.
 
-1. **View recent operations:**
-   ```bash
-   get_recent_operations()
-   ```
+Run this to undo it:
 
-2. **Get the created ID:**
-   ```bash
-   get_rollback_suggestions(operation_index=0)
-   ```
-   Shows: "Created ID: txn_new123"
+  delete_transaction(transaction_id='txn_created_1')
+```
 
-3. **Delete it:**
-   ```bash
-   delete_transaction(transaction_id="txn_new123")
-   ```
+### Scenario 3: Updated a transaction incorrectly
 
-**Easy!** Created items can be deleted immediately using their ID from the log.
+The reverse call restores **only** the fields the update changed, using the
+values they held beforehand. Fields you did not touch are left alone. If a
+changed field was missing from the snapshot, the notes say which, so you know
+what the reverse call will not cover.
 
-### Scenario 3: Updated Transaction Incorrectly
+### Scenario 4: Deleted multiple categories
 
-**What Happened:**
-Changed transaction amount or category to wrong value.
+Bulk deletes have no single reverse call. The entry reports this and carries a
+`pre_state.categories` list; recreate each one with
+`create_transaction_category`.
 
-**How to Rollback:**
+### Scenario 5: Runaway agent made many changes
 
-1. **Check what changed:**
-   ```bash
-   get_rollback_suggestions(operation_index=0)
-   ```
-   Shows:
-   ```
-   Modified ID: txn_abc123
-   Changed fields: amount, category_id
-   Note: You need the original values to restore
-   ```
+1. `enable_emergency_stop` — refuses all further writes immediately.
+2. `get_recent_operations(limit=50)` — every entry carries its own
+   `rollback_info.reverse_call`.
+3. Run the reverse calls in **reverse chronological order**, so later changes
+   are undone before the earlier ones they were layered on.
+4. `disable_emergency_stop` when finished.
 
-2. **Get original values:**
-   - **Best**: You kept notes before updating
-   - **Good**: Check Monarch Money web interface history
-   - **Okay**: Estimate from memory
-
-3. **Update back:**
-   ```bash
-   update_transaction(
-       transaction_id="txn_abc123",
-       amount=-75.00,  # Original amount
-       category_id="cat_original"  # Original category
-   )
-   ```
-
-**Prevention:**
-Use `get_transaction_details(transaction_id)` BEFORE updating and save the output.
-
-### Scenario 4: Deleted Multiple Categories
-
-**What Happened:**
-Used `delete_transaction_categories` and deleted too many.
-
-**How to Rollback:**
-
-1. **Check what was deleted:**
-   ```bash
-   get_rollback_suggestions(operation_index=0)
-   ```
-   Shows all deleted category IDs.
-
-2. **Get original category details:**
-   - If you ran `get_transaction_categories()` before deleting, use that output
-   - Otherwise, check Monarch Money web interface
-
-3. **Recreate each category:**
-   ```bash
-   create_transaction_category(name="Original Name 1", group_id="group_id")
-   create_transaction_category(name="Original Name 2", group_id="group_id")
-   # ... for each deleted category
-   ```
-
-**Prevention:**
-Run `get_transaction_categories()` and save output BEFORE bulk deleting.
-
-### Scenario 5: Runaway Claude Created 50 Transactions
-
-**What Happened:**
-Claude went rogue and created many unwanted transactions before you stopped it.
-
-**How to Rollback:**
-
-1. **Stop further damage:**
-   ```bash
-   enable_emergency_stop
-   ```
-
-2. **Review all recent operations:**
-   ```bash
-   get_recent_operations(limit=50)
-   ```
-
-3. **Identify the unwanted transactions:**
-   Look through the list for the runaway creates.
-
-4. **Delete each unwanted transaction:**
-   ```bash
-   # For each unwanted transaction in the log:
-   delete_transaction(transaction_id="txn_001")
-   delete_transaction(transaction_id="txn_002")
-   # ... etc
-   ```
-
-5. **Re-enable when done:**
-   ```bash
-   disable_emergency_stop
-   ```
-
-**Tip:** Created operations show their `created_id` in rollback info - use that to delete.
-
-## Best Practices
-
-### Before Destructive Operations
-
-1. **Save current state:**
-   ```bash
-   # Before deleting transaction
-   get_transaction_details(transaction_id="txn_123")
-   # Save the output!
-
-   # Before deleting account
-   get_accounts()  # Find and save account details
-
-   # Before bulk category delete
-   get_transaction_categories()  # Save all categories
-   ```
-
-2. **Test small first:**
-   - Delete 1 transaction, verify it worked
-   - Then delete the rest if needed
-
-3. **Use specific queries:**
-   - Don't delete based on vague criteria
-   - Get exact IDs first, then delete
-
-### After Operations
-
-1. **Review immediately:**
-   ```bash
-   get_recent_operations(limit=5)
-   ```
-   Check that what you did matches what you intended.
-
-2. **Keep log file:**
-   - Don't delete `~/.mm/detailed_operation_log.jsonl`
-   - It's your insurance policy
-
-3. **Regular backups:**
-   - Periodically run `get_transactions(limit=1000)` and save
-   - Export from Monarch Money web interface
+Daily caps stop this automatically before it gets far — see
+[Operation caps](#operation-caps).
 
 ## Limitations
 
-### What CAN Be Rolled Back
+### Reversible from the log
 
-| Operation | Reversibility | Method |
-|-----------|--------------|---------|
-| **create_transaction** | ✅ Easy | Delete using created ID |
-| **create_manual_account** | ✅ Easy | Delete using created ID |
-| **create_transaction_category** | ✅ Easy | Delete using created ID |
-| **create_tag** | ✅ Easy | Delete using created ID |
-| **delete_transaction** | ⚠️  Requires original data | Recreate using saved details |
-| **delete_account** | ⚠️  Requires original data | Recreate using saved details |
-| **delete_transaction_category** | ⚠️  Requires original data | Recreate using saved details |
-| **update_transaction** | ⚠️  Requires original values | Update back using saved values |
-| **update_account** | ⚠️  Requires original values | Update back using saved values |
+| Operation | Reversible when |
+|-----------|-----------------|
+| `create_transaction` | Always — the new ID is recorded |
+| `create_manual_account` | Always — the new ID is recorded |
+| `create_transaction_category` | Always — the new ID is recorded |
+| `delete_transaction` | A snapshot was captured |
+| `delete_account` | A snapshot was captured (shell only, see below) |
+| `delete_transaction_category` | A snapshot was captured |
+| `update_transaction` / `update_account` | A snapshot holds the changed fields |
+| `categorize_transaction` | A snapshot holds the prior category |
+| `add_transaction_tag` / `set_transaction_tags` | A snapshot holds the prior tag list |
+| `set_budget_amount` | A snapshot holds the prior amount |
+| `update_transaction_splits` | A snapshot holds the prior splits |
 
-### What CANNOT Be Easily Rolled Back
+### Not reversible through this server
 
-- **Deletions without saved data**: If you didn't save transaction/account/category details before deleting, rollback requires manual work
-- **Updates without original values**: If you didn't note original values, you can't restore them exactly
-- **Monarch Money web changes**: Changes made outside this MCP server aren't logged
+| Operation | Why |
+|-----------|-----|
+| `create_tag` | No delete-tag tool exists — remove it in the web interface |
+| `upload_attachment` | No remove-attachment tool exists |
+| `upload_account_balance_history` | Bulk overwrite with no inverse; needs a pre-upload export |
+| `delete_transaction_categories` | Recoverable, but as one recreate per category rather than a single call |
 
-### Workarounds
+### Caveats that apply to every recreate
 
-1. **For deletions**: Always use Monarch Money's web interface to view history
-2. **For updates**: Keep a notebook of original values before changing
-3. **For everything**: Regular backups via Monarch Money web export
+- **New IDs.** A recreated record is a new record. Anything that referenced the
+  old ID — splits, rules, links — is not reconnected.
+- **Deleted accounts lose history.** Only the account shell is restored. Its
+  transactions and any linked-institution connection are not recoverable here.
+- **Deleted categories do not reclaim their transactions.** Transactions
+  reassigned by the delete stay where they went.
+- **Changes made in the Monarch web interface are not logged**, so they cannot
+  be rolled back from here.
+
+### When a snapshot is missing
+
+Snapshot capture is best-effort: if the read fails (network, or the record was
+already gone), the operation still proceeds and the entry records
+`pre_state_error`. Those operations report as not reversible, with the reason
+stated. Recovery then needs the Monarch web interface or an export.
 
 ## Tips
 
-### Make Rollback Easy
+### Before destructive operations
 
-1. **Create pre-operation snapshots:**
-   ```bash
-   # Before big changes
-   get_accounts() > accounts_backup.json
-   get_transactions(limit=1000) > transactions_backup.json
-   get_transaction_categories() > categories_backup.json
-   ```
+Snapshots are captured automatically, so keeping your own notes is no longer
+required. Two things still help:
 
-2. **Use descriptive operations:**
-   Instead of bulk deletes, delete one at a time with approval.
-   Easier to rollback if something goes wrong.
+1. **Check what you are about to act on.** `get_transaction_details(id)` or
+   `get_accounts()` confirms you have the right record.
+2. **Prefer one-at-a-time over bulk.** Bulk deletes are the one case with no
+   single reverse call.
 
-3. **Test in Monarch Money sandbox:**
-   If Monarch Money offers a test environment, use it first.
+### Maintenance
 
-### Regular Maintenance
-
-1. **Review logs weekly:**
+1. **Review recent activity:**
    ```bash
    get_recent_operations(limit=20)
    ```
 
-2. **Clean old logs:**
-   The detailed log grows over time. Archive or delete entries older than 30 days if needed.
-
-3. **Backup the log:**
+2. **Archive old entries.** The detailed log grows with every write and now
+   carries snapshots, so it grows faster than before. Archive it periodically:
    ```bash
-   cp ~/.mm/detailed_operation_log.jsonl ~/.mm/backups/detailed_operation_log_$(date +%Y%m%d).jsonl
+   cp ~/.mm/detailed_operation_log.jsonl \
+      ~/.mm/backups/detailed_operation_log_$(date +%Y%m%d).jsonl
    ```
+
+   Snapshots are what make deletes reversible, so archive rather than delete if
+   you may still need to undo something.
 
 ## Summary
 
-✅ **Every write operation is logged** with full details
-✅ **View recent operations** with `get_recent_operations()`
-✅ **Get rollback instructions** with `get_rollback_suggestions()`
-✅ **Created items** → Easy to delete using logged ID
-⚠️  **Deleted items** → Need original data to recreate
-⚠️  **Updated items** → Need original values to restore
-
-**Best practice:** Save current state before destructive operations!
+- **Every write is logged**, successes and failures alike.
+- **Destructive and update operations capture a snapshot first**, which is what
+  makes them reversible.
+- **`get_rollback_suggestions` prints a runnable reverse call** — or names
+  exactly what is missing, and never claims an undo it cannot back up.
+- **Creates** reverse to a delete using the recorded ID.
+- **Recreated records get new IDs**; deleted accounts do not regain their
+  transaction history.

@@ -18,6 +18,11 @@ from ._common import tool_handler
 logger = logging.getLogger(__name__)
 
 
+def _format_args(arguments: dict) -> str:
+    """Render reverse-call arguments as a copy-pasteable argument list."""
+    return ", ".join(f"{key}={value!r}" for key, value in arguments.items())
+
+
 def register_safety_tools(mcp: FastMCP) -> None:
     """Register safety management tools with the FastMCP instance."""
 
@@ -83,37 +88,79 @@ def register_safety_tools(mcp: FastMCP) -> None:
             except json.JSONDecodeError:
                 return "Failed to parse operation log entry: invalid JSON."
 
-        # Generate rollback suggestions
         rollback = op.get("rollback_info", {})
         params = op.get("parameters", {})
 
-        suggestion = f"""Rollback Information
+        lines = [
+            "Rollback Information",
+            "",
+            f"Timestamp: {op.get('timestamp')}",
+            f"Operation: {op.get('operation')}",
+            f"Succeeded: {op.get('success', True)}",
+            f"Parameters: {json.dumps(params, indent=2)}",
+            "",
+        ]
 
-Timestamp: {op.get("timestamp")}
-Operation: {op.get("operation")}
-Parameters: {json.dumps(params, indent=2)}
+        if op.get("error"):
+            lines += [f"Error: {op['error']}", ""]
 
-{"REVERSIBLE" if rollback.get("reversible") else "NOT EASILY REVERSIBLE"}
+        call = rollback.get("reverse_call") or {}
 
-"""
-
-        if rollback.get("reversible"):
-            suggestion += f"""Reverse Operation: {rollback.get("reverse_operation")}
-Instructions: {rollback.get("notes")}
-
-"""
-            if "deleted_id" in rollback:
-                suggestion += f"To undo: Recreate the deleted item using its original details\n   Deleted ID: {rollback['deleted_id']}\n"
-            elif "deleted_ids" in rollback:
-                suggestion += f"To undo: Recreate {len(rollback['deleted_ids'])} deleted items\n   Deleted IDs: {', '.join(rollback['deleted_ids'])}\n"
-            elif "created_id" in rollback:
-                suggestion += f"To undo: Delete the created item\n   Created ID: {rollback['created_id']}\n"
-            elif "modified_id" in rollback and "modified_fields" in rollback:
-                suggestion += f"To undo: Restore original values\n   Modified ID: {rollback['modified_id']}\n   Changed fields: {', '.join(rollback['modified_fields'].keys())}\n"
+        if rollback.get("reversible") and call.get("tool"):
+            lines += [
+                "REVERSIBLE",
+                "",
+                rollback.get("notes", ""),
+                "",
+                "Run this to undo it:",
+                "",
+                f"  {call['tool']}({_format_args(call.get('arguments', {}))})",
+                "",
+            ]
+        elif rollback.get("reversible"):
+            # An entry written before rollback plans carried a reverse call.
+            # Those logs claimed reversibility without recording what an undo
+            # would need, so the honest answer is what was kept, not a
+            # fabricated call.
+            lines += [
+                "REVERSIBLE — but no reverse call was recorded",
+                "",
+                "This entry predates executable rollback plans, so the data "
+                "needed to undo it may not have been captured. What was "
+                "recorded:",
+                "",
+                json.dumps(
+                    {
+                        key: value
+                        for key, value in rollback.items()
+                        if key
+                        not in ("reversible", "reverse_operation", "reverse_call")
+                    },
+                    indent=2,
+                    default=str,
+                ),
+                "",
+            ]
         else:
-            suggestion += "This operation cannot be easily reversed.\n   You may need to manually fix any issues in Monarch Money web interface.\n"
+            # Say exactly what is missing. "Not easily reversible" told the
+            # caller nothing and read as a soft maybe.
+            lines += [
+                "NOT REVERSIBLE FROM THIS LOG",
+                "",
+                rollback.get("blocked_reason")
+                or "No rollback plan was recorded for this operation.",
+                "",
+            ]
+            if rollback.get("pre_state"):
+                lines += [
+                    "The snapshot below was captured before the operation ran "
+                    "and may help you restore it by hand:",
+                    "",
+                    json.dumps(rollback["pre_state"], indent=2),
+                    "",
+                ]
 
-        return suggestion
+        return "\n".join(lines)
 
     @mcp.tool()
     @tool_handler("enable_emergency_stop")

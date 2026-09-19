@@ -179,8 +179,8 @@ async def test_get_rollback_suggestions_json_decode_error(mcp, tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_get_rollback_suggestions_deleted_id(mcp, tmp_path):
-    """Verify get_rollback_suggestions shows deleted_id rollback info."""
+async def test_get_rollback_suggestions_executable_call(mcp, tmp_path):
+    """A current-format entry renders a copy-pasteable reverse call."""
     register_tools(mcp)
 
     log_dir = tmp_path / ".mm"
@@ -190,12 +190,22 @@ async def test_get_rollback_suggestions_deleted_id(mcp, tmp_path):
     op = {
         "operation": "delete_transaction",
         "timestamp": "2024-01-01T12:00:00Z",
+        "success": True,
         "parameters": {"transaction_id": "txn_123"},
         "rollback_info": {
             "reversible": True,
             "reverse_operation": "create_transaction",
-            "notes": "Recreate the deleted transaction",
-            "deleted_id": "txn_123",
+            "reverse_call": {
+                "tool": "create_transaction",
+                "arguments": {
+                    "account_id": "acc_1",
+                    "amount": -42.5,
+                    "merchant_name": "Cafe",
+                    "category_id": "cat_1",
+                    "date": "2026-03-04",
+                },
+            },
+            "notes": "Recreates the deleted record.",
         },
     }
     log_file.write_text(json.dumps(op) + "\n")
@@ -205,13 +215,16 @@ async def test_get_rollback_suggestions_deleted_id(mcp, tmp_path):
         result = await tool.fn(operation_index=0)
 
         assert "REVERSIBLE" in result
-        assert "txn_123" in result
-        assert "Deleted ID" in result
+        assert "Run this to undo it:" in result
+        # The rendered call must name the tool and carry every argument.
+        assert "create_transaction(" in result
+        assert "account_id='acc_1'" in result
+        assert "amount=-42.5" in result
 
 
 @pytest.mark.asyncio
-async def test_get_rollback_suggestions_created_id(mcp, tmp_path):
-    """Verify get_rollback_suggestions shows created_id rollback info."""
+async def test_get_rollback_suggestions_explains_why_not_reversible(mcp, tmp_path):
+    """A blocked plan states the missing data instead of a vague maybe."""
     register_tools(mcp)
 
     log_dir = tmp_path / ".mm"
@@ -219,76 +232,16 @@ async def test_get_rollback_suggestions_created_id(mcp, tmp_path):
     log_file = log_dir / "detailed_operation_log.jsonl"
 
     op = {
-        "operation": "create_transaction",
+        "operation": "delete_transaction",
         "timestamp": "2024-01-01T12:00:00Z",
-        "parameters": {"amount": 50.0},
-        "rollback_info": {
-            "reversible": True,
-            "reverse_operation": "delete_transaction",
-            "notes": "Delete the created transaction",
-            "created_id": "new_txn_456",
-        },
-    }
-    log_file.write_text(json.dumps(op) + "\n")
-
-    with patch("pathlib.Path.home", return_value=tmp_path):
-        tool = await mcp.get_tool("get_rollback_suggestions")
-        result = await tool.fn(operation_index=0)
-
-        assert "REVERSIBLE" in result
-        assert "new_txn_456" in result
-        assert "Created ID" in result
-
-
-@pytest.mark.asyncio
-async def test_get_rollback_suggestions_modified_id(mcp, tmp_path):
-    """Verify get_rollback_suggestions shows modified_id rollback info."""
-    register_tools(mcp)
-
-    log_dir = tmp_path / ".mm"
-    log_dir.mkdir()
-    log_file = log_dir / "detailed_operation_log.jsonl"
-
-    op = {
-        "operation": "update_transaction",
-        "timestamp": "2024-01-01T12:00:00Z",
-        "parameters": {"transaction_id": "txn_789", "amount": 100.0},
-        "rollback_info": {
-            "reversible": True,
-            "reverse_operation": "update_transaction",
-            "notes": "Restore original values",
-            "modified_id": "txn_789",
-            "modified_fields": {"amount": 50.0},
-        },
-    }
-    log_file.write_text(json.dumps(op) + "\n")
-
-    with patch("pathlib.Path.home", return_value=tmp_path):
-        tool = await mcp.get_tool("get_rollback_suggestions")
-        result = await tool.fn(operation_index=0)
-
-        assert "REVERSIBLE" in result
-        assert "txn_789" in result
-        assert "Modified ID" in result
-        assert "amount" in result
-
-
-@pytest.mark.asyncio
-async def test_get_rollback_suggestions_non_reversible(mcp, tmp_path):
-    """Verify get_rollback_suggestions handles non-reversible operations."""
-    register_tools(mcp)
-
-    log_dir = tmp_path / ".mm"
-    log_dir.mkdir()
-    log_file = log_dir / "detailed_operation_log.jsonl"
-
-    op = {
-        "operation": "bulk_delete",
-        "timestamp": "2024-01-01T12:00:00Z",
-        "parameters": {"ids": ["1", "2", "3"]},
+        "success": True,
+        "parameters": {"transaction_id": "txn_123"},
         "rollback_info": {
             "reversible": False,
-            "notes": "Cannot undo bulk delete",
+            "reverse_operation": None,
+            "reverse_call": None,
+            "notes": "",
+            "blocked_reason": "No pre-operation snapshot was captured.",
         },
     }
     log_file.write_text(json.dumps(op) + "\n")
@@ -297,8 +250,77 @@ async def test_get_rollback_suggestions_non_reversible(mcp, tmp_path):
         tool = await mcp.get_tool("get_rollback_suggestions")
         result = await tool.fn(operation_index=0)
 
-        assert "NOT EASILY REVERSIBLE" in result
-        assert "cannot be easily reversed" in result.lower()
+        assert "NOT REVERSIBLE FROM THIS LOG" in result
+        assert "No pre-operation snapshot was captured." in result
+        assert "Run this to undo it:" not in result
+
+
+@pytest.mark.asyncio
+async def test_get_rollback_suggestions_surfaces_a_failed_operation(mcp, tmp_path):
+    """Failed writes are logged now, and their entries show the error."""
+    register_tools(mcp)
+
+    log_dir = tmp_path / ".mm"
+    log_dir.mkdir()
+    log_file = log_dir / "detailed_operation_log.jsonl"
+
+    op = {
+        "operation": "delete_transaction",
+        "timestamp": "2024-01-01T12:00:00Z",
+        "success": False,
+        "error": "MonarchAPIError: upstream 500",
+        "parameters": {"transaction_id": "txn_123"},
+        "rollback_info": {
+            "reversible": False,
+            "reverse_call": None,
+            "blocked_reason": "raised before completing",
+        },
+    }
+    log_file.write_text(json.dumps(op) + "\n")
+
+    with patch("pathlib.Path.home", return_value=tmp_path):
+        tool = await mcp.get_tool("get_rollback_suggestions")
+        result = await tool.fn(operation_index=0)
+
+        assert "Succeeded: False" in result
+        assert "upstream 500" in result
+
+
+@pytest.mark.asyncio
+async def test_get_rollback_suggestions_handles_legacy_entries(mcp, tmp_path):
+    """Logs written before this change claim reversibility with no plan.
+
+    Those entries exist on real installs, so the tool must neither crash nor
+    render a fabricated call like ``None()``.
+    """
+    register_tools(mcp)
+
+    log_dir = tmp_path / ".mm"
+    log_dir.mkdir()
+    log_file = log_dir / "detailed_operation_log.jsonl"
+
+    op = {
+        "operation": "delete_transaction_categories",
+        "timestamp": "2024-01-01T12:00:00Z",
+        "parameters": {"category_ids": "cat_1,cat_2"},
+        "rollback_info": {
+            "reversible": True,
+            "reverse_operation": "create_transaction_category (multiple)",
+            "notes": "Recreate the deleted categories",
+            "deleted_ids": ["cat_1", "cat_2"],
+        },
+    }
+    log_file.write_text(json.dumps(op) + "\n")
+
+    with patch("pathlib.Path.home", return_value=tmp_path):
+        tool = await mcp.get_tool("get_rollback_suggestions")
+        result = await tool.fn(operation_index=0)
+
+        assert "no reverse call was recorded" in result
+        assert "None()" not in result
+        # What the old entry did capture is still shown.
+        assert "cat_1" in result
+        assert "cat_2" in result
 
 
 @pytest.mark.asyncio
@@ -333,35 +355,3 @@ async def test_disable_emergency_stop_tool(mcp):
 
         assert "Emergency stop disabled" in result
         mock_guard.return_value.disable_emergency_stop.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_get_rollback_suggestions_deleted_ids(mcp, tmp_path):
-    """Verify get_rollback_suggestions shows deleted_ids (plural) rollback info."""
-    register_tools(mcp)
-
-    log_dir = tmp_path / ".mm"
-    log_dir.mkdir()
-    log_file = log_dir / "detailed_operation_log.jsonl"
-
-    op = {
-        "operation": "delete_categories",
-        "timestamp": "2024-01-01T12:00:00Z",
-        "parameters": {"category_ids": "cat_1,cat_2"},
-        "rollback_info": {
-            "reversible": True,
-            "reverse_operation": "create_categories",
-            "notes": "Recreate the deleted categories",
-            "deleted_ids": ["cat_1", "cat_2"],
-        },
-    }
-    log_file.write_text(json.dumps(op) + "\n")
-
-    with patch("pathlib.Path.home", return_value=tmp_path):
-        tool = await mcp.get_tool("get_rollback_suggestions")
-        result = await tool.fn(operation_index=0)
-
-        assert "REVERSIBLE" in result
-        assert "cat_1" in result
-        assert "cat_2" in result
-        assert "2 deleted items" in result

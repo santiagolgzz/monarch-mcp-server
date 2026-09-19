@@ -133,14 +133,17 @@ Show my checking account balance history for the past 90 days
 
 ## 🛡️ Safety Features
 
-Destructive operations require explicit approval:
+Write operations are tiered, logged, and — where the data allows — reversible.
 
-| Operation | Protection |
-|-----------|------------|
-| `delete_transaction` | Requires confirmation |
-| `delete_account` | Requires confirmation |
-| `delete_transaction_category` | Requires confirmation |
-| `upload_account_balance_history` | Prevents accidental overwrites |
+| Tier | Behavior | Operations |
+|------|----------|------------|
+| **Destructive** | Warned and logged with a pre-operation snapshot | `delete_transaction`, `delete_account`, `delete_transaction_category`, `delete_transaction_categories`, `upload_account_balance_history` |
+| **Write** | Warned and logged | `create_transaction`, `update_transaction`, `update_transaction_splits`, `create_manual_account`, `update_account`, `set_budget_amount`, `add_transaction_tag`, `categorize_transaction`, `upload_attachment` |
+| **Recorded** | Logged, no warning | `create_tag`, `set_transaction_tags`, `create_transaction_category` |
+| **Read** | No protection needed | All `get_*`, `search_*`, `is_*` |
+
+> **Note:** warnings are advisory — they are logged, and the operation proceeds.
+> Only `enable_emergency_stop` refuses writes outright.
 
 ### Safety Tools
 
@@ -148,11 +151,31 @@ Destructive operations require explicit approval:
 |------|-------------|
 | `get_safety_stats` | View today's operation counts |
 | `get_recent_operations` | Review recent write operations |
-| `get_rollback_suggestions` | Get instructions to undo an operation |
+| `get_rollback_suggestions` | Get the exact call that undoes an operation |
 | `enable_emergency_stop` | Block all writes instantly |
 | `disable_emergency_stop` | Re-enable writes after emergency stop |
 
-All write operations are logged to `~/.mm/detailed_operation_log.jsonl` for audit and rollback.
+### What gets logged
+
+Every write is appended to `~/.mm/detailed_operation_log.jsonl`, **including
+failures** — a call that raised may still have applied, so those entries are
+the ones most worth seeing. File contents and confirmation tokens are redacted
+rather than written to disk.
+
+### What can actually be undone
+
+`get_rollback_suggestions` returns a concrete, runnable reverse call — not
+advice to go look something up. It reports an operation as reversible **only**
+when it holds the data an undo needs:
+
+- **Creates** are reversible from the result: the new entity's ID is recorded,
+  and the reverse is a delete.
+- **Deletes and updates** are reversible only from the snapshot captured before
+  they ran, since the operation is what destroyed the original values.
+
+When that data is missing, the tool says so and names what is missing, instead
+of claiming an undo that would not work. Recreated records get **new IDs**, and
+a deleted account's transaction history is not restored.
 
 **[📖 See docs/ROLLBACK_GUIDE.md for detailed rollback procedures](docs/ROLLBACK_GUIDE.md)**
 

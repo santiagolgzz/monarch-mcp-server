@@ -163,8 +163,23 @@ delete `txn_2` — and expires.
 
 This is what `require_approval` in the config always implied. Until now it
 implied it without doing it: the list existed, `get_safety_stats` reported it,
-and nothing was ever withheld. Set `require_confirmation: false` in
-`~/.mm/safety_config.json` to restore the old warn-and-proceed behavior.
+and nothing was ever withheld.
+
+> **What confirmation does and does not prove.** The token is answered by
+> whoever called the tool. That forces a second deliberate round-trip with the
+> arguments echoed back, and puts a description of the record into the
+> transcript where a person can see it — but an agent driving this server can
+> confirm its own delete. Read "confirmed" as "confirmed by the caller", not
+> "approved by a human".
+>
+> Two things do reach a person. Every tool declares MCP annotations
+> (`readOnlyHint`, `destructiveHint`, `idempotentHint`), so a client can apply
+> its own confirmation UX before the call arrives here. And MCP's elicitation
+> flow would let the server ask you directly; that is built but not yet
+> released, pending live testing of how it feels in practice.
+
+Set `require_confirmation: false` in `~/.mm/safety_config.json` to restore the
+old warn-and-proceed behavior.
 
 ### Daily caps
 

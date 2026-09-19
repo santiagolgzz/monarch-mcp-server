@@ -27,9 +27,14 @@ delete_transaction(transaction_id="txn_1", confirmation_token="8Kq...")
 → {"deleted": true, "transaction_id": "txn_1"}
 ```
 
-Show `about_to_change` to the user before confirming — that is the point of the
-two steps. Setting `require_confirmation: false` in `~/.mm/safety_config.json`
-restores warn-and-proceed.
+**Show `about_to_change` to the user and get their agreement before replaying
+the token.** The server cannot tell whether anyone saw it — the token is
+answered by whoever called the tool, so confirming it yourself is exactly as
+easy as asking first. You are the only thing standing between the challenge and
+the delete.
+
+Setting `require_confirmation: false` in `~/.mm/safety_config.json` restores
+warn-and-proceed.
 
 ### Tier 2: Write Operations
 **Show warning, don't require approval.**

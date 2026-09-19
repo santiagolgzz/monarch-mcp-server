@@ -96,7 +96,8 @@ delete_transaction(transaction_id="txn_1", confirmation_token="8Kq...")
 → {"deleted": true, "transaction_id": "txn_1"}
 ```
 
-Show the user `about_to_change` before confirming. A token reused for a
+**Show the user `about_to_change` and get their agreement before sending the
+token.** The server cannot tell whether a human saw it. A token reused for a
 different record is rejected, so confirm the call you were actually given.
 
 ## Accounts (12 tools)

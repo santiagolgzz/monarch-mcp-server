@@ -31,6 +31,7 @@ Operations:
 - `set_budget_amount`
 - `add_transaction_tag`
 - `categorize_transaction`
+- `upload_attachment`
 
 ### Tier 2b: Recorded-Only Write Operations
 **No warning, but recorded in audit log.**
@@ -71,3 +72,12 @@ get_rollback_suggestions(operation_index=0)
 ## Audit Log Location
 - Summary: `~/.mm/operation_log.json`
 - Detailed: `~/.mm/detailed_operation_log.jsonl`
+
+## Source of Truth
+
+These tiers are the defaults in `SafetyConfig._load_config`
+(`src/monarch_mcp_server/safety_config.py`). Users can override them in
+`~/.mm/safety_config.json`, so a specific install may differ.
+
+`tests/test_skill_accuracy.py` checks the Tier 1 / Tier 2 lists above against
+those defaults, so this file cannot drift out of sync with the code.

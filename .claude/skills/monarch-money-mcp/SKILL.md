@@ -5,7 +5,7 @@ description: "Queries and manages Monarch Money financial data via MCP tools —
 
 # Monarch Money MCP
 
-48 tools for Monarch Money personal finance (47 shared + 1 stdio-only).
+50 tools for Monarch Money personal finance (49 shared + 1 stdio-only).
 - **[tools.md](references/tools.md)**: Full tool list with registration order and parameters
 - **[safety.md](references/safety.md)**: Safety tiers, emergency controls, and audit trail
 - **[financial-analysis.md](references/financial-analysis.md)**: Patterns for balance changes, savings rate, net worth
@@ -27,7 +27,7 @@ get_budgets                   # Budget vs actual
 ## Safety
 
 - **Read-only tools are safe** — All `get_*`, `search_*`, and `is_*` tools
-- **8 write ops show warnings** — `create_transaction`, `update_transaction`, `update_transaction_splits`, `create_manual_account`, `update_account`, `set_budget_amount`, `add_transaction_tag`, `categorize_transaction`
+- **9 write ops show warnings** — `create_transaction`, `update_transaction`, `update_transaction_splits`, `create_manual_account`, `update_account`, `set_budget_amount`, `add_transaction_tag`, `categorize_transaction`, `upload_attachment`
 - **5 destructive ops require approval** — `delete_transaction`, `delete_account`, `delete_transaction_category`, `delete_transaction_categories`, `upload_account_balance_history`
 - **Other write ops** (`create_tag`, `set_transaction_tags`, `create_transaction_category`) are recorded but execute without warning
 - **Emergency stop** — `enable_emergency_stop` blocks all writes immediately
@@ -47,6 +47,8 @@ get_budgets                   # Budget vs actual
 | Recurring bills | `get_recurring_transactions` | Subscriptions and patterns |
 | Budget progress | `get_budgets` | Budget vs actual |
 | Net worth over time | `get_aggregate_snapshots` | Daily aggregate across all accounts |
+| Attach a receipt | `upload_attachment` | Attaches a file to a transaction (base64-encoded) |
+| Credit score history | `get_credit_history` | Requires credit monitoring enabled in Monarch |
 
 ## Similar Tools
 
@@ -66,6 +68,10 @@ get_budgets                   # Budget vs actual
 - `category_id` (string) — from `get_transaction_categories`
 - `date` (string) — YYYY-MM-DD
 - `notes` (string, optional)
+- `update_balance` (boolean, optional, default `false`) — when `true`, the
+  transaction moves the account's balance, the same as the "impact balance"
+  checkbox in the Monarch app. Leave it `false` to record a transaction without
+  changing the balance.
 
 ## Auth Errors
 

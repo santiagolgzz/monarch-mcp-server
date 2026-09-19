@@ -20,11 +20,12 @@ get_transactions(start_date="2026-01-01", end_date="2026-01-31", limit=100)
 Use `get_account_history` to compare balances over time. Do not sum transaction amounts — this misses transfers, adjustments, and sync corrections.
 
 ```
-# Get account balance change for a period:
-get_account_history(account_id="123456")
+# Get account balance change for a period. Pass the dates — the tool filters
+# server-side, so don't pull the full history and scan it client-side:
+get_account_history(account_id="123456", start_date="2026-01-01", end_date="2026-01-31")
 → entries with "date" and "signedBalance" fields
 
-# Find balances at start and end dates, compute:
+# Then take the first and last entries:
 net_change = end_balance - start_balance
 ```
 

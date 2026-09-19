@@ -129,6 +129,34 @@ Enforced in two places:
 
 When you deliberately widen or accept a gap, re-record it with `--update-baseline` and say why in the commit message. The issue #15 gap is additionally pinned by its own test, so `--update-baseline` alone cannot re-accept it.
 
+## Bundled Claude Skill
+
+`.claude/skills/monarch-money-mcp/` documents the tool surface for agents:
+`SKILL.md` plus `references/tools.md`, `references/safety.md`, and
+`references/financial-analysis.md`.
+
+It is documentation *of this codebase*, so it goes stale the same way a README
+does — except an agent acts on it. It did go stale: for five months it described
+`create_transaction` without `update_balance`, so an agent following it would
+write the exact bug issue #15 fixed.
+
+`tests/test_skill_accuracy.py` now guards it. The test derives truth from the
+registered FastMCP tools and `SafetyConfig`'s defaults, then checks the skill's
+tables agree on:
+
+- tool names, registration order, and gapless numbering
+- per-section and contents counts
+- safety tier labels (Read / Recorded / Warn / Approval / Action)
+- the `### <tool> Parameters` tables — every parameter, and whether it's required
+- the headline tool count and safety bullets in `SKILL.md`
+- that no skill file names a tool that doesn't exist
+
+**Adding or renaming a tool, or changing a safety tier, will fail this test
+until the skill is updated.** That's the point — fix the skill, don't loosen the
+test. Parameter tables are opt-in: a tool only gets checked if `tools.md` has a
+`### <tool> Parameters` section for it, so add one when a tool's arguments are
+subtle enough that an agent could get them wrong.
+
 ## Code Style
 
 - Ruff with rules: E, F, I, UP, B, SIM. Line length 88. Double quotes.
